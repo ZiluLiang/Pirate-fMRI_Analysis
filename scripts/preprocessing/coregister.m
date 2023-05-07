@@ -1,0 +1,48 @@
+function coregister(subimg_dir,varargin)
+% coregister the T1(source) to the mean epi image(reference)
+%
+% created files r*(a coregistered T1 image)
+% ------ written by Zillu Liang(2023.4,Oxford)------
+
+    % get flags
+    use_reorient = true;
+    if numel(varargin) == 1 && islogical(use_reorient)
+        use_reorient = varargin{1};
+    end
+
+    % get regular expression for different image files 
+    filepattern = get_pirate_defaults(false,'filepattern');
+    
+    % get reoriented images, or raw images if re-oriented images are not found or explicitly sepecified that reoriented images are not to be used
+    if use_reorient
+        nii_files = structfun(@(scantype) ...
+                                  structfun(@(pattern) spm_select('FPList', subimg_dir, [pattern,'.*\.nii']),...
+                                             scantype,'UniformOutput',false),...
+                               filepattern.reorient,...
+                               'UniformOutput',false);
+    end
+    if use_reorient && all(structfun(@(scantype) all(structfun(@(scans) ~isempty(scans),scantype)),nii_files))
+        nii_files = structfun(@(scantype) structfun(@(scans) cellstr(scans),scantype,'uni',0),nii_files,'uni',0);
+    else
+        nii_files = structfun(@(scantype) ...
+                                  structfun(@(pattern) cellstr(spm_select('FPList', subimg_dir, [pattern,'.*\.nii'])),...
+                                             scantype,'UniformOutput',false),...
+                               filepattern.raw,...
+                               'UniformOutput',false);
+    end
+    meanepi_img = cellstr(spm_select('FPList', subimg_dir, [filepattern.preprocess.meanepi,'.*\.nii']));
+    
+    coregister  = {};
+    coregister{1}.spm.spatial.coreg.estwrite.source = nii_files.anatomical.T1;
+    coregister{1}.spm.spatial.coreg.estwrite.ref    = meanepi_img; 
+    coregister{1}.spm.spatial.coreg.estimate.other = {''};
+%     Defaults from spm
+%     coregister{1}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
+%     coregister{1}.spm.spatial.coreg.estimate.eoptions.sep      = [4 2];
+%     coregister{1}.spm.spatial.coreg.estimate.eoptions.tol      = [ 0.0200 0.0200 0.0200 0.0010 0.0010 0.0010 ...
+%                                                                    0.0100 0.0100 0.0100 0.0010 0.0010 0.0010];
+%     coregister{1}.spm.spatial.coreg.estimate.eoptions.fwhm     = [7 7];        
+    
+    save(fullfile(subimg_dir,'coregister.mat'),'coregister')
+    spm_jobman ('run',coregister);
+end

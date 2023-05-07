@@ -10,9 +10,7 @@ probdf
 scripts/behavior
 scripts/generic
 scripts/history
-scripts/preprocessing
 scripts/tidydata
 scripts/univariate
 scripts/utils
-scripts/*.m
 scripts/behavior.Rmd
