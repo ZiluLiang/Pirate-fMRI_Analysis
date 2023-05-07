@@ -12,5 +12,4 @@ scripts/generic
 scripts/history
 scripts/tidydata
 scripts/univariate
-scripts/utils
 scripts/behavior.Rmd
