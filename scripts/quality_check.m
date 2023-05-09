@@ -64,4 +64,16 @@ for isub = 1:participants.nsub
     pause   
 end
 
-%% Quality Check  for head motion
+
+%% --------------  Quality Check  for head motion  -------------- 
+qc_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri_image\qualitycheck';
+hm_dir = fullfile(qc_dir,'headmotion');
+checkdir(hm_dir)
+for isub = 1:participants.nsub
+    subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
+    f = check_head_motion(subimg_dir,false,true,false);
+    saveas(f,fullfile(hm_dir,[participants.ids{isub},'.png']));
+    %pause   
+    close all
+end
+
