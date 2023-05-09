@@ -6,6 +6,7 @@ probdf
 *.Rproj
 *.Rproj.user
 *.code-workspace
+*.asv
 
 scripts/behavior
 scripts/generic

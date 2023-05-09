@@ -2,8 +2,8 @@ function f = check_head_motion(subimg_dir,varargin)
 % show the animated 4D series (preprocessed fmri niis) to check the effect of
 % motion correction using MRIcroGl.
 % plot the head motion parameters estimated during motion correction (realign)
-% usage: checkHeadMotion(subimg_dir,flag_animate,flag_plotmotion)
-    if numel(varargin)>2
+% usage: checkHeadMotion(subimg_dir,flag_animate,flag_plotmotion,flag_showmotion)
+    if numel(varargin)>3
         error('Too many input arguments')
     end
     
@@ -11,9 +11,9 @@ function f = check_head_motion(subimg_dir,varargin)
     filepattern = get_pirate_defaults(false,'filepattern');
     
     %set flags
-    flags = {1,1};
+    flags = {1,1,1};
     flags(1:numel(varargin)) = varargin(:);
-    [flag_animate,flag_plotmotion] = flags{:};
+    [flag_animate,flag_plotmotion,flag_showmotion] = flags{:};
     
     %find files
     img_files = cellstr(spm_select('FPList',subimg_dir,[filepattern.preprocess.normalise,'.*.nii']));
@@ -24,22 +24,26 @@ function f = check_head_motion(subimg_dir,varargin)
     end
     
     if flag_plotmotion
-        f = plot_rp(rp_files);
+        f = plot_rp(rp_files,flag_showmotion);
     end    
 end
 
-function f = plot_rp(rp_files)
+function f = plot_rp(rp_files,flag_showmotion)
+    filepattern = get_pirate_defaults(false,'filepattern');
     tablenames = {'Displacement from first frame',...
                 'Framewise displacement',};
     yvars = {'x','y','z','pitch','yaw','roll'};
     n_sessions = numel(rp_files);
     
     f = figure;
+    if ~flag_showmotion
+        set(gcf,'Visible', 'off');
+    end
     tiledlayout(n_sessions,2)
     
     for j = 1:n_sessions
         [~,task_run,~] = fileparts(rp_files{j});
-        task_run = strrep(task_run,filepattern.preprocess.motionparam,'');        
+        task_run = regexprep(task_run,filepattern.preprocess.motionparam,'');        
 
         displacement = readtable(rp_files{j});        
         displacement.Properties.VariableNames = yvars;
@@ -52,7 +56,7 @@ function f = plot_rp(rp_files)
                 plot(1:size(tables{t},1),tables{t}.(yvars{k}))
                 hold on
             end
-            title(strjoin({tablenames{t},task_run},'\n'))
+            title(strjoin({tablenames{t},task_run},'\n'),'Interpreter','none')
         end
     end
     hL = legend(yvars{:});
