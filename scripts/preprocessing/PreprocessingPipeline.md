@@ -13,9 +13,9 @@ After preprocessing, quality checks were conducted.
 ## Auto-reorientation
 Auto reorientation to the MNI space are performed before all other preprocessing steps so that we could provide a better prior for performing the segmentation and normalization. The T1 image was used to estimate a rigid transformation matrix. This matrix is then applied to the functional images and the fieldmap images of the same participants.  
 `reorient.m` is called to perform this step. It is adapted from the following resources:  
-[lrq3000/spm_auto_reorient_coregister](https://github.com/lrq3000/spm_auto_reorient_coregister) 
-[SPMwiki: How_to_automatically_reorient_images?](https://en.wikibooks.org/wiki/SPM/How-to#How_to_automatically_reorient_images)
-[SPMwiki: How to manually change the orientation of an image?](https://en.wikibooks.org/wiki/SPM/How-to#How_to_manually_change_the_orientation_of_an_image?)  
+[lrq3000/spm_auto_reorient_coregister](https://github.com/lrq3000/spm_auto_reorient_coregister)   
+[SPMwiki: How_to_automatically_reorient_images?](https://en.wikibooks.org/wiki/SPM/How-to#How_to_automatically_reorient_images)  
+[SPMwiki: How to manually change the orientation of an image?](https://en.wikibooks.org/wiki/SPM/How-to#How_to_manually_change_the_orientation_of_an_image?)    
 Manual inspection on reorientation quality was carried out. But no manual reorientation was performed after inspection.
 
 ## Realignment and Unwarping using fieldmap
