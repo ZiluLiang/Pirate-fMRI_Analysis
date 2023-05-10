@@ -8,6 +8,9 @@ This task aims to investigate the neural mechanism underlying compositional gene
 2. behavioral data analysis pipeline
 3. fmri data analysis pipelines
 
-
-## File structure
+## Prerequisites
+### Platform and Toolbox:
+[SPM12](https://www.fil.ion.ucl.ac.uk/spm/software/spm12/) in MATLAB2020b  
+[MRIcroGL](https://www.nitrc.org/projects/mricrogl) python needs to be installed for customised MRIcroGL scripts to run.
+### File structure
 see [File Structure](FILESTRUCTURE.md) for naming conventions and data structure
