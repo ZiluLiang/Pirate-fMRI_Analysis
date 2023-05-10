@@ -13,7 +13,7 @@ function normalise(subimg_dir)
     normalization{1}.spm.spatial.normalise.write.subj.resample = func_imgs;        
     normalization{1}.spm.spatial.normalise.write.woptions.bb  = bb; % change to match the bb of the template image
     normalization{1}.spm.spatial.normalise.write.woptions.vox = [2.5 2.5 2.5]; % change to match the resolution of acquistion
-    normalization{1}.spm.spatial.normalise.write.woptions.interp = 4; % change to 7 to achieve 
+    normalization{1}.spm.spatial.normalise.write.woptions.interp = 7; % change to 7 to achieve higher normalization quality
     
     save(fullfile(subimg_dir,'normalization.mat'),'normalization')
     spm_jobman ('run',normalization);
