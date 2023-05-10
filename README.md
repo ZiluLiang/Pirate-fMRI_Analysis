@@ -7,3 +7,7 @@ This task aims to investigate the neural mechanism underlying compositional gene
 1. [fmri data preprocessing pipeline](scripts/preprocessing/PreprocessingPipeline.md)
 2. behavioral data analysis pipeline
 3. fmri data analysis pipelines
+
+
+## File structure
+see [File Structure](FILESTRUCTURE.md) for naming conventions and data structure
