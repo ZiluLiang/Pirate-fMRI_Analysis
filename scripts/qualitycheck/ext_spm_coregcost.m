@@ -27,7 +27,12 @@ function o = ext_spm_coregcost(source_img,template_img,varargin)
         VG       = smooth_uint8(VG,fwhmg); % Note side effects
     end
     for k=1:numel(VF)
-        VFk = VF{k};
+        if size(VF{k},1)>1
+            warning('4D data found, using the first volume of the time series!')
+            VFk = VF{k}(1);
+        else
+            VFk = VF{k};
+        end
         if ~isfield(VFk, 'uint8')
             VFk.uint8 = loaduint8(VFk);
             vxf       = sqrt(sum(VFk.mat(1:3,1:3).^2));

@@ -1,6 +1,8 @@
 % quality checks of fmri data preprocessing
-%
-% ------ written by Zillu Liang(2023.5,Oxford)------
+% TODO: checkout
+% https://github.com/jsheunis/fMRwhy/tree/master/fmrwhy/qcand see if more
+% quality control measures should be calculated
+% ------ written by Zilu Liang(2023.5,Oxford)------
 
 clear;clc
 %% Configurations
