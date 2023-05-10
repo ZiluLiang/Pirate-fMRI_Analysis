@@ -42,7 +42,7 @@ For detailed explanation on distortion correction and how to set the pm_defaults
 In SPM12, segmentation and normalization in unified into one module. This step segments and normalises the coregistered T1 image based on the SPM TPM template (calling [`segment`](segment.m)). The estimated parameters were then applied to realigned and unwarped EPI images for normalization (calling [`normalise`](normalise.m)). Note that in [`normalise`](normalise.m#L14) the size of bounding box was set to be the same size as the template image, and that B-splinethe interpolation with 7-degree splines is used to achieve higher quality.
 
 ## Quality checks
-Some handy functions are provided in the [`qualitycheck`](../qualitycheck)) directory to perform manual inspections of preprocessing quality. Currently, the following checks are performed in [`quality_check`](..\quality_check.m). The results are logged manually in [QualityCheckLogBook](..\..\data\fmri\qualitycheck\QualityCheckLogBook.xlsx)
+Some handy functions are provided in the [`qualitycheck`](../qualitycheck)) directory to perform manual inspections of preprocessing quality. Currently, the following checks are performed in [`quality_check`](../quality_check.m). The results are logged manually in [QualityCheckLogBook](../../data/fmri/qualitycheck/QualityCheckLogBook.xlsx)
 1. check quality of signal distortion correction
    A quality check for this process is to compare the image before and after distortion correction to see if there are less signal loss near air-tissue interfaces, which include regions such as orbitalfrontal cortex, anterial perfrontal cortex as well as lateral temporal lobe.  
    This can be done after VDM calculation is finished. VDM calculation will create an unwarped (distortion corrected) version of the first epi (first volume of the first task run). By putting unwarped epi, original epi and t1 image side by side, and checking different regions, it will be clear whether the unwarped image is better than the original epi.   
@@ -51,4 +51,4 @@ Some handy functions are provided in the [`qualitycheck`](../qualitycheck)) dire
    checks for spatial coregistration quality can be performed after: 1) reorientaion, 2) t1 to epi coregistration, 3) normalization.
    Usually, coregistered source image and reference image are put side by side to see if there are big deviations 
 3. check head motion
-   Head motion estimats are extracted from `rp_*.txt` files and plotted as line graph. An alternative is to view the animation of 4D series in mricroGL to see if there are sudden shifts of volumes. Both can be done by calling [`check_head_motion`](..\qualitycheck\check_head_motion.m)
+   Head motion estimats are extracted from `rp_*.txt` files and plotted as line graph. An alternative is to view the animation of 4D series in mricroGL to see if there are sudden shifts of volumes. Both can be done by calling [`check_head_motion`](../qualitycheck/check_head_motion.m)
