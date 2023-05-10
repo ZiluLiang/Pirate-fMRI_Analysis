@@ -15,7 +15,7 @@ clear;clc
 [directory,participants,filepattern,handles] = get_pirate_defaults(false,'directory','participants','filepattern','handles');
 
 % Configure the steps, field names of the preprocess_flags struct must not be changed 
-preprocess_flags   = struct('reorient',       true,...
+preprocess_flags   = struct('reorient',       false,...
                             'calVDM',         true,...
                             'realign_unwarp', true,...
                             'coregistration', true,...
@@ -24,24 +24,24 @@ preprocess_flags   = struct('reorient',       true,...
                             'smooth',         false);                       
 
 %% set up parallel pool
-num_workers   = feature('NumCores') - 1;
+num_workers   = feature('NumCores') - 4;
 poolobj       =  parpool(num_workers);%set up parallel processing
+%create temporary variables so that we can minimize the amount of data sent to different parallel workers
+ids           = participants.ids;
+nsub          = participants.nsub;
+preproc_dir   = directory.preprocess;
                         
 %% -----------------------  Preprocess data  ---------------------- 
 preproc_steps = fieldnames(handles.preprocess);
 preproc_steps = preproc_steps(cellfun(@(s) preprocess_flags.(s),preproc_steps)); % only run steps where flag is true
 
-%create temporary variables so that we can minimize the amount of data sent to different parallel workers
-ids           = participants.ids;
-nsub          = participants.nsub;
-preproc_dir   = directory.preprocess;
 err_tracker   = cell(nsub,numel(preproc_steps));%initialize error tracker to record errors
 for j = 1:numel(preproc_steps)
     curr_step   = preproc_steps{j};
     curr_handle = handles.preprocess.(curr_step);
     fprintf('Running %s\n\n', curr_step)
     
-    for isub = 1%:nsub
+    parfor isub = 1:nsub
         fprintf('Running %s %d/%d subject\n', ids{isub}, isub, nsub)
         try % use try catch to minimize the chance of interrupted execution if error occurs in one of the jobs
             curr_handle(fullfile(preproc_dir,ids{isub}));  %#ok<*PFBNS>
@@ -68,8 +68,11 @@ if copy_preprocessed
         to_dir   = fullfile(par_dir,ids{isub});
         checkdir(to_dir)
         src_fns  = cellfun(@(p) cellstr(spm_select('FPList',fullfile(preproc_dir,ids{isub}),p)),move_files,'uni',0)
+        fprintf('Copying %s %d/%d subject\n', ids{isub}, isub, nsub)
         cellfun(@(s) copyfile(s,to_dir),cat(1,src_fns{:}));
+        fprintf('Completed copying %s %d/%d subject\n', ids{isub}, isub, nsub)
     end
+    fprintf('Completed data copying\n\n')
 end
 
 %% close parallel pool
