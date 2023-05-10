@@ -33,8 +33,10 @@ Scripts for different analysis (including preprocessing) are placed in `scripts`
 ## data
 ### data naming convention
 data are named in a BIDS-like format. Future work will try to make it compatible with BIDS.  
-for the raw fmri data in `the fmri/data/renamed` folder, file names are constructed from several key-value pairs:
-sub-xxx_modality-xxx_run-xx.nii
+
+For the raw fmri data in `the fmri/data/renamed` folder. nii files are usually accompanied by json files that stores meta information. File names are constructed from several key-value pairs:
+``sub-xxx_modality-xxx_run-xx.nii``  
+``sub-xxx_modality-xxx_run-xx.json``  
 for instance:  
 ```
 └── sub001
@@ -53,6 +55,10 @@ for instance:
     ├── sub-001_task-localizer_run-1.json
     └── sub-001_fmap-magnitude2.json
 ```
+During preprocessing, each step will add its own prefix to the nii file (prefix can be found at [get_pirate_defaults](get_pirate_defaults.m)), no json file is created.
+
+For the behavioral data, the naming follows the same convention, without the json files.
+
 
 ### data structure
 Data are all placed in the data folder, sorted according to data type and analysis type.
