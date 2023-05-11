@@ -12,6 +12,5 @@ scripts/behavior
 scripts/generic
 scripts/history
 scripts/tidydata
-scripts/univariate
 scripts/behavior.Rmd
 FILESCTRUCTURE.md
