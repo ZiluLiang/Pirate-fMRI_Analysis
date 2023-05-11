@@ -12,17 +12,28 @@
 
 clear;clc
 %% Configurations
-[directory,participants,filepattern,handles] = get_pirate_defaults(false,'directory','participants','filepattern','handles');
+[directory,participants,filepattern] = get_pirate_defaults(false,'directory','participants','filepattern');
 
 % Configure the steps, field names of the preprocess_flags struct must not be changed 
 preprocess_flags   = struct('reorient',       false,...
-                            'calVDM',         true,...
-                            'realign_unwarp', true,...
-                            'coregistration', true,...
-                            'segmentation',   true,...
+                            'calVDM',         false,...
+                            'realign_unwarp', false,...
+                            'coregistration', false,...
+                            'segmentation',   false,...
                             'normalisation',  true,...
                             'smooth',         false);                       
+copy_preprocessed = false;
 
+
+%% Function handles for preprocessing
+preprocess_handles  = struct('reorient',       @reorient,...
+                             'calVDM',         @calculateVDM,...
+                             'realign_unwarp', @realign_unwarp,...
+                             'coregistration', @coregister,...
+                             'segmentation',   @segment,...
+                             'normalisation',  @normalise,...
+                             'smooth',         @smooth);
+                                             
 %% set up parallel pool
 num_workers   = feature('NumCores') - 4;
 poolobj       =  parpool(num_workers);%set up parallel processing
@@ -32,13 +43,13 @@ nsub          = participants.nsub;
 preproc_dir   = directory.preprocess;
                         
 %% -----------------------  Preprocess data  ---------------------- 
-preproc_steps = fieldnames(handles.preprocess);
+preproc_steps = fieldnames(preprocess_handles);
 preproc_steps = preproc_steps(cellfun(@(s) preprocess_flags.(s),preproc_steps)); % only run steps where flag is true
 
 err_tracker   = cell(nsub,numel(preproc_steps));%initialize error tracker to record errors
 for j = 1:numel(preproc_steps)
     curr_step   = preproc_steps{j};
-    curr_handle = handles.preprocess.(curr_step);
+    curr_handle = preprocess_handles.(curr_step);
     fprintf('Running %s\n\n', curr_step)
     
     parfor isub = 1:nsub
@@ -58,12 +69,11 @@ end
 %% -----------------  Copy Files -------------------
 % After preprocessing is finished, create a copy of preprocessed files in a
 % clean folder for subsequent statistical analysis
-copy_preprocessed = false;
 if copy_preprocessed
     par_dir    = directory.unsmoothed; %#ok<*UNRCH>
     move_files = {filepattern.preprocess.normalise,...
                   filepattern.preprocess.motionparam};
-    parfor isub  = 1:nsub
+    parfor isub  = 2:nsub
         from_dir = fullfile(preproc_dir,ids{isub});
         to_dir   = fullfile(par_dir,ids{isub});
         checkdir(to_dir)

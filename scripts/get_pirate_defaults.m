@@ -9,7 +9,7 @@ function varargout = get_pirate_defaults(varargin)
 %    if return_struct_flag is true, then a struct is returned,
 %    if return_struct_flag is false, then multiple configurations are returned 
 % -----------------------------------------------------------------------    
-% written by Zillu Liang(2023.5,Oxford)
+% written by Zilu Liang(2023.5,Oxford)
 
     % set defaults for pirate fMRI analysis
     pirate_defaults = setdefaults();
@@ -62,9 +62,11 @@ function pirate_defaults = setdefaults
     pirate_defaults.directory.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
     pirate_defaults.directory.pm_default   = fullfile(script_dir,'preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
     pirate_defaults.directory.mni_template = 'C:\MRIcroGL_windows\MRIcroGL\mni_icbm152_nl_VI_nifti\icbm_avg_152_t1_tal_nlin_symmetric_VI.nii'; % mni template used for visualization and estimate parameters for auto-reorientation
-    pirate_defaults.directory.preprocess   = fullfile(wk_dir,'data','fmri_image','preprocess'); % directory to images created during preprocessing
-    pirate_defaults.directory.unsmoothed   = fullfile(wk_dir,'data','fmri_image','unsmoothed'); % directory to preprossesed images without smoothing
-    pirate_defaults.directory.smoothed     = fullfile(wk_dir,'data','fmri_image','smoothed'); % directory to preprossesed images after smoothing
+    pirate_defaults.directory.fmri_data    = fullfile(wk_dir,'data','fmri');
+    pirate_defaults.directory.fmribehavior = fullfile(wk_dir,'data','fmri','beh');
+    pirate_defaults.directory.preprocess   = fullfile(wk_dir,'data','fmri','preprocess'); % directory to images created during preprocessing
+    pirate_defaults.directory.unsmoothed   = fullfile(wk_dir,'data','fmri','unsmoothed'); % directory to preprossesed images without smoothing
+    pirate_defaults.directory.smoothed     = fullfile(wk_dir,'data','fmri','smoothed');   % directory to preprossesed images after smoothing
     
 
     %% --------------  Read subject list -------------- 
@@ -77,18 +79,20 @@ function pirate_defaults = setdefaults
     
     
     %% --------------  naming patterns ------------------
+    pirate_defaults.filepattern.task1   = 'sub-.*_task-piratenavigation_run-[1-4]';
+    pirate_defaults.filepattern.task2   = 'sub-.*_task-localizer_run-[1]';
     % prefix for raw image files (before preprocessing), the fieldnames should not be changed as they will be called in each preprocessing script
     pirate_defaults.filepattern.raw                    = struct('fieldmap',struct(),'anatomical',struct(),'functional',struct());
-    %fieldmaps
+    %%%%%fieldmaps
     pirate_defaults.filepattern.raw.fieldmap.phasediff = '^sub-.*_fmap-phasediff';
     pirate_defaults.filepattern.raw.fieldmap.shortecho = '^sub-.*_fmap-magnitude1';
     pirate_defaults.filepattern.raw.fieldmap.longecho  = '^sub-.*_fmap-magnitude2';
-    %anatomical scans
+    %%%%%anatomical scans
     pirate_defaults.filepattern.raw.anatomical.T1      = '^sub-.*_anat-T1w';
-    %functional scans, more fields can be added in the form of task1, task2, task3,... taskn
+    %%%%%functional scans, more fields can be added in the form of task1, task2, task3,... taskn
     pirate_defaults.filepattern.raw.functional.task1   = '^sub-.*_task-piratenavigation_run-[1-4]';% the first run in this will be used as the first session
     pirate_defaults.filepattern.raw.functional.task2   = '^sub-.*_task-localizer_run-[1]';
-    %make sure fields are in the right order
+    %%%%%make sure fields are in the right order
     pirate_defaults.filepattern.raw.functional = orderfields(pirate_defaults.filepattern.raw.functional,...
                                                              arrayfun(@(x) sprintf('task%d',x),1:numel(fieldnames(pirate_defaults.filepattern.raw.functional)),'uni',0));
                                                     
@@ -107,19 +111,7 @@ function pirate_defaults = setdefaults
                                                                 'normalise',      '^wu',... % normalise adds w, normalise is done on realigned unwarped images, so prefix is wu*
                                                                 'normseg_t1',     '^wc',...% normalised and segmented anatomical image
                                                                 'smooth',         '^swu'); % smooth adds s, smooth is done on normalized realigned unwarped images, so prefix is swu*
-    %%%%%TODO add behavior as well
-
-    
-    %% --------------  funtion handles ------------------
-    % functions called to perform preprocessing step
-    pirate_defaults.handles.preprocess  = struct('reorient',       @reorient,...
-                                                 'calVDM',         @calculateVDM,...
-                                                 'realign_unwarp', @realign_unwarp,...
-                                                 'coregistration', @coregister,...
-                                                 'segmentation',   @segment,...
-                                                 'normalisation',  @normalise,...
-                                                 'smooth',         @smooth);
-
+   
 
 end
 
