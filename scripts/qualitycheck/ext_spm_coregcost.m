@@ -8,15 +8,24 @@ function o = ext_spm_coregcost(source_img,template_img,varargin)
 %    - source_img:cell array containing one/multiple images to be compared
 %    - template_image: one template image
 %    - costfun: must be one of: 'mi','ecc','nmi','ncc'.
+%    - volumne: if 4D series is specified as source image, which volume
+%    should be used
 % OUTPUT:
 %    - 1*N array of matching measures, N being the number of source images.
 % TODO: mi measures are greater than one, is that normal?
 
-    if numel(varargin) == 1 && ischar(varargin{1})
+    if numel(varargin) >= 1 && ischar(varargin{1})
         costfun = varargin{1};
     else
         costfun = 'nmi';
     end
+    
+    if numel(varargin) >= 2 && isnumeric(varargin{2})
+        vol = varargin{2};
+    else
+        vol = 1;
+    end
+    
     VG = spm_vol(template_img);
     VF = spm_vol(source_img);
     o = nan(size(VF));
@@ -28,8 +37,8 @@ function o = ext_spm_coregcost(source_img,template_img,varargin)
     end
     for k=1:numel(VF)
         if size(VF{k},1)>1
-            warning('4D data found, using the first volume of the time series!')
-            VFk = VF{k}(1);
+            warning('4D data found, using the volume %d of the time series!',vol)
+            VFk = VF{k}(vol);
         else
             VFk = VF{k};
         end
@@ -46,12 +55,9 @@ end
 % function o = cost(VG,VF,cf,fwhm) -- stolen from optfun in spm_coreg.m
 %==========================================================================
 
-function o = cost(VG,VF,cf,fwhm)
+function o = cost(VG,VF,cf)
     % The function that is minimised.
-    if nargin<4, fwhm = [7 7];   end
     if nargin<3, cf   = 'mi';    end
-
-
 
     % Create the joint histogram
     H = spm_hist2(VG.uint8,VF.uint8, eye(4) ,[1 1 1]);
