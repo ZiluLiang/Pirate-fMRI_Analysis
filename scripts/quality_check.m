@@ -67,7 +67,7 @@ for isub = 1:participants.nsub
 end
 
 
-%% --------------  Quality Check  for head motion  -------------- 
+%% --------------  Quality Check for head motion: line plot of rp parameters  -------------- 
 % set up parallel pool
 num_workers   = feature('NumCores');
 poolobj       =  parpool(num_workers);%set up parallel processing
@@ -89,3 +89,11 @@ hm_table = cat(1,hm_tables{:});
 writetable(hm_table,fullfile(qc_dir,'QualityCheckLogBook.xlsx'),'Sheet','headmotion')
 % close parallel pool
 delete(poolobj)
+
+%% --------------  Quality Check for head motion: view 4D images as animation in mricro GL  -------------- 
+for isub = 1:participants.nsub
+    fprintf('viewing 4d series for %s\n',participants.ids{isub});
+    subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
+    check_head_motion(subimg_dir,[-5,4],2.5,true,false,false);
+    pause
+end
