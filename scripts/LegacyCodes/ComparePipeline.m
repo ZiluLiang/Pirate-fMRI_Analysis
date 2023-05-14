@@ -12,8 +12,8 @@ compare_output_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\f
 checkdir(compare_output_dir)
 
 %flags
-compare_nmi = true; % compare normalization quality
-compare_rp = false;% compare head motion estimates
+compare_nmi = false; % compare normalization quality
+compare_rp = true;% compare head motion estimates
 
 %% compare normalization quality
 if compare_nmi
@@ -58,7 +58,7 @@ if compare_rp
                    [filepattern.preprocess.motionparam,'.*',strrep(filepattern.raw.functional.task2,'^','')]};
     n_task = numel(regexp_rps);
     rp_res = cell(5,1); %#ok<*UNRCH>
-    mean_xyz_distance = cell(5,1);
+    mean_rp_corr = cell(5,1);
     for isub = 1:participants.nsub
         subimg_dir_w  = fullfile(with_reorientation_dir,participants.ids{isub});
         subimg_dir_wo  = fullfile(without_reorientation_dir,participants.ids{isub});
@@ -66,23 +66,31 @@ if compare_rp
         rp_files_wo = cellstr(spm_select('FPList',subimg_dir_wo,filepattern.preprocess.motionparam));
         for j = 1:numel(rp_files_wo)
             rp_res{j}(isub,:) = mean(abs(table2array(subtract_table(readtable(rp_files_w{j}),readtable(rp_files_wo{j})))),1,'omitnan');
-            mean_xyz_distance{j}(isub,:) = cal_rp_xyz_dist(readtable(rp_files_w{j}),readtable(rp_files_wo{j}));
+            mean_rp_corr{j}(isub,:) = cal_rp_corr(readtable(rp_files_w{j}),readtable(rp_files_wo{j}));
         end
     end
-    mean_xyz_distance = cellfun(@(x) mean(x,2,'omitnan'),mean_xyz_distance,'uni',0);
-    mean_xyz_distance{5}(participants.nsub,:) = nan;
-    mean_xyz_distance = cat(2,mean_xyz_distance{:});
-    mean_xyz_distance = array2table(mean_xyz_distance,'VariableNames',{'localizer_run1','navigation_run1','navigation_run2','navigation_run3','navigation_run4'});
+    mean_rp_corr = cellfun(@(x) mean(table2array(x),2,'omitnan'),mean_rp_corr,'uni',0);
+    mean_rp_corr{5}(participants.nsub,:) = nan;
+    mean_rp_corr = cat(2,mean_rp_corr{:});
+    mean_rp_corr = array2table(mean_rp_corr,'VariableNames',{'localizer_run1','navigation_run1','navigation_run2','navigation_run3','navigation_run4'});
+    writetable(mean_rp_corr,fullfile(compare_output_dir,'comparepipeline.xlsx'),'Sheet','mu_corr_betweenpipeline')
+    
     rp_res = cell2struct(rp_res,{'localizer_run1','navigation_run1','navigation_run2','navigation_run3','navigation_run4'});
     mean_rp_difference = structfun(@(x) array2table(x,'VariableNames',{'x','y','z','pitch','yaw','roll'}),rp_res,'uni',0);
-    save(fullfile(compare_output_dir,'comparepipeline_RP.mat'),'mean_xyz_distance','mean_rp_difference')
-    writetable(mean_xyz_distance,fullfile(compare_output_dir,'comparepipeline.xlsx'),'Sheet','mu_XYZdistance')
     cellfun(@(f) writetable(mean_rp_difference.(f),fullfile(compare_output_dir,'comparepipeline.xlsx'),'Sheet',['mu_paramdiff-',f]),fieldnames(mean_rp_difference));
+    save(fullfile(compare_output_dir,'comparepipeline_RP.mat'),'mean_rp_corr')
+    
 end
 
-function distance = cal_rp_xyz_dist(A,B)
-    matA = table2array(A);
-    matB = table2array(B);
-    distance = arrayfun(@(k) norm(matA(k,1:3) - matB(k,1:3)),1:size(A,1));    
+function rho_tab = cal_rp_corr(A,B,varnames)
+    if nargin<4, varnames = {'x','y','z','pitch','yaw','roll'}; end
+    if nargin<3, rownames = ''; end
+    vars = A.Properties.VariableNames;
+    rhos = cellfun(@(f) corr(A.(f),B.(f)),vars);
+    if isempty(rownames)
+        rho_tab  = array2table(rhos, 'VariableNames',varnames);
+    else
+        rho_tab  = array2table(rhos, 'VariableNames',varnames,'RowNames',rownames);
+    end
 end
 
