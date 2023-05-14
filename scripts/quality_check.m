@@ -36,10 +36,10 @@ end
 n_tasks = 2;
 n_runs  = [4,1];
 n_volumes = {[296,296,296,296],[326]};
-for isub = 1:participants.nsub
+for isub = 17%:participants.nsub
     subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
     for task = 1:n_tasks
-        for run = 1:n_runs(task)
+        for run = 1%:n_runs(task)
             vol = randi(n_volumes{task}(run));
             check_distortion_correction(subimg_dir,task,run,vol);
             fprintf('showing %s-task%d-run%d-vol-%d',participants.ids{isub},task,run,vol)
@@ -68,14 +68,24 @@ end
 
 
 %% --------------  Quality Check  for head motion  -------------- 
-qc_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri_image\qualitycheck';
+% set up parallel pool
+num_workers   = feature('NumCores');
+poolobj       =  parpool(num_workers);%set up parallel processing
+% run head motion check
+qc_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\qualitycheck';
 hm_dir = fullfile(qc_dir,'headmotion');
+hm_tables = cell(participants.nsub,1);
 checkdir(hm_dir)
-for isub = 1:participants.nsub
+parfor isub = 1:participants.nsub
+    fprintf('ploting head motion for %s\n',participants.ids{isub});
     subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
-    f = check_head_motion(subimg_dir,false,true,false);
+    [hm_tables{isub},f] = check_head_motion(subimg_dir,[-5,4],2.5,false,true,false);
+    participant = repmat(participants.ids(isub),size(hm_tables{isub},1),1);
+    hm_tables{isub} = addvars(hm_tables{isub},participant,'Before',1);    
     saveas(f,fullfile(hm_dir,[participants.ids{isub},'.png']));
-    %pause   
-    close all
+    close all     
 end
-
+hm_table = cat(1,hm_tables{:});
+writetable(hm_table,fullfile(qc_dir,'QualityCheckLogBook.xlsx'),'Sheet','headmotion')
+% close parallel pool
+delete(poolobj)
