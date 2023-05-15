@@ -1,17 +1,42 @@
-function specify_estimate_glm(glm_name,subid,varargin)
+function specify_estimate_glm(varargin)
 %writen by Zilu Liang (2023 May, Oxford)
 %this script specifies first-level glm in spm
-    if nargin<3
-        flag_estimate = true;
-    else
-        flag_estimate = varargin{1};
-    end
+% usage: specify_estimate_glm(nii_files,multicond_files,nuisance_files,output_dir,flag_estimate)
 
-    glm_config              = get_glm_config(glm_name);
-    [directory,filepattern] = get_pirate_defaults(false,'directory','filepattern'); 
+    % validate input and find files 
+    
+    err_flag = 1;
+    if nargin == 4 || nargin == 5
+        if all(cellfun(@(arg) iscell(arg),varargin(1:3))) && ischar(varargin{4})
+            nii_files       = varargin{1};
+            multicond_files = varargin{2};
+            nuisance_files  = varargin{3};
+            output_dir      = varargin{4};
+            err_flag   = 0;
+            if nargin<5, flag_estimate = true; end
+        end
+    end
+    
+    if err_flag
+        error('invalid inputs')
+    else
+        checkdir(output_dir)
+    end
+    
+    if ~all(cellfun(@(x) exist(x,'file'),[nii_files,multicond_files,nuisance_files]))
+        all_files = [nii_files,multicond_files,nuisance_files];
+        missing_files = all_files(cellfun(@(x) ~exist(x,'file'),[nii_files,multicond_files,nuisance_files]));
+        error('The following files do not exist: \n %s \n',strjoin(missing_files,'\n'))
+    end
+    if numel(nii_files)==numel(multicond_files) && numel(nii_files)==numel(nuisance_files)
+        nsess = numel(nii_files);
+    else
+        error('number of 4D nii files, multiple conditions files, and number of nuisance regressor files do not match!')
+    end   
+    
     
     %% Directory
-    specification.dir = {fullfile(directory.fmri_data,glm_config.name,'first',subid)};
+    specification.dir = {output_dir};
     
     %% Timing parameters
     % check out discussion here on how to specify timing parameters for
@@ -22,21 +47,15 @@ function specify_estimate_glm(glm_name,subid,varargin)
     specification.timing.fmri_t0 = 13;     %reference slice
     
     %% Data&Design
-    nii_regexp = sprintf([glm_config.filepattern,'.*.nii'],strrep(subid,'sub',''));
-    rp_regexp  = sprintf([filepattern.preprocess.motionparam,'.*',glm_config.filepattern,'.*.txt'],strrep(subid,'sub',''));
-    scans      = cellstr(spm_select('FPList',fullfile(directory.unsmoothed,subid),nii_regexp));
-    rp_files   = cellstr(spm_select('FPList',fullfile(directory.unsmoothed,subid),rp_regexp));
-    [~,Mfiles]   = setup_multiconditions(glm_name,subid);
-    nsess = numel(scans);
     for iSess = 1:nsess
         %Data&Design - scans/imgs to be processed
-        specification.sess(iSess).scans = scans(iSess);%#ok<*AGROW> %scans for each run
+        specification.sess(iSess).scans = nii_files(iSess);%#ok<*AGROW> %scans for each run
         %Data&Design - conditions and pmods
         specification.sess(iSess).cond = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {}, 'orth', {});
-        specification.sess(iSess).multi = Mfiles(iSess);
+        specification.sess(iSess).multi = multicond_files(iSess);
         %Data&Design - nuisance regressors
         specification.sess(iSess).regress = struct('name',{},'val',{});
-        specification.sess(iSess).multi_reg = rp_files(iSess);
+        specification.sess(iSess).multi_reg = nuisance_files(iSess);
         % high-pass filter
         specification.sess(iSess).hpf = 128;
     end
@@ -72,12 +91,12 @@ function specify_estimate_glm(glm_name,subid,varargin)
     specification.global = 'None';% or 'Scaling'
     
     %% Masking Threshold
-    specification.mthresh = 0.8;
+    specification.mthresh = -Inf;
     
     %% Explicit mask 
     %%%spm intracranial volume mask: {'D:\Matlab_Toolbox\spm12\tpm\mask_ICV.nii'}; no mask: {''}
     specification.mask = {fullfile(spm('dir'),'tpm','mask_ICV.nii')};
-    specification.mask = {''};
+    %%specification.mask = {''};
     
     %% Serial correlations
     specification.cvi='AR(1)';%'FAST','none';

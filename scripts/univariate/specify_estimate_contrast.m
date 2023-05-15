@@ -1,27 +1,43 @@
-function specify_estimate_contrast(glm_name,subid,varargin)
-    if nargin<3
-        flag_replace = true;
-    else
-        flag_replace = varargin{1};
+function specify_estimate_contrast(varargin)
+%writen by Zilu Liang (2023 May, Oxford)
+%this script specifies contrast in first-level glm in spm
+% usage: specify_estimate_contrast(firstlvl_output_dir,contrast_names,contrast_types,contrast_wvec,flag_replace)
+    
+    err_flag = 1;
+    if nargin == 4 || nargin == 5
+        if all(cellfun(@(arg) iscell(arg),varargin(2:4))) && ischar(varargin{1})
+            firstlvl_output_dir = varargin{1};
+            contrast_names      = varargin{2};
+            contrast_types      = varargin{3};
+            contrast_wvecs      = varargin{4};
+            err_flag   = 0;
+            if nargin<5, flag_replace = true; end
+        end
     end
-
-    glm_config = get_glm_config(glm_name);
-    directory  = get_pirate_defaults(false,'directory');
-    firstlvl_output_dir = fullfile(directory.fmri_data,glm_config.name,'first',subid);
+    
+    if err_flag
+        error('invalid inputs')
+    end
+    
+    if numel(contrast_names)==numel(contrast_types) && numel(contrast_names)==numel(contrast_wvecs)
+        n_contrasts = numel(contrast_names);
+    else
+        error('number of contrast names, contrast types, and number of contrast vectors do not match!')
+    end   
     
     % define spm matlabbatch
-    for j = 1:numel(glm_config.contrasts)
-        switch lower(glm_config.contrasts(j).type)
+    for j = 1:n_contrasts
+        switch lower(contrast_types{j})
             case 't'   
                 %t.contrast
-                contrast.consess{j}.tcon.name    = glm_config.contrasts(j).name;
-                contrast.consess{j}.tcon.weights = glm_config.contrasts(j).wvec;
+                contrast.consess{j}.tcon.name    = contrast_names{j};
+                contrast.consess{j}.tcon.weights = contrast_wvecs{j};
                 contrast.consess{j}.tcon.sessrep = 'none';                
                 
             case 'f'
                 %f.contrast
-                contrast.consess{j}.fcon.name    = glm_config.contrasts(j).name;
-                contrast.consess{j}.fcon.weights = glm_config.contrasts(j).wvec;
+                contrast.consess{j}.fcon.name    = contrast_names{j};
+                contrast.consess{j}.fcon.weights = contrast_wvecs{j};
                 contrast.consess{j}.fcon.sessrep = 'none';                
         end
     end
