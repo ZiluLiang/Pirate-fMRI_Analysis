@@ -7,6 +7,11 @@
 %       normalisation:  use the estimated normalization parameters to normalise epi images to mni space
 %       smooth:         spatial smoothing
 % Quality inspection should be taken in between steps to check preprocessing quality
+% 
+% After preprocessing: nuisance regressors are created for conducting first
+% level glm analysis, preprocessed images are copied to cleaned folders for
+% subsequent analysis
+%
 %
 % ------ written by Zillu Liang(2023.4,Oxford)------
 
@@ -20,9 +25,10 @@ preprocess_flags   = struct('reorient',       false,...
                             'realign_unwarp', false,...
                             'coregistration', false,...
                             'segmentation',   false,...
-                            'normalisation',  true,...
+                            'normalisation',  false,...
                             'smooth',         false);                       
-copy_preprocessed = false;
+generate_nuisance = true;
+copy_preprocessed = true;
 
 
 %% Function handles for preprocessing
@@ -35,13 +41,14 @@ preprocess_handles  = struct('reorient',       @reorient,...
                              'smooth',         @smooth);
                                              
 %% set up parallel pool
-num_workers   = feature('NumCores') - 4;
-poolobj       =  parpool(num_workers);%set up parallel processing
-%create temporary variables so that we can minimize the amount of data sent to different parallel workers
-ids           = participants.ids;
-nsub          = participants.nsub;
-preproc_dir   = directory.preprocess;
-                        
+if any([cell2mat(struct2cell(preprocess_flags))',generate_nuisance,copy_preprocessed])
+    num_workers   = feature('NumCores');
+    poolobj       =  parpool(num_workers);%set up parallel processing
+    %create temporary variables so that we can minimize the amount of data sent to different parallel workers
+    ids           = participants.ids;
+    nsub          = participants.nsub;
+    preproc_dir   = directory.preprocess;
+end                        
 %% -----------------------  Preprocess data  ---------------------- 
 preproc_steps = fieldnames(preprocess_handles);
 preproc_steps = preproc_steps(cellfun(@(s) preprocess_flags.(s),preproc_steps)); % only run steps where flag is true
@@ -65,15 +72,30 @@ for j = 1:numel(preproc_steps)
     fprintf('Completed %s\n\n', curr_step)
 end
 
+%% --------------  Generate Nuisance Regressor for head motion  -------------- 
+% gen nuisance regressor
+if generate_nuisance
+    err_tracker   = cell(participants.nsub,1);
+    parfor isub = 1:participants.nsub
+        fprintf('creating head motion regressor for %s\n',participants.ids{isub});
+        try
+            subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
+            generate_nuisance_regressor(subimg_dir,true,{'raw','fw'}); % generate nuisance regressor using head motion parameters and their first derivatives
+        catch err
+            err_tracker{isub} = err
+        end
+    end
+end
+
 
 %% -----------------  Copy Files -------------------
 % After preprocessing is finished, create a copy of preprocessed files in a
 % clean folder for subsequent statistical analysis
 if copy_preprocessed
     par_dir    = directory.unsmoothed; %#ok<*UNRCH>
-    move_files = {filepattern.preprocess.normalise,...
-                  filepattern.preprocess.motionparam};
-    parfor isub  = 2:nsub
+    move_files = {filepattern.preprocess.nuisance};%{filepattern.preprocess.normalise};%,...
+                  %};
+    parfor isub  = 1:nsub
         from_dir = fullfile(preproc_dir,ids{isub});
         to_dir   = fullfile(par_dir,ids{isub});
         checkdir(to_dir)
@@ -86,4 +108,6 @@ if copy_preprocessed
 end
 
 %% close parallel pool
-delete(poolobj)
+if any([cell2mat(struct2cell(preprocess_flags))',generate_nuisance,copy_preprocessed])
+    delete(poolobj)
+end

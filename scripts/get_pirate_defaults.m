@@ -76,8 +76,9 @@ function pirate_defaults = setdefaults
     pirate_defaults.participants.ids     = fieldnames(renamer);
     pirate_defaults.participants.nsub    = numel(pirate_defaults.participants.ids);
     %%%%%TODO add valid participants list
-    
-    
+    pirate_defaults.participants.validids     = pirate_defaults.participants.ids(1:30); % exclude sub 31 due to incomplete scans
+    pirate_defaults.participants.nvalidsub    = numel(pirate_defaults.participants.validids);% exclude sub 31 due to incomplete scans
+        
     %% --------------  naming patterns ------------------
     pirate_defaults.filepattern.task1   = 'sub-.*_task-piratenavigation_run-[1-4]';
     pirate_defaults.filepattern.task2   = 'sub-.*_task-localizer_run-[1]';
@@ -97,10 +98,8 @@ function pirate_defaults = setdefaults
                                                              arrayfun(@(x) sprintf('task%d',x),1:numel(fieldnames(pirate_defaults.filepattern.raw.functional)),'uni',0));
                                                     
     % prefix for files after reorientation and preprocessing --- these should not be changed as this is set by in each preprocessing script
-    pirate_defaults.filepattern.reorient               = structfun(@(scantype) ...
-                                                                    structfun(@(pattern) ['^o',strrep(pattern,'^','')],scantype,'uni',0),...
-                                                                    pirate_defaults.filepattern.raw,'uni',0);
-    pirate_defaults.filepattern.preprocess             = struct('vdm',            '^vdm5_sc',...
+    pirate_defaults.filepattern.preprocess             = struct('reorient',       '^o',...
+                                                                'vdm',            '^vdm5_sc',...
                                                                 'firstepiunwarp', '^qc_ufirstepi_',...
                                                                 'realignunwarp',  '^u',...
                                                                 'meanepi',        '^meanu',... % mean epi created after realign and unwarp
@@ -110,8 +109,11 @@ function pirate_defaults = setdefaults
                                                                 'deformation',    '^y_',...
                                                                 'normalise',      '^wu',... % normalise adds w, normalise is done on realigned unwarped images, so prefix is wu*
                                                                 'normseg_t1',     '^wc',...% normalised and segmented anatomical image
-                                                                'smooth',         '^swu'); % smooth adds s, smooth is done on normalized realigned unwarped images, so prefix is swu*
-   
+                                                                'smooth',         '^swu',...% smooth adds s, smooth is done on normalized realigned unwarped images, so prefix is swu*
+                                                                'nuisance',       '^nuisance_'); % txt files that contains nuisance regressors  
+    pirate_defaults.filepattern.reorient               = structfun(@(scantype) ...
+                                                                    structfun(@(pattern) [pirate_defaults.filepattern.preprocess.reorient,strrep(pattern,'^','')],scantype,'uni',0),...
+                                                                    pirate_defaults.filepattern.raw,'uni',0);
 
 end
 
