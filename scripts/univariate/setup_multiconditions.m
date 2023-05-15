@@ -1,9 +1,10 @@
-function [M,M_fn] = setup_multiconditions(glm_name,subid)
+function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir)
 % create the mat file for multiple condtions
     directory  = get_pirate_defaults(false,'directory');
     glm_config = get_glm_config(glm_name);
     glm_dir    = fullfile(directory.fmri_data,glm_config.name);
-    output_dir = fullfile(glm_dir,'first',subid);
+    
+    if nargin<3, output_dir = fullfile(glm_dir,'first',subid); end
     checkdir(output_dir)
     
     search_str = sprintf(glm_config.filepattern,strrep(subid,'sub',''));

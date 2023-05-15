@@ -14,10 +14,10 @@ function glms = glm_gallery
     glms(1).contrasts   = struct('name',{},'type',{},'wvec',{});
     glms(1).contrasts(1).name = 'stimuli';
     glms(1).contrasts(1).type = 't';
-    glms(1).contrasts(1).wvec  = gen_contrast_vec([1,0],6,4);
+    glms(1).contrasts(1).wvec  = gen_contrast_vec([1,0],24,4);% weight vector for task regressors
     glms(1).contrasts(2).name = 'response';
     glms(1).contrasts(2).type = 't';
-    glms(1).contrasts(2).wvec  = gen_contrast_vec([0,1],6,4);
+    glms(1).contrasts(2).wvec  = gen_contrast_vec([1,0],24,4);
 
     glms(2).name = 'sc_localizer';
     glms(2).filepattern = 'sub-%s_task-localizer_run-[1]';
@@ -25,27 +25,67 @@ function glms = glm_gallery
     glms(2).contrasts   = struct('name',{},'type',{},'wvec',{});
     glms(2).contrasts(1).name = 'stimuli';
     glms(2).contrasts(1).type = 't';
-    glms(2).contrasts(1).wvec  = gen_contrast_vec([1,0],6,4);
+    glms(2).contrasts(1).wvec  = gen_contrast_vec([1,0],24,1);
     glms(2).contrasts(2).name = 'response';
     glms(2).contrasts(2).type = 't';
-    glms(2).contrasts(2).wvec  = gen_contrast_vec([0,1],6,4);
+    glms(2).contrasts(2).wvec  = gen_contrast_vec([0,1],24,1);
 
+    glms(3).name = 'rs_f_navigation';
+    glms(3).filepattern = 'sub-%s_task-piratenavigation_run-[1-4]';
+    glms(3).conditions  = {'samecolor','diffcolor','sameshape','diffshape','excluderp'};
+    glms(3).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(3).contrasts(1).name = 'same_minus_diff_color';
+    glms(3).contrasts(1).type = 't';
+    glms(3).contrasts(1).wvec  = gen_contrast_vec([1,-1,0,0,0],24,4);% weight vector for task regressors
+    glms(3).contrasts(2).name = 'same_minus_diff_shape';
+    glms(3).contrasts(2).type = 't';
+    glms(3).contrasts(2).wvec  = gen_contrast_vec([0,0,1,-1,0],24,4);
     
+    glms(4).name = 'rs_loc1d_navigation';
+    glms(4).filepattern = 'sub-%s_task-piratenavigation_run-[1-4]';
+    glms(4).conditions  = {'samex','diffx','samey','diffy','excluderp'};
+    glms(4).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(4).contrasts(1).name = 'same_minus_diff_x';
+    glms(4).contrasts(1).type = 't';
+    glms(4).contrasts(1).wvec = gen_contrast_vec([1,-1,0,0,0],24,4);% weight vector for task regressors
+    glms(4).contrasts(2).name = 'same_minus_diff_y';
+    glms(4).contrasts(2).type = 't';
+    glms(4).contrasts(2).wvec = gen_contrast_vec([0,0,1,-1,0],24,4);
+    
+    glms(5).name = 'rs_loc1d_localizer';
+    glms(5).filepattern = 'sub-%s_task-localizer_run-[1]';
+    glms(5).conditions  = {'samex','diffx','samey','diffy'};
+    glms(5).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(5).contrasts(1).name = 'same_minus_diff_x';
+    glms(5).contrasts(1).type = 't';
+    glms(5).contrasts(1).wvec = gen_contrast_vec([1,-1,0,0],24,1);% weight vector for task regressors
+    glms(5).contrasts(2).name = 'same_minus_diff_y';
+    glms(5).contrasts(2).type = 't';
+    glms(5).contrasts(2).wvec = gen_contrast_vec([0,0,1,-1],24,1);
+    
+    glms(6).name = 'rs_loc1d_localizer';
+    glms(6).filepattern = 'sub-%s_task-localizer_run-[1]';
+    glms(6).conditions  = {'samex','diffx','samey','diffy'};
+    glms(6).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(6).contrasts(1).name = 'same_minus_diff_x';
+    glms(6).contrasts(1).type = 't';
+    glms(6).contrasts(1).wvec = gen_contrast_vec([1,-1,0,0],24,1);% weight vector for task regressors
+    glms(6).contrasts(2).name = 'same_minus_diff_y';
+    glms(6).contrasts(2).type = 't';
+    glms(6).contrasts(2).wvec = gen_contrast_vec([0,0,1,-1],24,1);
 
 end
 
 function vec = gen_contrast_vec(v,nN,nS)
-% generate a 1 x ((nC+nN)*nS + nS) contrast vector
-% INPUTS:
-% v  - contrast in one session
-% nC - number of conditions
-% nN - number of nuisance regressors
+% generate contrast vector
 % based on spm convention that regressors are ordered as in:
 % [C-1_sess-1,C-2_sess-1,...N-1_sess-1,N-2_sess-1,...C-nC_sess-N,...N-nN_sess-nS,S-1,...S-nS]
-% where C is condition regressor, N is nuisance regressor and S is the session regressor
+% where C is condition regressor, N is nuisance regressor and S is the session regressor% INPUTS:
+% v  - contrast in one session
+% nS - number of sessions
+% nN - number of nuisance regressors
 
-    if nargin<4, nN = 6; end
-    v = v/nS; % scaled by number of sessions
+    %v = v/nS; % scaled by number of sessions
     v = [v,zeros(1,nN)];
     % concatenate across session
     vec = [repmat(v,1,nS),zeros(1,nS)];

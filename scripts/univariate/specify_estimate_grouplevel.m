@@ -1,24 +1,26 @@
-function specify_estimate_grouplevel(glm_name,varargin)
-        if nargin<2
-            flag_estimate = true;
-        else
-            flag_estimate = varargin{1};
-        end
-
-        glm_config              = get_glm_config(glm_name);
-        [directory,participants] = get_pirate_defaults(false,'directory','participants'); 
+function specify_estimate_grouplevel(varargin)
+% specify_estimate_grouplevel(modeldir,contrast_names)
+    err_flag = 1;
+    if nargin == 2 && ischar(varargin{1}) && iscell(varargin{2})
+        model_dir      = varargin{1};
+        contrast_names = varargin{2};
+        err_flag = 0;
+    end
+    if err_flag
+        error('invalid inputs')
+    else
+        n_contrast       = numel(contrast_names);
+        seclvl_contrasts = 1:n_contrast;        
+        seclvl_dirs      = fullfile(model_dir,'second',contrast_names);
+    end
         
-       %% numbers of second level models to run
-        n_contrast=numel(glm_config.contrasts);
-        seclvl_contrasts=1:n_contrast;
     for j=seclvl_contrasts   
         %% Directory
-        seclvl_output_dir=fullfile(directory.fmri_data,glm_config.name,'second',glm_config.contrasts(j).name);
-        checkdir(seclvl_output_dir)
-        design.dir = {seclvl_output_dir};
+        checkdir(seclvl_dirs{j})
+        design.dir = seclvl_dirs(j);
         %% Design
         %%select files for second level analysis
-        design.des.t1.scans = fullfile(directory.fmri_data,glm_config.name,'first',participants.ids(1:30),sprintf('con_000%d.nii',j));
+        design.des.t1.scans = fullfile(model_dir,'first',participants.validids,sprintf('con_000%d.nii',j));
         %%covariate
         design.cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {});
         design.multi_cov = struct('files', {}, 'iCFI', {}, 'iCC', {});
@@ -37,7 +39,7 @@ function specify_estimate_grouplevel(glm_name,varargin)
         
         %% Contrast Specification
         contrast.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-        contrast.consess{1}.tcon.name = glm_config.contrasts(j).name;
+        contrast.consess{1}.tcon.name = contrast_names{j};
         contrast.consess{1}.tcon.sessrep = 'none';
         contrast.consess{1}.tcon.weights = 1;
         contrast.delete=0;
@@ -62,8 +64,8 @@ function specify_estimate_grouplevel(glm_name,varargin)
         matlabbatch{2}.spm.stats.fmri_est = estimation;
         matlabbatch{3}.spm.stats.con = contrast;
         matlabbatch{4}.spm.stats.results = results;
-        save(fullfile(seclvl_output_dir,'spec2est2ndlvl.mat'),'matlabbatch')
-        spm_jobman('initcfg');
+        save(fullfile(seclvl_dirs{j},'spec2est2ndlvl.mat'),'matlabbatch')
+        
         spm_jobman('run', matlabbatch);
     end
 end
