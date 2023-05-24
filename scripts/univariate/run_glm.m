@@ -7,7 +7,7 @@ function err_tracker = run_glm(glm_name,glm_dir,preproc_img_dir,subidlist,steps)
     if nargin < 5, steps = {'spec2est','contrast','second_level'}; end
     
     nsub = numel(subidlist);
-    err_tracker    = cell(2);
+    err_tracker    = cell(2,1);
     
     err_tracker_1 = cell(nsub,1);
     for isub = 1:nsub
