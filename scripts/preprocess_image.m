@@ -26,8 +26,8 @@ preprocess_flags   = struct('reorient',       false,...
                             'coregistration', false,...
                             'segmentation',   false,...
                             'normalisation',  false,...
-                            'smooth',         false);                       
-generate_nuisance = true;
+                            'smooth',         true);                       
+generate_nuisance = false;
 copy_preprocessed = true;
 
 
@@ -42,7 +42,7 @@ preprocess_handles  = struct('reorient',       @reorient,...
                                              
 %% set up parallel pool
 if any([cell2mat(struct2cell(preprocess_flags))',generate_nuisance,copy_preprocessed])
-    num_workers   = feature('NumCores');
+    num_workers   = feature('NumCores')-3;
     poolobj       =  parpool(num_workers);%set up parallel processing
     %create temporary variables so that we can minimize the amount of data sent to different parallel workers
     ids           = participants.ids;
@@ -82,7 +82,7 @@ if generate_nuisance
             subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
             generate_nuisance_regressor(subimg_dir,true,{'raw','fw'}); % generate nuisance regressor using head motion parameters and their first derivatives
         catch err
-            err_tracker{isub} = err
+            err_tracker{isub} = err;
         end
     end
 end
@@ -92,9 +92,8 @@ end
 % After preprocessing is finished, create a copy of preprocessed files in a
 % clean folder for subsequent statistical analysis
 if copy_preprocessed
-    par_dir    = directory.unsmoothed; %#ok<*UNRCH>
-    move_files = {filepattern.preprocess.nuisance};%{filepattern.preprocess.normalise};%,...
-                  %};
+    par_dir    = directory.smoothed; %#ok<*UNRCH>
+    move_files = {filepattern.preprocess.smooth,filepattern.preprocess.nuisance};
     parfor isub  = 1:nsub
         from_dir = fullfile(preproc_dir,ids{isub});
         to_dir   = fullfile(par_dir,ids{isub});
