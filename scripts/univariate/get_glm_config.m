@@ -6,25 +6,24 @@ end
 
 function glms = glm_gallery
     glms = struct('name',{},'filepattern',{},'conditions',{},'contrasts',{});
-% TODO: add contrast specification glm.contrast(
     nN = 12; % number of nuisance regressors
     
     glms(1).name = 'sc_navigation';
     glms(1).filepattern = 'sub-%s_task-piratenavigation_run-[1-4]';
     glms(1).conditions  = {'stimuli','response'};
     glms(1).contrasts   = struct('name',{},'type',{},'wvec',{});
-    glms(1).contrasts(1).name = 'stimuli';
+    glms(1).contrasts(1).name = 'visual';
     glms(1).contrasts(1).type = 't';
-    glms(1).contrasts(1).wvec  = gen_contrast_vec([1,0],nN,4);% weight vector for task regressors
-    glms(1).contrasts(2).name = 'response';
+    glms(1).contrasts(1).wvec  = gen_contrast_vec([1,1],nN,4);% weight vector for task regressors
+    glms(1).contrasts(2).name = 'motor';
     glms(1).contrasts(2).type = 't';
-    glms(1).contrasts(2).wvec  = gen_contrast_vec([1,0],nN,4);
+    glms(1).contrasts(2).wvec  = gen_contrast_vec([0,1],nN,4);
 
     glms(2).name = 'sc_localizer';
     glms(2).filepattern = 'sub-%s_task-localizer_run-[1]';
     glms(2).conditions = {'stimuli','response'};
     glms(2).contrasts   = struct('name',{},'type',{},'wvec',{});
-    glms(2).contrasts(1).name = 'stimuli';
+    glms(2).contrasts(1).name = 'visual';
     glms(2).contrasts(1).type = 't';
     glms(2).contrasts(1).wvec  = gen_contrast_vec([1,0],nN,1);
     glms(2).contrasts(2).name = 'response';
@@ -75,7 +74,7 @@ function vec = gen_contrast_vec(v,nN,nS)
 % nS - number of sessions
 % nN - number of nuisance regressors
 
-    %v = v/nS; % scaled by number of sessions
+    v = v/nS; % scaled by number of sessions
     v = [v,zeros(1,nN)];
     % concatenate across session
     vec = [repmat(v,1,nS),zeros(1,nS)];
