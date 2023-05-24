@@ -41,6 +41,9 @@ For detailed explanation on distortion correction and how to set the pm_defaults
 ## Segmentation and Normalisation
 In SPM12, segmentation and normalization in unified into one module. This step segments and normalises the coregistered T1 image based on the SPM TPM template (calling [`segment`](segment.m)). The estimated parameters were then applied to realigned and unwarped EPI images for normalization (calling [`normalise`](normalise.m)). Note that in [`normalise`](normalise.m#L14) the size of bounding box was set to be the same size as the template image, and that B-splinethe interpolation with 7-degree splines is used to achieve higher quality.
 
+## Smoothing
+Following suggestions in [Handbook of functional MRI data analysis Chapter 3.7.1](https://www.cambridge.org/core/books/handbook-of-functional-mri-data-analysis/preprocessing-fmri-data/76A784C9F6369B1EA1DFC89EF394251C), normalised nii files are smoothed using fwhm that is twice the voxel size (`[5,5,5]`).
+
 ## Quality checks
 Some handy functions are provided in the [`qualitycheck`](/scripts/qualitycheck) directory to perform manual inspections of preprocessing quality. Currently, the following checks are performed in [`quality_check`](/scripts/quality_check.m). The results are logged manually in [QualityCheckLogBook](https://unioxfordnexus-my.sharepoint.com/:x:/r/personal/sedm6713_ox_ac_uk/Documents/Project/pirate_fmri/Analysis/data/fmri/qualitycheck/QualityCheckLogBook.xlsx?d=w4d93d7284861418bbad93c525fa01b30&csf=1&web=1&e=YjFIZj) ([local copy](/data/fmri/qualitycheck/QualityCheckLogBook.xlsx))
 1. check quality of signal distortion correction

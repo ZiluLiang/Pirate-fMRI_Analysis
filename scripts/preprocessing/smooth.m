@@ -7,7 +7,7 @@ function smooth(subimg_dir)
 
     smooth = {};
     smooth{1}.spm.spatial.smooth.data   = func_imgs;
-    smooth{1}.spm.spatial.smooth.fwhm   = [6 6 6];
+    smooth{1}.spm.spatial.smooth.fwhm   = [5 5 5];
     smooth{1}.spm.spatial.smooth.dtype  = 0;
     smooth{1}.spm.spatial.smooth.im     = 0;
     smooth{1}.spm.spatial.smooth.prefix = 's';
