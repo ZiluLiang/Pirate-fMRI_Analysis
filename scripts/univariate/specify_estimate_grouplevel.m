@@ -1,5 +1,5 @@
 function specify_estimate_grouplevel(varargin)
-% specify_estimate_grouplevel(modeldir,contrast_names)
+% specify_estimate_grouplevel(model_dir,contrast_names)
     err_flag = 1;
     if nargin == 2 && ischar(varargin{1}) && iscell(varargin{2})
         model_dir      = varargin{1};
@@ -13,6 +13,8 @@ function specify_estimate_grouplevel(varargin)
         seclvl_contrasts = 1:n_contrast;        
         seclvl_dirs      = fullfile(model_dir,'second',contrast_names);
     end
+    
+    participants  = get_pirate_defaults(false,'participants');
         
     for j=seclvl_contrasts   
         %% Directory

@@ -10,7 +10,7 @@ function err_tracker = run_glm(glm_name,glm_dir,preproc_img_dir,subidlist,steps)
     err_tracker    = cell(2);
     
     err_tracker_1 = cell(nsub,1);
-    for isub = 1:nsub-1
+    for isub = 1:nsub
         fprintf('%s: Running first-level GLM for %s %d/%d subject\n', glm_name, subidlist{isub}, isub, nsub)
         subimg_dir = fullfile(preproc_img_dir,subidlist{isub});
         glm_config = get_glm_config(glm_name);           
@@ -44,8 +44,8 @@ function err_tracker = run_glm(glm_name,glm_dir,preproc_img_dir,subidlist,steps)
     
     if ismember('second_level',steps)
         try
-            fprintf('%s: Running second-level', glm_name)
-            specify_estimate_grouplevel(glm_name)
+            fprintf('%s: Running second-level\n', glm_name)
+            specify_estimate_grouplevel(glm_dir,{glm_config.contrasts.name})
         catch err
             err_tracker{2} = err;
         end
