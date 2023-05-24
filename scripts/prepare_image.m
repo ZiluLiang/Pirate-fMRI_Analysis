@@ -1,6 +1,6 @@
 % fmri data preparation: convert, rename to annonymized files and organize
-% The script contains three steps controlled by three flags:
-%       img_convert, img_organize, img_backup
+% The script contains four steps controlled by four flags:
+%       img_convert, img_organize, img_backup, img_backup
 %       img_convert: convert dicom images to nii images
 %       img_organize: organize and rename the data according to
 %                     renamer.json. organized and renamed files are placed in renamed_dir
@@ -29,10 +29,10 @@ dcm2niix_path  = 'C:\MRIcroGL_windows\MRIcroGL\Resources\dcm2niix.exe';
 SPM12_dir      = 'C:\Program Files\MATLAB\matlab toolbox\spm12';
 
 %file pattern for different type of scans
-filepattern    = struct('fieldmap','gre_field_mapping_2.5mm',...
-                        't1','GIfMI_T1_MPRAGE',...
-                        'piratenavigation','ep2d_bold_RUN_[1-4]',...
-                        'localizer','ep2d_bold_RUN_[5]');
+filepattern    = struct('fieldmap',         'gre_field_mapping_2.5mm',...
+                        't1',               'GIfMI_T1_MPRAGE',...
+                        'piratenavigation', 'ep2d_bold_RUN_[1-4]',...
+                        'localizer',        'ep2d_bold_RUN_[5]');
 % Step control
 img_convert  = false;
 img_organize = false;
@@ -74,11 +74,12 @@ if img_convert
     end
 end
 
-%% Generate image list and re-arrange images
-%Generate a table to check if participant have redundent or missing image files.
+%% Re-name images and Generate image list
+%Rename images and generate a table to check if participant have redundent 
+%or missing image files.
 %%!!!! check the for redundent images, delete redundant images and re-run
 %%!!!! this block before proceeding.
-renamed_filepattern = struct('fieldmap','fmap-',...
+renaming_pattern = struct('fieldmap','fmap-',...
                              't1','anat-T1w',...
                              'piratenavigation','task-piratenavigation_run-[1-4]',...
                              'localizer','task-localizer_run-1');
@@ -106,11 +107,12 @@ if img_organize
                 end
                 new_names = cellfun(@(fn) rename_converted_imgs(scan_types{j},fn,new_id),old_names,'uni',0);
                 cd(subimg_dir)
+                % rename both json files and nii files
                 arrayfun(@(x) copyfile(fullfile(subimg_dir,[old_names{x},'.nii']),fullfile(renamed_subimg_dir,[new_names{x},'.nii'])),1:numel(old_names),'uni',0);
                 arrayfun(@(x) copyfile(fullfile(subimg_dir,[old_names{x},'.json']),fullfile(renamed_subimg_dir,[new_names{x},'.json'])),1:numel(old_names),'uni',0);      
             end
             %count files
-            new_names = cellstr(spm_select('FPListRec', renamed_subimg_dir, ['.*',renamed_filepattern.(scan_types{j}),'.*\.nii']));
+            new_names = cellstr(spm_select('FPListRec', renamed_subimg_dir, ['.*',renaming_pattern.(scan_types{j}),'.*\.nii']));
             tr_count = strjoin(cellfun(@(fn) num2str(numel(cellstr(spm_select('expand', fn)))),new_names,'uni',0),'+');
             fprintf(fileID,'%1$s\t%2$s\t%3$s\t%4$s\n',new_id,scan_types{j},num2str(numel(new_names)),tr_count);
         end
@@ -125,24 +127,24 @@ end
 
 
 function new_name = rename_converted_imgs(scan_type,old_name,new_id) %#ok<*DEFNU>
-    scan_renamer = struct('fieldmap','fmap-%s',...
-                          't1','anat-T1w',...
-                          'piratenavigation','task-piratenavigation_run-%s',...
-                          'localizer','task-localizer_run-1');
+    renaming_pattern = struct('fieldmap',         'fmap-%s',...
+                              't1',               'anat-T1w',...
+                              'piratenavigation', 'task-piratenavigation_run-%s',...
+                              'localizer',        'task-localizer_run-1');
     switch scan_type
         case 'fieldmap'
             switch old_name(end-1:end)
                 case 'e1'
-                    new_name = sprintf(['sub-%s_',scan_renamer.(scan_type)],new_id(4:end),'magnitude1');
+                    new_name = sprintf(['sub-%s_',renaming_pattern.(scan_type)],new_id(4:end),'magnitude1');
                 case 'e2'
-                    new_name = sprintf(['sub-%s_',scan_renamer.(scan_type)],new_id(4:end),'magnitude2');
+                    new_name = sprintf(['sub-%s_',renaming_pattern.(scan_type)],new_id(4:end),'magnitude2');
                 case 'ph'
-                    new_name = sprintf(['sub-%s_',scan_renamer.(scan_type)],new_id(4:end),'phasediff');
+                    new_name = sprintf(['sub-%s_',renaming_pattern.(scan_type)],new_id(4:end),'phasediff');
             end
         case 'piratenavigation'
             parts = strsplit(old_name,'_');
-            new_name = sprintf(['sub-%s_',scan_renamer.(scan_type)],new_id(4:end),parts{6});  
+            new_name = sprintf(['sub-%s_',renaming_pattern.(scan_type)],new_id(4:end),parts{6});  
         otherwise
-            new_name = sprintf(['sub-%s_',scan_renamer.(scan_type)],new_id(4:end));
+            new_name = sprintf(['sub-%s_',renaming_pattern.(scan_type)],new_id(4:end));
     end
 end
