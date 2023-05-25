@@ -7,6 +7,7 @@
 clear;clc
 %% Configurations
 [directory,participants,filepattern] = get_pirate_defaults(false,'directory','participants','filepattern');                                                         
+qc_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\qualitycheck';
 
 
 
@@ -72,7 +73,6 @@ end
 num_workers   = feature('NumCores');
 poolobj       =  parpool(num_workers);%set up parallel processing
 % run head motion check
-qc_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\qualitycheck';
 hm_dir = fullfile(qc_dir,'headmotion');
 hm_tables = cell(participants.nsub,1);
 checkdir(hm_dir)
@@ -97,3 +97,28 @@ for isub = 1:participants.nsub
     check_head_motion(subimg_dir,[-5,4],2.5,true,false,false);
     pause
 end
+
+%% --------------  Calculate tSNR for each run of each participants  -------------- 
+mask_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks';
+masks_names = cellstr(spm_select('List',mask_dir,'.*.nii'));
+masks = cell2struct(fullfile(mask_dir,masks_names),cellfun(@(x) strrep(x,'.nii',''),masks_names,'uni',0));
+mean_tsnr = nan(numel(participants.ids)*5,numel(masks_names));
+tsnr_dir  = fullfile(qc_dir,'tsnr');
+checkdir(tsnr_dir)
+for isub = 1:participants.nsub
+    fprintf('calculating tsnr for %s\n',participants.ids{isub});
+    subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
+    func_imgs   = cellstr(spm_select('FPList',subimg_dir,filepattern.preprocess.normalise));
+    for j = 1:numel(func_imgs)
+        src_img  = func_imgs{j};
+        [~,fn,~] = fileparts(src_img);
+        
+        outputfn = fullfile(tsnr_dir,['tsnr_',fn,'.nii']);
+        tmp_tsnr   = calculate_snr(src_img,outputfn,masks);
+        mean_tsnr((isub-1)*5+j,:) = table2array(struct2table(tmp_tsnr));
+    end
+end
+mean_tsnr_T = array2table(mean_tsnr,'VariableNames',masks_names);
+tmp = fullfact([5,numel(participants.ids)]);
+mean_tsnr_T.Properties.RowNames = arrayfun(@(k) [participants.ids{tmp(k,2)},'-run',num2str(tmp(k,1))],1:size(tmp,1),'uni',0);
+writetable(mean_tsnr_T,fullfile(qc_dir,'QualityCheckLogBook.xlsx'),'Sheet','tsnr')

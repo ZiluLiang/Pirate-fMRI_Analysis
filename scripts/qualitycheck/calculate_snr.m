@@ -6,16 +6,25 @@ function mean_tsnr = calculate_snr(source,outputname,masks)
 % tsnr across all voxels.
 % usage: calculate_snr(source,outputname,masks)
 % INPUT: 
-%    -source: the file name of the 4D nii series tsnr to be calculated
-%    -outputname: the file name of the output tsnr image
+%    -source: the full path of the 4D nii series tsnr to be calculated
+%    -outputname: the full path of the output tsnr image
 %    -masks: a cell array of mask image files or a struct with fieldnames as
 %    mask names and field values as mask image files.
-% ------ written by Zillu Liang(2023.5,Oxford)------
+% ------ written by Zilu Liang(2023.5,Oxford)------
 
 
-    if nargin<4, masks = struct(); end
-    if ~isstruct(masks) && iscell(masks)
-        masks = cell2struct(reshape(masks,numel(masks),1),arrayfun(@(x) sprintf('mask%d',x),1:numel(masks),'uni',0));
+    if nargin<2
+        [filepath,src_name,ext] = fileparts(source);
+        outputname = fullfile(filepath,['tsnr_',src_name,ext]); 
+    end
+    
+    if nargin<3, masks = {}; end
+    if iscell(masks) && ~isempty(masks)
+        masknames = arrayfun(@(x) sprintf('mask%d',x),1:numel(masks),'uni',0);
+        masks = cell2struct(reshape(masks,numel(masks),1),masknames);
+    end
+    if isempty(masks)
+        masks = cell2struct({fullfile(spm('dir'),'tpm','mask_ICV.nii')},{'spmICV'});
     end
 
     disp('Extracting Time Series...')
@@ -32,20 +41,11 @@ function mean_tsnr = calculate_snr(source,outputname,masks)
     std_acrosstime = std(ts_2D,0,2);
     tsnr_2D = mean_acrosstime./ std_acrosstime;
     tsnr_3D = reshape(tsnr_2D,Nx,Ny,Nz);
-    
-%     do with 4D
-%     mean_acrosstime = mean(ts_4D,4);
-%     std_acrosstime = std(ts_4D,0,4);
-%     tsnr = mean_acrosstime./ std_acrosstime;
 
     Vo = Vi(1);
     Vo.fname = outputname;
     spm_write_vol(Vo,tsnr_3D);
     
     % return snr measure within masks
-    if ~isempty(masks)
-        mean_tsnr = structfun(@(x) mean(spm_summarise(Vo,x),'all','omitnan'),masks,'uni',0);
-    else
-        mean_tsnr = struct('all',mean(spm_summarise(Vo,'all'),'all','omitnan'));
-    end
+    mean_tsnr = structfun(@(x) mean(spm_summarise(Vo,x),'all','omitnan'),masks,'uni',0);
 end
