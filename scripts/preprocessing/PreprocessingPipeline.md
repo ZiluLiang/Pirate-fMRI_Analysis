@@ -55,3 +55,5 @@ Some handy functions are provided in the [`qualitycheck`](/scripts/qualitycheck)
    Usually, coregistered source image and reference image are put side by side to see if there are big deviations 
 3. check head motion
    Head motion estimats are extracted from `rp_*.txt` files and plotted as line graph. An alternative is to view the animation of 4D series in mricroGL to see if there are sudden shifts of volumes. Both can be done by calling [`check_head_motion`](/scripts/qualitycheck/check_head_motion.m)
+4. calculate tSNR
+   Following the definition of [Triantafyllou et al., (2005)](https://doi.org/10.1016/j.neuroimage.2005.01.007), [`calculate_snr.m`](/scripts/qualitycheck/calculate_snr.m) calculate voxel-wise tsnr for a given timeseries (a 4D nii file), it can further calculate the mean tsnr across the whole brain or within a masked region.
