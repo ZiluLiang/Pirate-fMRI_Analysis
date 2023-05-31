@@ -1,0 +1,31 @@
+## Model Designs
+The following classes of univariate analyses have been performed
+### Sanity check models
+1. sanity check for navigation task  
+   **First-level**: each participants 4D fmri series are modeled with two regressors: stimuli and response. box car functions are used with duration corresponding to acutual stimuli presentation time and actual response time (time participants spent moving the pirate)
+   two T-contrasts are built:  
+    (1) to test for visual effect: a weight vector of `[1,1]` is used  
+    (2) to test for motor effect: a weight vector of `[0,1]` is used  
+    **Second-level**: each first-level contrast from all participants are selected, group effect is tested using one-sample t-test.
+2. sanity check for localizer task  
+   **First-level**: each participants 4D fmri series are modeled with two regressors: stimuli and response. Stick functions are used for both regressors.
+   two T-contrasts are built:    
+    (1) to test for visual effect: a weight vector of `[1,0]` is used   
+    (2) to test for motor effect: a weight vector of `[0,1]` is used   
+    **Second-level**: each first-level contrast from all participants are selected, group effect is tested using one-sample t-test.  
+
+### Repetition Suppression models
+Repetition supression models for the navigation task modeled three events:
+(1) the stimuli event for trials not preceeded by a response trial   
+(2) the motor event in response trial  
+(3) the stimuli event for trials preceeded by a response trial  
+In the first regressor, the euclidean distance between current trial stimuli and previous trial stimuli is included as a parametric modulator for the stimuli event.  
+Two variant of this model is constructed, one with groundtruth euclidean distance, the other with euclidean distance computed from participants' response map.
+
+Repetition supression model for the localizer task is similar to the one above for navigation task, except that button presses are not modeled. Only one model with euclidean distance between pirate locations in successive trials are included.
+
+### Models for extracting beta series
+To extract activity related to stimuli, we adopted the LSA approach. We build first level GLM in which each stimuli is modeled with one regressor in each session. This yields 25 stimuli regressors for each session in the navigation task (100 beta series in total) and 9 regressors for the localizer task (oen session, only 9 training locations are showed in the localizer task).
+
+## SPM settings
+All univariate analysis are conducted with canonical HRF without temporal and dispersion derivatives. We use spm's intracranial volume mask as explicit mask (mask_ICV.nii in the `spm/tpm` directory) combined with a lowered implicit masking threshold of 0.2. 
