@@ -46,10 +46,12 @@ end
 
 function pirate_defaults = setdefaults
 
-    pirate_defaults = struct('directory',struct(),...
-                             'participants',struct(),...
-                             'filepattern',struct(),...
-                             'handles',struct());
+    pirate_defaults = struct('directory',      struct(),...
+                             'participants',   struct(),...
+                             'filepattern',    struct(),...
+                             'scanning',       struct(),...
+                             'preprocessing',  struct(),...
+                             'handles',        struct());
 
     
     %% --------------  Specify directory  --------------  
@@ -61,7 +63,7 @@ function pirate_defaults = setdefaults
 
     pirate_defaults.directory.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
     pirate_defaults.directory.pm_default   = fullfile(script_dir,'preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
-    pirate_defaults.directory.mni_template = 'C:\MRIcroGL_windows\MRIcroGL\mni_icbm152_nl_VI_nifti\icbm_avg_152_t1_tal_nlin_symmetric_VI.nii'; % mni template used for visualization and estimate parameters for auto-reorientation
+    pirate_defaults.directory.mni_template = 'C:\MRIcroGL_windows\MRIcroGL\standard\mni152.nii.gz'; % mni template used for visualization and estimate parameters for auto-reorientation
     pirate_defaults.directory.fmri_data    = fullfile(wk_dir,'data','fmri');
     pirate_defaults.directory.fmribehavior = fullfile(wk_dir,'data','fmri','beh');
     pirate_defaults.directory.preprocess   = fullfile(wk_dir,'data','fmri','preprocess'); % directory to images created during preprocessing
@@ -114,7 +116,12 @@ function pirate_defaults = setdefaults
     pirate_defaults.filepattern.reorient               = structfun(@(scantype) ...
                                                                     structfun(@(pattern) [pirate_defaults.filepattern.preprocess.reorient,strrep(pattern,'^','')],scantype,'uni',0),...
                                                                     pirate_defaults.filepattern.raw,'uni',0);
-
+                                                                
+    %% --------------  scanning parameters and preprocessing defaults ------------------
+    pirate_defaults.fmri.voxelsize = 2.5; % voxel size in mm
+    pirate_defaults.fmri.tr        = 1.73;% TR in seconds
+    pirate_defaults.fmri.nuisance_terms = {'raw','fw'}; 
+    
 end
 
 function add_path(varargin)
@@ -130,12 +137,16 @@ function add_path(varargin)
             add_with_subfolders_flag = varargin{end};            
         end
     end
-
+    
+    path_added = @(x) contains([pathsep,path,pathsep], [pathsep,x,pathsep], 'IgnoreCase', ispc);
     for j = 1:numel(new_paths)
         new_path = new_paths{j};
-        if ~contains([pathsep, path, pathsep], [pathsep, new_path, pathsep], 'IgnoreCase', ispc)
+        if ~path_added(new_path)
             if add_with_subfolders_flag
-                addpath(genpath(new_path));
+                path_added = cellfun(@path_added, strsplit(genpath(new_path),';'));
+                if ~ all(path_added)
+                    addpath(genpath(new_path));
+                end
             else
                 addpath(new_path);
             end

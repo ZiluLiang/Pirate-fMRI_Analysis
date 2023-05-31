@@ -1,73 +1,85 @@
-function specify_estimate_grouplevel(varargin)
-% specify_estimate_grouplevel(model_dir,contrast_names)
-    err_flag = 1;
-    if nargin == 2 && ischar(varargin{1}) && iscell(varargin{2})
-        model_dir      = varargin{1};
-        contrast_names = varargin{2};
-        err_flag = 0;
-    end
-    if err_flag
-        error('invalid inputs')
+function specify_estimate_grouplevel(outputdir,scans,factor_names)
+% specify_estimate_grouplevel(outputdir,scans)
+% INPUT:
+%  - otputdir: output directory of second level analysis
+%  - scans: a N1*N2*...*Nf...*NnF cell array, it specifies a design with nF
+%           number of factors, factor 1 has N1 levels, factor 2 has N2
+%           levels, etc, and the nF th factor has NnF number of levels.
+%           each element contains the first-level contrast images corresponding 
+%           to one condition in the factorial design. For example, a design
+%           has 4 factors A,B,C,D, yielding a total of nA*nB*nC*nD
+%           conditions. Then scans must be the saize of nA*nB*nC*nD, and
+%           scans{1,2,3,4} specifies the first level contrasts images 
+%           corresponding to condition A1B2C3D4.
+%  - factor_names: cell array of names of each factor. 
+    
+    % reshape input so that each factor at least has two levels
+    nLs0 = size(scans); 
+    nLs  = nLs0(nLs0>1); % number of levels for each factor
+    if numel(nLs)==0 
+        factor_names = factor_names(1);
+        nLs = 1;
+    elseif numel(nLs)==1
+        scans = reshape(scans,[nLs,1]);
+        factor_names = factor_names(1);
     else
-        n_contrast       = numel(contrast_names);
-        seclvl_contrasts = 1:n_contrast;        
-        seclvl_dirs      = fullfile(model_dir,'second',contrast_names);
+        scans = reshape(scans,nLs);
+        factor_names = factor_names(nLs0>1);
+    end
+    % number of factors
+    nF  = numel(factor_names);
+    
+        
+    %% Directory
+    checkdir(outputdir)
+    design.dir = {outputdir};
+
+    %% Design
+    if nF == 1 && nLs(1) ==1
+        % if only one cell, it is a one sample t test
+        t1 = struct();
+        t1.scans = reshape(scans{1},[],1);
+        % assign to design struct
+        design.des.t1 = t1;
+    else
+        fd = struct();
+        for f = 1:nF
+            fd.fact(f).name = factor_names{f};
+            fd.fact(f).levels = nLs(f);
+            fd.fact(f).dept = 0;
+            fd.fact(f).variance = 1;
+            fd.fact(f).gmsca = 0;
+            fd.fact(f).ancova = 0;
+        end
+        for j = 1:numel(scans)
+            fd.icell(j).levels = ind2sub(nLs,j);
+            fd.icell(j).scans  = reshape(scans{j},[],1);
+        end
+        fd.contrasts = 1;
+        % assign to design struct
+        design.des.fd = fd;
     end
     
-    participants  = get_pirate_defaults(false,'participants');
-        
-    for j=seclvl_contrasts   
-        %% Directory
-        checkdir(seclvl_dirs{j})
-        design.dir = seclvl_dirs(j);
-        %% Design
-        %%select files for second level analysis
-        design.des.t1.scans = fullfile(model_dir,'first',participants.validids,sprintf('con_000%d.nii',j));
-        %%covariate
-        design.cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {});
-        design.multi_cov = struct('files', {}, 'iCFI', {}, 'iCC', {});
-        %%masking and other settings
-        design.masking.tm.tm_none = 1;
-        design.masking.im = 1;
-        design.masking.em = {''};
-        design.globalc.g_omit = 1;
-        design.globalm.gmsca.gmsca_no = 1;
-        design.globalm.glonorm = 1;
-        
-        %% Estimation
-        estimation.spmmat(1) = cfg_dep('Factorial design specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-        estimation.write_residuals = 0;
-        estimation.method.Classical = 1;
-        
-        %% Contrast Specification
-        contrast.spmmat(1) = cfg_dep('Model estimation: SPM.mat File', substruct('.','val', '{}',{2}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-        contrast.consess{1}.tcon.name = contrast_names{j};
-        contrast.consess{1}.tcon.sessrep = 'none';
-        contrast.consess{1}.tcon.weights = 1;
-        contrast.delete=0;
-        
-        %% Output Results
-        results.spmmat(1) = cfg_dep('Contrast Manager: SPM.mat File', substruct('.','val', '{}',{3}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-        for k = 1:numel(contrast.consess)
-            results.conspec(k).titlestr = '';
-            results.conspec(k).contrasts = k;
-            results.conspec(k).threshdesc = 'none';
-            results.conspec(k).thresh = 0.001;
-            results.conspec(k).extent = 0;
-            results.conspec(k).conjunction = 1;
-            results.conspec(k).mask.none = 1;
-        end
-        results.units=1;
-        results.export{1}.jpg=true;
-        results.export{2}.xls=true;        
-        
-        %% Save second level batch job
-        matlabbatch{1}.spm.stats.factorial_design = design;
-        matlabbatch{2}.spm.stats.fmri_est = estimation;
-        matlabbatch{3}.spm.stats.con = contrast;
-        matlabbatch{4}.spm.stats.results = results;
-        save(fullfile(seclvl_dirs{j},'spec2est2ndlvl.mat'),'matlabbatch')
-        
-        spm_jobman('run', matlabbatch);
-    end
+    %%covariate
+    design.cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {});
+    design.multi_cov = struct('files', {}, 'iCFI', {}, 'iCC', {});
+    %%masking and other settings
+    design.masking.tm.tm_none = 1;
+    design.masking.im = 1;
+    design.masking.em = {''};
+    design.globalc.g_omit = 1;
+    design.globalm.gmsca.gmsca_no = 1;
+    design.globalm.glonorm = 1;
+
+    %% Estimation
+    estimation.spmmat(1) = cfg_dep('Factorial design specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
+    estimation.write_residuals = 0;
+    estimation.method.Classical = 1;
+
+    %% Save second level batch job
+    matlabbatch{1}.spm.stats.factorial_design = design;
+    matlabbatch{2}.spm.stats.fmri_est = estimation;
+    save(fullfile(outputdir,'spec2est2ndlvl.mat'),'matlabbatch')
+
+    spm_jobman('run', matlabbatch);
 end
