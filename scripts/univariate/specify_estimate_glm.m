@@ -43,8 +43,8 @@ function specify_estimate_glm(varargin)
     % multiband data https://www.jiscmail.ac.uk/cgi-bin/wa-jisc.exe?A2=ind2205&L=SPM&P=R5597
     specification.timing.units   = 'secs'; %timing mode, options in clude {'scans','secs'}
     specification.timing.RT      = 1.73;   %TR length
-    specification.timing.fmri_t  = 50/2;   %number of slices/multi band factor = 50/2
-    specification.timing.fmri_t0 = 13;     %reference slice
+    specification.timing.fmri_t  = 50/2;   %number of time bins: number of slices/multi band factor = 50/2
+    specification.timing.fmri_t0 = 13;     %set the middle time bins as reference
     
     %% Data&Design
     for iSess = 1:nsess
@@ -66,7 +66,7 @@ function specify_estimate_glm(varargin)
     %% Basis Functions:
     %use the default hrf,first element means time derivatives, second means
     %dispersion derivatives
-    %specification.bases.hrf.derivs = [0 0];
+    specification.bases.hrf.derivs = [0 0];
     % %to use other basis function, specify through
     % %1)fourier set
     % specification.fourier.length =;
@@ -91,15 +91,21 @@ function specify_estimate_glm(varargin)
     specification.global = 'None';% or 'Scaling'
     
     %% Masking Threshold
-    specification.mthresh = -Inf;
+    % implicit masking threshold. SPM by default uses an implicit masking
+    % threshold of 0.8. But this sometimes exclude voxels with low tsnr in
+    % regions we care about. Here we use a combination of explicit mask
+    % with low implicit masking threshold so that sensible voxels in all
+    % brain regions can be included. This threshold is purely empirical
+    % without theoretical support. For example discussion see: https://www.jiscmail.ac.uk/cgi-bin/wa-jisc.exe?A2=ind1910&L=SPM&P=R91828
+    specification.mthresh = 0.2; 
     
     %% Explicit mask 
-    %%%spm intracranial volume mask: {'D:\Matlab_Toolbox\spm12\tpm\mask_ICV.nii'}; no mask: {''}
+    %%%use spm intracranial volume mask as explicit mask
     specification.mask = {fullfile(spm('dir'),'tpm','mask_ICV.nii')};
     %%specification.mask = {''};
     
     %% Serial correlations
-    specification.cvi='AR(1)';%'FAST','none';
+    specification.cvi='AR(1)';%spm default, or change to 'none' if do not want to account for temporal autocorrelation;
     
     %% Estimation
     if flag_estimate
