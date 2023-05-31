@@ -1,15 +1,38 @@
-function nuisance_reg = generate_nuisance_regressor(subimg_dir,flag_save,terms,saving_dir)
-    %valid terms:{'raw','fw','squared-raw','squared-fw','outlier-fw'}
-    
+function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,terms,saving_dir)
+% This function generates the nuisance regressor for first level GLM
+% analysis from the rp_*.txt files generated in the spm realignment
+% process. 
+% INPUT:
+%    - subimg_dir: the directory where rp_*.txt files are saved
+%    - flag_save:  write the generated regressor to file or not
+%    - terms:      terms to be included as nuisance regressor, must be from
+%                  {'raw','fw','squared-raw','squared-fw','outlier-fw'}.
+%                  'raw': the six columns in the rp_*.txt file
+%                  'fw':  the six columns of framewise displacement, i.e.,
+%                  the first derivatives of the six columns in the rp_*.txt file.
+%                  'outlier-fw': the outliers in framewise displacement
+%                  using the voxel size as a threshold. rotation parameters
+%                  in radian were transformed into mm on a 50-mm sphere
+%                  (proximately the radius of adult human head) before
+%                  classification of outliers.
+%    - saving_dir: the directory where the nuisance regressor files are
+%    saved
+% OUTPUT:
+%    - nuisance_reg: the matrix of nuisance regressors
+%    - nN: number of nuisance regressors
+
+   
+    % get the filepattern from default setting 
+    [filepattern,fmri] = get_pirate_defaults(false,'filepattern','fmri');
+
     %configurations
-    if nargin<2, flag_save = true; end
-    if nargin<3, terms = {'raw','fw'}; end% terms to be included as nuisance regressor, by default will generate 12, i.e., realignment parameters and their first derivatives(framewise displacement)
+    if nargin<2, flag_save  = true; end
+    % terms to be included as nuisance regressor, by default will generate 12, i.e., realignment parameters and their first derivatives(framewise displacement)
+    if nargin<3, terms      = fmri.nuisance_terms; end
     if nargin<4, saving_dir = subimg_dir; end    
     
-    % get the filepattern from default setting 
-    filepattern = get_pirate_defaults(false,'filepattern');
     
-    % find files 
+    % find files
     rp_files   = cellstr(spm_select('FPList',subimg_dir,[filepattern.preprocess.motionparam,'.*.txt']));
     
     % setup headmotion regressors
@@ -19,10 +42,10 @@ function nuisance_reg = generate_nuisance_regressor(subimg_dir,flag_save,terms,s
         [~,tasknames{j},~] = fileparts(rp_files{j});
         tasknames{j} = regexprep(tasknames{j},filepattern.preprocess.motionparam,'');
         tasknames{j} = regexprep(tasknames{j},filepattern.preprocess.reorient,'');        
-        scanningparam = loadjson(spm_select('FPList',subimg_dir,[tasknames{j},'.json']));
         
         % displacement(D)
         D = table2array(readtable(rp_files{j})); 
+        
         % framewise displacement(FW)
         FW = D - [zeros(1,6);D(1:end-1,:)];
         
@@ -37,8 +60,14 @@ function nuisance_reg = generate_nuisance_regressor(subimg_dir,flag_save,terms,s
         FW_mm = FW;
         FW_mm(:,4:6) = FW_mm(:,4:6).*50;
         FW_mm = arrayfun(@(x) sum(abs(FW_mm(x,:))),1:size(FW_mm));
-        OFW(FW_mm>scanningparam.SliceThickness,FW_mm>scanningparam.SliceThickness) = 1;
+        OFW(FW_mm>fmri.voxelsize,FW_mm>fmri.voxelsize) = 1;
         OFW = OFW.* eye(nvol);        
+        
+%         % demean and detrend
+%         D = demean_timeseries(D);
+%         D = detrend_timeseries(D);
+%         FW = demean_timeseries(FW);
+%         FW = detrend_timeseries(FW);        
         
         % set up nuisance regressors
         nuisance_reg = [];
@@ -53,5 +82,20 @@ function nuisance_reg = generate_nuisance_regressor(subimg_dir,flag_save,terms,s
             prefix = strrep(filepattern.preprocess.nuisance,'^','');
             writematrix(nuisance_reg,fullfile(saving_dir,[prefix,tasknames{j},'.txt']),'Delimiter','tab');            
         end
+        nN = size(nuisance_reg,2);
     end
+end
+
+function demeaned_data = demean_timeseries(data) %#ok<*DEFNU>
+    nr = size(data,1);
+    demeaned_data = data - repmat(mean(data,1,'omitnan'),nr,1);
+end
+
+function detrended_data = detrend_timeseries(data)
+    nr = size(data,1);
+    X = data - repmat(mean(data,1,'omitnan'),nr,1);
+    X = [X ones(nr,1)];
+    Y = data;
+    b = pinv(X)*Y;
+    detrended_data = data - X(:,1:end-1) * b(1:end-1,:);
 end

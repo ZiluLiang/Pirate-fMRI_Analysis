@@ -17,7 +17,7 @@
 
 clear;clc
 %% Configurations
-[directory,participants,filepattern] = get_pirate_defaults(false,'directory','participants','filepattern');
+[directory,participants,filepattern,fmri] = get_pirate_defaults(false,'directory','participants','filepattern','fmri');
 
 % Configure the steps, field names of the preprocess_flags struct must not be changed 
 preprocess_flags   = struct('reorient',       false,...
@@ -26,8 +26,8 @@ preprocess_flags   = struct('reorient',       false,...
                             'coregistration', false,...
                             'segmentation',   false,...
                             'normalisation',  false,...
-                            'smooth',         true);                       
-generate_nuisance = false;
+                            'smooth',         false);                       
+generate_nuisance = true;
 copy_preprocessed = true;
 
 
@@ -75,12 +75,13 @@ end
 %% --------------  Generate Nuisance Regressor for head motion  -------------- 
 % gen nuisance regressor
 if generate_nuisance
-    err_tracker   = cell(participants.nsub,1);
+    err_tracker = cell(participants.nsub,1);
     parfor isub = 1:participants.nsub
         fprintf('creating head motion regressor for %s\n',participants.ids{isub});
         try
             subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
-            generate_nuisance_regressor(subimg_dir,true,{'raw','fw'}); % generate nuisance regressor using head motion parameters and their first derivatives
+            % generate nuisance regressor using head motion parameters and their first derivatives
+            generate_nuisance_regressor(subimg_dir,false); 
         catch err
             err_tracker{isub} = err;
         end
@@ -93,7 +94,7 @@ end
 % clean folder for subsequent statistical analysis
 if copy_preprocessed
     par_dir    = directory.smoothed; %#ok<*UNRCH>
-    move_files = {filepattern.preprocess.smooth,filepattern.preprocess.nuisance};
+    move_files = {filepattern.preprocess.nuisance};%{filepattern.preprocess.smooth,filepattern.preprocess.nuisance};
     parfor isub  = 1:nsub
         from_dir = fullfile(preproc_dir,ids{isub});
         to_dir   = fullfile(par_dir,ids{isub});
