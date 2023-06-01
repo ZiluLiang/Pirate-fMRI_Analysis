@@ -33,6 +33,8 @@ end
 % extract residuals to double check if models are running okay
 for j = 1:numel(LSAglm_names)
     glm_name = LSAglm_names{j};
-    [rangeCon.(glm_name),meanResMS.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,'unsmoothedLSA',glm_name));
+    masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\wfu','.*.nii'));
+    [rangeCon.(glm_name),meanResMS1.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,'unsmoothedLSA',glm_name),masks);
+    [rangeCon.(glm_name),meanResMS2.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,'smoothedLSA5mm',glm_name),masks);
 end
 
