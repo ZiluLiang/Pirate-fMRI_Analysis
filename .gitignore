@@ -8,6 +8,7 @@ probdf
 *.code-workspace
 *.asv
 
+scripts/LegacyCodes
 scripts/behavior
 scripts/generic
 scripts/history
