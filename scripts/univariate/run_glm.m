@@ -1,6 +1,22 @@
 function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
+% run first and second level analysis for different glms
+% INPUT:
+% - glm_name: name of the glm, this will be used to find glm
+%             configurations in the get_glm_config functions
+% - steps: what steps to include, must be from
+%          {'spec2est','contrast','second_level'}. 
+%          'spec2est': specify and estimat first level model
+%          'contrast': specify and estimat first level contrast
+%          'second_level': specify and estimat 2nd level model
+% - glm_dir: output directory for the glm model results
+% - preproc_img_dir: directory for preprocessed fmri data
+% - subidlist: list of participants to be included in the analysis
+% OUTPUT:
+% - error_tracker: this function do not pause when spm job runs into error,
+%                  errors are returned for tracking which participants' 
+%                  data did not run through
 % TODO: make second level accommodate different types of first level
-% analysis
+% contrasts
     spm('defaults','FMRI')
     [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
     
@@ -77,25 +93,27 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
     end
 end
 
-function [contrast_idx,split_names] = split_Fcontrast(subfirstlvldir,contrast_name,wvec,row_names)
-% construct_contrast_for_F
-   
-    subSPM     = load(fullfile(subfirstlvldir,'SPM.mat'),'SPM').SPM;
-    firstlvlF_wvec = gen_contrast_matrix(subSPM,wvec);
-    nC = size(firstlvlF_wvec,1);
-    splitF2T_wvec  = arrayfun(@(k) firstlvlF_wvec(k,:),1:nC,'uni',0);
-    split_names = arrayfun(@(k) sprintf('bf%d_%s',k,contrast_name),1:designSPM.xBF.order,'uni',0);
-    
-    % check if required contrasts already exists
-    contrast_idx = cellfun(@(cname) find_contrast_idx(subSPM,cname),split_names);
-    % build the required contrasts that do not exists yet.
-    build_idx = arrayfun(@isnan,contrast_idx);
-    if ~any(build_idx)
-        specify_estimate_contrast(subfirstlvldir,...
-                                  split_names(build_idx),...
-                                  splitF2T_wvec(build_idx),...
-                                  false); % do not replace existing contrast
-    end
-    % find contrast idx after all required contrasts have been constructed
-    contrast_idx = find_contrast_idx(subSPM,split_names);
-end
+% TODO: make second level accommodate different types of first level
+% contrasts
+% function [contrast_idx,split_names] = split_Fcontrast(subfirstlvldir,contrast_name,wvec,row_names)
+% % construct_contrast_for_F
+%    
+%     subSPM     = load(fullfile(subfirstlvldir,'SPM.mat'),'SPM').SPM;
+%     firstlvlF_wvec = gen_contrast_matrix(subSPM,wvec);
+%     nC = size(firstlvlF_wvec,1);
+%     splitF2T_wvec  = arrayfun(@(k) firstlvlF_wvec(k,:),1:nC,'uni',0);
+%     split_names = arrayfun(@(k) sprintf('bf%d_%s',k,contrast_name),1:designSPM.xBF.order,'uni',0);
+%     
+%     % check if required contrasts already exists
+%     contrast_idx = cellfun(@(cname) find_contrast_idx(subSPM,cname),split_names);
+%     % build the required contrasts that do not exists yet.
+%     build_idx = arrayfun(@isnan,contrast_idx);
+%     if ~any(build_idx)
+%         specify_estimate_contrast(subfirstlvldir,...
+%                                   split_names(build_idx),...
+%                                   splitF2T_wvec(build_idx),...
+%                                   false); % do not replace existing contrast
+%     end
+%     % find contrast idx after all required contrasts have been constructed
+%     contrast_idx = find_contrast_idx(subSPM,split_names);
+% end

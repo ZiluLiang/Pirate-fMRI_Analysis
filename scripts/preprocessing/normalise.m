@@ -1,6 +1,6 @@
 function normalise(subimg_dir)
     % find files
-    filepattern = get_pirate_defaults(false,'filepattern');    
+    [fmri,filepattern] = get_pirate_defaults(false,'fmri','filepattern');    
     def_field = cellstr(spm_select('FPList',subimg_dir,filepattern.preprocess.deformation));
     func_imgs = cellstr(spm_select('ExtFPList', subimg_dir, [filepattern.preprocess.realignunwarp,'.*\.nii']));
 
@@ -12,7 +12,7 @@ function normalise(subimg_dir)
     normalization{1}.spm.spatial.normalise.write.subj.def = def_field;
     normalization{1}.spm.spatial.normalise.write.subj.resample = func_imgs;        
     normalization{1}.spm.spatial.normalise.write.woptions.bb  = bb; % change to match the bb of the template image
-    normalization{1}.spm.spatial.normalise.write.woptions.vox = [2.5 2.5 2.5]; % change to match the resolution of acquistion
+    normalization{1}.spm.spatial.normalise.write.woptions.vox = [fmri.voxelsize fmri.voxelsize fmri.voxelsize]; % change to match the resolution of acquistion
     normalization{1}.spm.spatial.normalise.write.woptions.interp = 7; % change to 7 to achieve higher normalization quality
     
     save(fullfile(subimg_dir,'normalization.mat'),'normalization')

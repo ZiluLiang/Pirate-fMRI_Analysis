@@ -1,8 +1,8 @@
 function w_mat = gen_contrast_matrix(subSPM,wm)
 % generate contrast vector
 % INPUTS:
-% subSPM: path to first level SPM.mat file or the loaded SPM struct;
-% wm: contrast matrix in one session
+%  - subSPM: path to first level SPM.mat file or the loaded SPM struct;
+%  - wm: contrast matrix in one session
 % TODO: generate contrasts based on regressor names?
     if ischar(subSPM)
         if exist(subSPM,'file')
