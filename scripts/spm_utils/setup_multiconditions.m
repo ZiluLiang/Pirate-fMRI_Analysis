@@ -14,6 +14,7 @@ function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cf
     glm_dir    = fullfile(directory.fmri_data,glm_config.name);
     
     if nargin<3, output_dir = fullfile(glm_dir,'beh',subid); end
+    if nargin<4, gen_multi_cfg = struct();end
     checkdir(output_dir)
     
     data_mat   = cellstr(spm_select('FPList',fullfile(directory.fmribehavior,subid),[glm_config.filepattern,'.*mat']));
@@ -36,9 +37,23 @@ function multi = gen_multi(data,cond_names,pmod_names,custom_cfg)
 % INPUT
 %     data: the data table
 %     names: names of the event
-%     cfg: 
-%     pmod:
-% OUTPUT: 1xN N = numel(eventnames)
+%     cfg: configurations for design matrix, it has the following fields
+%           'use_stick' - whether to use box car or stick function, by default uses stick function (durtation = 0)
+%           'tmod',     - the order of time modulation,
+%           'orth',     - whether to orthogonalize parametric modulators
+%     pmod_names: names of parametric modulators
+% Note that this function look for event onset (and/or duration) by looking
+% for names of the event/parametric modulator columns in the data table, 
+% for event names, onset_eventname/duration_eventname must be a column in the data table
+% for pmod names, pmodname must be a column in the data table. For
+% instance, a condition called 'stimuli' is set up by looking for columns
+% called 'onset_stimuli' and 'duration_stimuli' in the data table. a
+% parametric modulator called 'distance' is set up by looking for a column
+% called 'distance' in the data table.
+
+% OUTPUT:
+%   a struct with the following fields: 'names','onsets','durations','orth','tmod','pmod'.
+%   each field value is a cell array or struct array of size 1xN N = numel(eventnames).
 %    cell arrays - names,onsets,durations,orth,tmod
 %    struct array - pmod
 % Output format are constructed according to the spm documentation, e.g.
@@ -78,32 +93,11 @@ function multi = gen_multi(data,cond_names,pmod_names,custom_cfg)
     % specify conditions
     orth = num2cell([cfg.orth]);
     tmod = num2cell([cfg.tmod]);
-    pmod = repmat(struct('name',{},'param',{},'poly',{}),n_conditions,1);
-    try
-        if ~isempty(pmod_names)
-            for j = 1:numel(cond_names)
-                if j>numel(pmod_names) && isempty(pmod_names{j})
-                    pmod(j) = struct('name',{},'param',{},'poly',{});
-                else
-                    for k = 1:numel(pmod_names{j})
-                        pmod(j).name{k} = pmod_names{j}{k};
-                        data_col = data.(pmod_names{j}{k});
-                        pmod_val = data_col(~isnan(data_col));
-                        pmod(j).param{k} = pmod_val;
-                        pmod(j).poly{k} = 1;
-                    end
-                end
-            end
-        end
-    catch
-        pmod = struct('name',{},'param',{},'poly',{});
-    end
-
-
+    pmod = repmat(struct('name','','param','','poly',''),n_conditions,1);
     onsets    = cell(size(cond_names));
     durations = cell(size(cond_names));
 
-    for j = 1:numel(cond_names)
+    for j = 1:n_conditions
         % find columns for onset and duration
         onsets{j} = data.(['onset_',cond_names{j}]);
         if ~cfg(j).use_stick
@@ -127,7 +121,7 @@ function multi = gen_multi(data,cond_names,pmod_names,custom_cfg)
             error('size of onset array and duration array do not match!')
         end
         % find columns for parametric modulators
-        if j<numel(pmod_names) && ~isempty(pmod_names{j})
+        if j<=numel(pmod_names) && ~isempty(pmod_names{j})
             for k = 1:numel(pmod_names{j})
                 pmod(j).name{k} = pmod_names{j}{k};
                 data_col = data.(pmod_names{j}{k});

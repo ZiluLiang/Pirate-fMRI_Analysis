@@ -1,4 +1,5 @@
 function glm_cofig = get_glm_config(glm_name)
+% get the configurations of the glm models
     glms      = glm_gallery;
     glm_names = {glms.name};
     glm_cofig = glms(cellfun(@(x) strcmp(glm_name,x),glm_names));
