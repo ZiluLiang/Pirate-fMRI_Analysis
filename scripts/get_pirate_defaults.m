@@ -37,7 +37,7 @@ function varargout = get_pirate_defaults(varargin)
     % parse fields of default settings to output
     cellarr  = cellfun(@(x) pirate_defaults.(x),get_fields,'uni',0);
     if return_struct_flag        
-        varargout = cell2struct(cellarr, get_fields);
+        varargout = {cell2struct(cellarr, get_fields)};
     else
         varargout = cellarr;
     end
@@ -46,23 +46,26 @@ end
 
 function pirate_defaults = setdefaults
 
-    pirate_defaults = struct('directory',      struct(),...
-                             'participants',   struct(),...
-                             'filepattern',    struct(),...
-                             'scanning',       struct(),...
-                             'preprocessing',  struct(),...
-                             'handles',        struct());
+    pirate_defaults = struct('packages',     struct(),...
+                             'directory',    struct(),...
+                             'participants', struct(),...
+                             'filepattern',  struct(),...
+                             'fmri',         struct());
 
     
-    %% --------------  Specify directory  --------------  
-    wk_dir          = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\';
-    script_dir      = fullfile(wk_dir,'scripts');
-    SPM12_dir       = 'C:\Program Files\MATLAB\matlab toolbox\spm12';
-    add_path(script_dir,1)
-    add_path(SPM12_dir,0)
-
-    pirate_defaults.directory.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
-    pirate_defaults.directory.pm_default   = fullfile(script_dir,'preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
+    %% --------------  Specify dependencies --------------  
+    wk_dir  = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\';
+    % packages that do not need to add with subfolders
+    pirate_defaults.packages.SPM12        = 'C:\Program Files\MATLAB\matlab toolbox\spm12';
+    pirate_defaults.packages.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
+    % packages that need to add with subfolders
+    pirate_defaults.packages.scripts      = genpath(fullfile(wk_dir,'scripts'));
+    pirate_defaults.packages.wfupickatlas = genpath('C:\Program Files\MATLAB\matlab toolbox\wfupickatlas');
+    % add path to packages
+    structfun(@(pkg_path) addpath(pkg_path),rmfield(pirate_defaults.packages,'MRIcroGL'))
+    
+    %% --------------  Specify directory  --------------      
+    pirate_defaults.directory.pm_default   = fullfile(pirate_defaults.packages.scripts,'preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
     pirate_defaults.directory.mni_template = 'C:\MRIcroGL_windows\MRIcroGL\standard\mni152.nii.gz'; % mni template used for visualization and estimate parameters for auto-reorientation
     pirate_defaults.directory.fmri_data    = fullfile(wk_dir,'data','fmri');
     pirate_defaults.directory.fmribehavior = fullfile(wk_dir,'data','fmri','beh');
@@ -78,8 +81,8 @@ function pirate_defaults = setdefaults
     pirate_defaults.participants.ids     = fieldnames(renamer);
     pirate_defaults.participants.nsub    = numel(pirate_defaults.participants.ids);
     %%%%%TODO add valid participants list
-    pirate_defaults.participants.validids     = pirate_defaults.participants.ids(1:30); % exclude sub 31 due to incomplete scans
-    pirate_defaults.participants.nvalidsub    = numel(pirate_defaults.participants.validids);% exclude sub 31 due to incomplete scans
+    pirate_defaults.participants.validids  = pirate_defaults.participants.ids(1:30); % exclude sub 31 due to incomplete scans
+    pirate_defaults.participants.nvalidsub = numel(pirate_defaults.participants.validids);% exclude sub 31 due to incomplete scans
         
     %% --------------  naming patterns ------------------
     pirate_defaults.filepattern.task1   = 'sub-.*_task-piratenavigation_run-[1-4]';
@@ -122,34 +125,4 @@ function pirate_defaults = setdefaults
     pirate_defaults.fmri.tr        = 1.73;% TR in seconds
     pirate_defaults.fmri.nuisance_terms = {'raw','fw'}; 
     
-end
-
-function add_path(varargin)
-% add_path(path1,path2,...,pathn,add_with_subfolders_flag)
-% path1, ..., pathn: paths to add
-% add_with_subfolders_flag : 1-add path with subfolders, 0-add without subfolders
-    if nargin == 1
-        add_with_subfolders_flag = 0;
-        new_paths = varargin(1);
-    else
-        if isnumeric(varargin{end})
-            new_paths = varargin(1:end-1);
-            add_with_subfolders_flag = varargin{end};            
-        end
-    end
-    
-    path_added = @(x) contains([pathsep,path,pathsep], [pathsep,x,pathsep], 'IgnoreCase', ispc);
-    for j = 1:numel(new_paths)
-        new_path = new_paths{j};
-        if ~path_added(new_path)
-            if add_with_subfolders_flag
-                path_added = cellfun(@path_added, strsplit(genpath(new_path),';'));
-                if ~ all(path_added)
-                    addpath(genpath(new_path));
-                end
-            else
-                addpath(new_path);
-            end
-        end
-    end
 end

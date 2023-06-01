@@ -1,28 +1,23 @@
-function specify_estimate_glm(varargin)
+function specify_estimate_glm(nii_files,multicond_files,nuisance_files,output_dir,flag_estimate)
 %writen by Zilu Liang (2023 May, Oxford)
 %this script specifies first-level glm in spm
 % usage: specify_estimate_glm(nii_files,multicond_files,nuisance_files,output_dir,flag_estimate)
+% INPUT:
+% - nii_files: cell array of fmri time series files for the analysis, each
+%               element is the file for one session
+% - multicond_files: cell array of .mat file that contains the specification of
+%                    conditions in spm, each element is the file for one session.  
+%                    see spm batch GUI for detailed formatting instructions
+% - nuisance_files:  cell array of .txt files that contains the nuisance regressors,
+%                    each element is the file for one session.  
+%                    each column in a txt file is the value of one nuisance
+%                    regressor.
+% - output_dir:      the directory in which result images and SPM.mat is saved 
+% - flag_estimate:   if false, the model will only be specified but not
+%                    estimated
 
-    % validate input and find files 
-    
-    err_flag = 1;
-    if nargin == 4 || nargin == 5
-        if all(cellfun(@(arg) iscell(arg),varargin(1:3))) && ischar(varargin{4})
-            nii_files       = varargin{1};
-            multicond_files = varargin{2};
-            nuisance_files  = varargin{3};
-            output_dir      = varargin{4};
-            err_flag   = 0;
-            if nargin<5, flag_estimate = true; end
-        end
-    end
-    
-    if err_flag
-        error('invalid inputs')
-    else
-        checkdir(output_dir)
-    end
-    
+    % validate input and find files
+    if nargin<5, flag_estimate = true; end %#ok<*NASGU>    
     if ~all(cellfun(@(x) exist(x,'file'),[nii_files,multicond_files,nuisance_files]))
         all_files = [nii_files,multicond_files,nuisance_files];
         missing_files = all_files(cellfun(@(x) ~exist(x,'file'),[nii_files,multicond_files,nuisance_files]));
@@ -33,7 +28,8 @@ function specify_estimate_glm(varargin)
     else
         error('number of 4D nii files, multiple conditions files, and number of nuisance regressor files do not match!')
     end   
-    
+    checkdir(output_dir)
+
     
     %% Directory
     specification.dir = {output_dir};
