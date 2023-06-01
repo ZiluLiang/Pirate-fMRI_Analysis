@@ -1,4 +1,8 @@
-function [rangeCon,sumResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_dir,masks)
+function [rangeCon,meanResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_dir,masks)
+% This function finds the gives some summary statistics on the statistical
+% results of first level glm analysis for sanity check of model fitting
+% results.
+% TODO: calculate measure of model fitting quality?
     [directory,participants]  = get_pirate_defaults(false,'directory','participants');
     contrast_names = {get_glm_config(glm_name).contrasts.name};
     if nargin<2
@@ -7,10 +11,12 @@ function [rangeCon,sumResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_d
     if nargin<3
         masks = repmat({'all'},numel(contrast_names),1);
     end
-    
+    unique_masks = unique(masks);
+    mask_names = cell(size(unique_masks));
+
     rangeStat  = cell(numel(participants.validids),numel(contrast_names));
     rangeCon   = cell(numel(participants.validids),numel(contrast_names));
-    sumResMS  = nan(numel(participants.validids), 3);
+    meanResMS  = nan(numel(participants.validids), numel(unique_masks));
     for isub = 1:numel(participants.validids)
         firstlevel_dir = fullfile(glm_dir,'first',participants.validids{isub});
         for j = 1:numel(contrast_names)
@@ -24,13 +30,14 @@ function [rangeCon,sumResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_d
                 rangeStat{isub,j} = [nan,nan];
                 rangeCon{isub,j} = [nan,nan];
             end           
-        end        
-        voxelwise_ResMS = spm_summarise(fullfile(firstlevel_dir,'ResMS.nii'),'all');            
-        sumResMS(isub,:) = [min(voxelwise_ResMS),...
-                             max(voxelwise_ResMS),...
-                             mean(voxelwise_ResMS,'all','omitnan')];
+        end
+        for k = 1:numel(unique_masks)
+            voxelwise_ResMS = spm_summarise(fullfile(firstlevel_dir,'ResMS.nii'),unique_masks{k});            
+            meanResMS(isub,k) = mean(voxelwise_ResMS,'all','omitnan');
+            [~,mask_names{k},~] = fileparts(unique_masks{k});
+        end
     end
     rangeStat = cell2table(rangeStat,'VariableNames',contrast_names);
     rangeCon  = cell2table(rangeCon,'VariableNames',contrast_names);
-    sumResMS = array2table(sumResMS,'VariableNames',{'min','max','mean'});
+    meanResMS = array2table(meanResMS,'VariableNames',mask_names);
 end

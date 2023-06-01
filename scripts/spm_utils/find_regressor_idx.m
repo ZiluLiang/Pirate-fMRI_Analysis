@@ -1,10 +1,10 @@
 function regressor_idx = find_regressor_idx(subSPM,regressor_names)
-% This function finds the index of the name of regressors
-% example usage: find_regressor_idx(subSPM,regressor_names)
-% example usage: find_regressor_idx(subSPM,regressor_pattern)
-%  if it is regular expression, it will return all the matches of that reg
-%  exp.
-%    subSPM = load(fullfile(glm_dir,'first',subid,'SPM.mat'),'SPM').SPM;
+% This function finds the index of regressors given its name/pattern in the SPM struct
+% INPUT:
+%    - subSPM: path to first level SPM.mat file;
+%    - regressor_names: name or a cell array of names of the regressor(s);
+% OUTPUT:
+%    - regressor_idx: the index/indices of the regressor(s) in SPM.xX.name;
     if ischar(subSPM)
         if exist(subSPM,'file')
             subSPM = load(subSPM).SPM;

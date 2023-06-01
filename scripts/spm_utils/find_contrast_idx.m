@@ -1,4 +1,5 @@
 function [contrast_idx,contrast_img,stat_img] = find_contrast_idx(subSPM,contrasts_names)
+% This function finds the index of a contrast given its name in the SPM struct
 % INPUT:
 %    - subSPM: path to first level SPM.mat file;
 %    - contrasts_names: name or a cell array of names of the contrast(s);
