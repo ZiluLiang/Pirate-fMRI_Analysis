@@ -17,6 +17,7 @@ function varargout = get_pirate_defaults(varargin)
     % set return flags and validate fields
     if numel(varargin) == 0
         return_struct_flag = true;
+        get_fields = fieldnames(pirate_defaults);
     else
         if islogical(varargin{1})
             return_struct_flag = varargin{1};
@@ -58,9 +59,10 @@ function pirate_defaults = setdefaults
     % packages that do not need to add with subfolders
     pirate_defaults.packages.SPM12        = 'C:\Program Files\MATLAB\matlab toolbox\spm12';
     pirate_defaults.packages.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
+    pirate_defaults.packages.jsonlab      = 'C:\Program Files\MATLAB\matlab toolbox\jsonlab-master';
     % packages that need to add with subfolders
     pirate_defaults.packages.scripts      = genpath(fullfile(wk_dir,'scripts'));
-    pirate_defaults.packages.wfupickatlas = genpath('C:\Program Files\MATLAB\matlab toolbox\wfupickatlas');
+    %pirate_defaults.packages.wfupickatlas = genpath('C:\Program Files\MATLAB\matlab toolbox\wfupickatlas');
     % add path to packages
     structfun(@(pkg_path) addpath(pkg_path),rmfield(pirate_defaults.packages,'MRIcroGL'))
     
