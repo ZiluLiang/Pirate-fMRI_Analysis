@@ -60,14 +60,15 @@ function pirate_defaults = setdefaults
     pirate_defaults.packages.SPM12        = 'C:\Program Files\MATLAB\matlab toolbox\spm12';
     pirate_defaults.packages.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
     pirate_defaults.packages.jsonlab      = 'C:\Program Files\MATLAB\matlab toolbox\jsonlab-master';
+    pirate_defaults.packages.SPM12OldNorm = fullfile(pirate_defaults.packages.SPM12,'toolbox','OldNorm'); % this is so that auto reorientation runs
+    pirate_defaults.packages.SPM12batch   = fullfile(pirate_defaults.packages.SPM12,'matlabbatch');         % this is so that batch management runs
     % packages that need to add with subfolders
     pirate_defaults.packages.scripts      = genpath(fullfile(wk_dir,'scripts'));
-    %pirate_defaults.packages.wfupickatlas = genpath('C:\Program Files\MATLAB\matlab toolbox\wfupickatlas');
     % add path to packages
     structfun(@(pkg_path) addpath(pkg_path),rmfield(pirate_defaults.packages,'MRIcroGL'))
     
     %% --------------  Specify directory  --------------      
-    pirate_defaults.directory.pm_default   = fullfile(pirate_defaults.packages.scripts,'preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
+    pirate_defaults.directory.pm_default   = fullfile(wk_dir,'scripts','preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
     pirate_defaults.directory.mni_template = 'C:\MRIcroGL_windows\MRIcroGL\standard\mni152.nii.gz'; % mni template used for visualization and estimate parameters for auto-reorientation
     pirate_defaults.directory.fmri_data    = fullfile(wk_dir,'data','fmri');
     pirate_defaults.directory.fmribehavior = fullfile(wk_dir,'data','fmri','beh');

@@ -35,19 +35,21 @@ function calculateVDM(subimg_dir,varargin)
     
     % set up vdm
     first_epi = strrep(nii_files.functional.task1{1},'.nii','.nii,1');% use the first volume of the functional images here just for quality inspection, please see SPM instruction
-    calculateVDM = {};
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.phase = nii_files.fieldmap.phasediff;
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.magnitude = nii_files.fieldmap.shortecho; %select the one with short echo
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsfile  = cellstr(directory.pm_default);
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.session.epi = cellstr(first_epi); 
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.matchvdm = 1; % cogregister the magnitude image to the EPI image.
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.sessname = 'session';
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.writeunwarped = 1; % save the unwarped image for quality check
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.anat = nii_files.anatomical.T1;
-    calculateVDM{1}.spm.tools.fieldmap.calculatevdm.subj.matchanat = 1;
+    matlabbatch = {};
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.phase = nii_files.fieldmap.phasediff;
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.data.presubphasemag.magnitude = nii_files.fieldmap.shortecho; %select the one with short echo
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.defaults.defaultsfile  = cellstr(directory.pm_default);
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.session.epi = cellstr(first_epi); 
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.matchvdm = 1; % cogregister the magnitude image to the EPI image.
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.sessname = 'session';
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.writeunwarped = 1; % save the unwarped image for quality check
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.anat = nii_files.anatomical.T1;
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.matchanat = 1;
     
-    save(fullfile(subimg_dir,'calculate_VDM.mat'),'calculateVDM')
-    spm_jobman ('run',calculateVDM);
+    save(fullfile(subimg_dir,'calculate_VDM.mat'),'matlabbatch')
+    spm('defaults', 'FMRI');
+    spm_jobman('initcfg')
+    spm_jobman ('run',matlabbatch);
     
     % rename the unwarped first epi file so that it doesn't interfere with
     % file selction in the later realign and unwarp step

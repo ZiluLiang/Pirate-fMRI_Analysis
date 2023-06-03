@@ -37,12 +37,17 @@ function realign_unwarp(subimg_dir,varargin)
     func_imgs = cat(1,func_imgs{:});
     
     % set realign_unwarp job
-    realign_unwarp = {};
+    matlabbatch{1}.spm.spatial.realignunwarp.data = struct('scans', {}, 'pmscan', {});
     for sess = 1:numel(func_imgs)
-        realign_unwarp{1}.spm.spatial.realignunwarp.data(sess).scans = cellstr(spm_select('expand',func_imgs{sess}));
-        realign_unwarp{1}.spm.spatial.realignunwarp.data(sess).pmscan = vdm_img;
+        matlabbatch{1}.spm.spatial.realignunwarp.data(sess).scans = cellstr(spm_select('expand',func_imgs{sess}));
+        matlabbatch{1}.spm.spatial.realignunwarp.data(sess).pmscan = vdm_img;
     end
     
-    save(fullfile(subimg_dir,'realign_unwarp.mat'),'realign_unwarp')
-    spm_jobman ('run',realign_unwarp);
+    matlabbatch{1}.spm.spatial.realignunwarp.eoptions.einterp = 7;% change to 7 to achieve higher quality
+    matlabbatch{1}.spm.spatial.realignunwarp.uwroptions.rinterp = 7;% change to 7 to achieve higher quality
+
+    spm('defaults', 'FMRI');
+    spm_jobman('initcfg')
+    save(fullfile(subimg_dir,'realign_unwarp.mat'),'matlabbatch')
+    spm_jobman('run',matlabbatch);
 end

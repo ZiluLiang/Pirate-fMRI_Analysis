@@ -32,10 +32,10 @@ function coregister(subimg_dir,varargin)
     end
     meanepi_img = cellstr(spm_select('FPList', subimg_dir, [filepattern.preprocess.meanepi,'.*\.nii']));
     
-    coregister  = {};
-    coregister{1}.spm.spatial.coreg.estwrite.source = nii_files.anatomical.T1;
-    coregister{1}.spm.spatial.coreg.estwrite.ref    = meanepi_img; 
-    coregister{1}.spm.spatial.coreg.estimate.other = {''};
+    matlabbatch  = {};
+    matlabbatch{1}.spm.spatial.coreg.estwrite.source = nii_files.anatomical.T1;
+    matlabbatch{1}.spm.spatial.coreg.estwrite.ref    = meanepi_img; 
+    matlabbatch{1}.spm.spatial.coreg.estimate.other = {''};
 %     Defaults from spm
 %     coregister{1}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
 %     coregister{1}.spm.spatial.coreg.estimate.eoptions.sep      = [4 2];
@@ -43,6 +43,8 @@ function coregister(subimg_dir,varargin)
 %                                                                    0.0100 0.0100 0.0100 0.0010 0.0010 0.0010];
 %     coregister{1}.spm.spatial.coreg.estimate.eoptions.fwhm     = [7 7];        
     
-    save(fullfile(subimg_dir,'coregister.mat'),'coregister')
-    spm_jobman ('run',coregister);
+    save(fullfile(subimg_dir,'coregister.mat'),'matlabbatch')
+    spm('defaults', 'FMRI');
+    spm_jobman('initcfg')
+    spm_jobman ('run',matlabbatch);
 end
