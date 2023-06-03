@@ -63,12 +63,6 @@ function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,te
         OFW(FW_mm>fmri.voxelsize,FW_mm>fmri.voxelsize) = 1;
         OFW = OFW.* eye(nvol);        
         
-%         % demean and detrend
-%         D = demean_timeseries(D);
-%         D = detrend_timeseries(D);
-%         FW = demean_timeseries(FW);
-%         FW = detrend_timeseries(FW);        
-        
         % set up nuisance regressors
         nuisance_reg = [];
         if ismember('raw',terms), nuisance_reg = [nuisance_reg,D]; end %#ok<*AGROW>
@@ -84,18 +78,4 @@ function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,te
         end
         nN = size(nuisance_reg,2);
     end
-end
-
-function demeaned_data = demean_timeseries(data) %#ok<*DEFNU>
-    nr = size(data,1);
-    demeaned_data = data - repmat(mean(data,1,'omitnan'),nr,1);
-end
-
-function detrended_data = detrend_timeseries(data)
-    nr = size(data,1);
-    X = data - repmat(mean(data,1,'omitnan'),nr,1);
-    X = [X ones(nr,1)];
-    Y = data;
-    b = pinv(X)*Y;
-    detrended_data = data - X(:,1:end-1) * b(1:end-1,:);
 end

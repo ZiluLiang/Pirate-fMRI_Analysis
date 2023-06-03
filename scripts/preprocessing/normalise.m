@@ -8,13 +8,15 @@ function normalise(subimg_dir)
     [bb,~]=spm_get_bbox([spm('dir'),filesep,'tpm',filesep,'TPM.nii']);
 
     % set up normalization job
-    normalization = {};
-    normalization{1}.spm.spatial.normalise.write.subj.def = def_field;
-    normalization{1}.spm.spatial.normalise.write.subj.resample = func_imgs;        
-    normalization{1}.spm.spatial.normalise.write.woptions.bb  = bb; % change to match the bb of the template image
-    normalization{1}.spm.spatial.normalise.write.woptions.vox = [fmri.voxelsize fmri.voxelsize fmri.voxelsize]; % change to match the resolution of acquistion
-    normalization{1}.spm.spatial.normalise.write.woptions.interp = 7; % change to 7 to achieve higher normalization quality
+    matlabbatch = {};
+    matlabbatch{1}.spm.spatial.normalise.write.subj.def = def_field;
+    matlabbatch{1}.spm.spatial.normalise.write.subj.resample = func_imgs;        
+    matlabbatch{1}.spm.spatial.normalise.write.woptions.bb  = bb; % change to match the bb of the template image
+    matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = [fmri.voxelsize fmri.voxelsize fmri.voxelsize]; % change to match the resolution of acquistion
+    matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 7; % change to 7 to achieve higher normalization quality
     
-    save(fullfile(subimg_dir,'normalization.mat'),'normalization')
-    spm_jobman ('run',normalization);
+    save(fullfile(subimg_dir,'normalization.mat'),'matlabbatch')
+    spm('defaults', 'FMRI');
+    spm_jobman('initcfg')
+    spm_jobman ('run',matlabbatch);
 end

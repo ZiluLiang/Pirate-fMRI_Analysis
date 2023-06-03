@@ -13,20 +13,20 @@
 % subsequent analysis
 %
 %
-% ------ written by Zillu Liang(2023.4,Oxford)------
+% ------ written by Zilu Liang(2023.4,Oxford)------
 
 clear;clc
 %% Configurations
 [directory,participants,filepattern,fmri] = get_pirate_defaults(false,'directory','participants','filepattern','fmri');
 
 % Configure the steps, field names of the preprocess_flags struct must not be changed 
-preprocess_flags   = struct('reorient',       false,...
-                            'calVDM',         false,...
-                            'realign_unwarp', false,...
-                            'coregistration', false,...
-                            'segmentation',   false,...
-                            'normalisation',  false,...
-                            'smooth',         false);                       
+preprocess_flags   = struct('reorient',       true,...
+                            'calVDM',         true,...
+                            'realign_unwarp', true,...
+                            'coregistration', true,...
+                            'segmentation',   true,...
+                            'normalisation',  true,...
+                            'smooth',         true);                       
 generate_nuisance = true;
 copy_preprocessed = true;
 
@@ -73,28 +73,28 @@ for j = 1:numel(preproc_steps)
 end
 
 %% --------------  Generate Nuisance Regressor for head motion  -------------- 
-% gen nuisance regressor
+% gen nuisance regressor using head motion parameters and their first derivatives
 if generate_nuisance
-    err_tracker = cell(participants.nsub,1);
+    err_tracker2 = cell(participants.nsub,1);
     parfor isub = 1:participants.nsub
         fprintf('creating head motion regressor for %s\n',participants.ids{isub});
         try
             subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
-            % generate nuisance regressor using head motion parameters and their first derivatives
-            generate_nuisance_regressor(subimg_dir,false); 
+            generate_nuisance_regressor(subimg_dir); 
         catch err
-            err_tracker{isub} = err;
+            fprintf('Error generating nuisance regressor for %s %d/%d subject\n', ids{isub}, isub, nsub)
+            err_tracker2{isub} = err;
         end
     end
 end
 
 
-%% -----------------  Copy Files -------------------
+%% -----------------  Copy Files: UnSmoothed -------------------
 % After preprocessing is finished, create a copy of preprocessed files in a
 % clean folder for subsequent statistical analysis
 if copy_preprocessed
-    par_dir    = directory.smoothed; %#ok<*UNRCH>
-    move_files = {filepattern.preprocess.nuisance};%{filepattern.preprocess.smooth,filepattern.preprocess.nuisance};
+    par_dir    = directory.unsmoothed; %#ok<*UNRCH>
+    move_files = {filepattern.preprocess.normalise,filepattern.preprocess.nuisance};
     parfor isub  = 1:nsub
         from_dir = fullfile(preproc_dir,ids{isub});
         to_dir   = fullfile(par_dir,ids{isub});
@@ -102,9 +102,27 @@ if copy_preprocessed
         src_fns  = cellfun(@(p) cellstr(spm_select('FPList',fullfile(preproc_dir,ids{isub}),p)),move_files,'uni',0)
         fprintf('Copying %s %d/%d subject\n', ids{isub}, isub, nsub)
         cellfun(@(s) copyfile(s,to_dir),cat(1,src_fns{:}));
-        fprintf('Completed copying %s %d/%d subject\n', ids{isub}, isub, nsub)
+        fprintf('Completed copying UnSmoothed data %s %d/%d subject\n', ids{isub}, isub, nsub)
     end
-    fprintf('Completed data copying\n\n')
+    fprintf('Completed UnSmoothed data copying\n\n')
+end
+
+%% -----------------  Copy Files: Smoothed -------------------
+% After preprocessing is finished, create a copy of preprocessed files in a
+% clean folder for subsequent statistical analysis
+if copy_preprocessed
+    par_dir    = directory.smoothed; %#ok<*UNRCH>
+    move_files = {filepattern.preprocess.smooth,filepattern.preprocess.nuisance};
+    parfor isub  = 1:nsub
+        from_dir = fullfile(preproc_dir,ids{isub});
+        to_dir   = fullfile(par_dir,ids{isub});
+        checkdir(to_dir)
+        src_fns  = cellfun(@(p) cellstr(spm_select('FPList',fullfile(preproc_dir,ids{isub}),p)),move_files,'uni',0)
+        fprintf('Copying %s %d/%d subject\n', ids{isub}, isub, nsub)
+        cellfun(@(s) copyfile(s,to_dir),cat(1,src_fns{:}));
+        fprintf('Completed copying Smoothed data %s %d/%d subject\n', ids{isub}, isub, nsub)
+    end
+    fprintf('Completed Smoothed data copying\n\n')
 end
 
 %% close parallel pool
