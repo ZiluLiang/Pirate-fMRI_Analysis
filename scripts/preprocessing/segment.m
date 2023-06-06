@@ -1,4 +1,7 @@
 function segment(subimg_dir)
+% performs segmentation and normalization on the t1 image
+% output: c*.nii(different tissue segmentations) wc*.nii(different normalized tissue segmentations)
+% ------ written by Zilu Liang(2023.4,Oxford)------
 
     filepattern = get_pirate_defaults(false,'filepattern');     
     coregistered_T1 = cellstr(spm_select('FPList', subimg_dir, [filepattern.preprocess.coreg,'.*\.nii']));

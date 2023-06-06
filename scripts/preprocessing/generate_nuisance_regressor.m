@@ -20,7 +20,7 @@ function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,te
 % OUTPUT:
 %    - nuisance_reg: the matrix of nuisance regressors
 %    - nN: number of nuisance regressors
-
+% ------ written by Zilu Liang(2023,Oxford)------
    
     % get the filepattern from default setting 
     [filepattern,fmri] = get_pirate_defaults(false,'filepattern','fmri');

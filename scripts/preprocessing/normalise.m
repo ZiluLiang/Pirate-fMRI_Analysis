@@ -1,4 +1,8 @@
 function normalise(subimg_dir)
+% normlise functional images
+%
+% output: w*.nii(smoothed images)
+% ------ written by Zilu Liang(2023.4,Oxford)------
     % find files
     [fmri,filepattern] = get_pirate_defaults(false,'fmri','filepattern');    
     def_field = cellstr(spm_select('FPList',subimg_dir,filepattern.preprocess.deformation));
@@ -11,7 +15,7 @@ function normalise(subimg_dir)
     matlabbatch = {};
     matlabbatch{1}.spm.spatial.normalise.write.subj.def = def_field;
     matlabbatch{1}.spm.spatial.normalise.write.subj.resample = func_imgs;        
-    matlabbatch{1}.spm.spatial.normalise.write.woptions.bb  = bb; % change to match the bb of the template image
+    matlabbatch{1}.spm.spatial.normalise.write.woptions.bb  = bb; % change to match the bounding box of the template image
     matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = [fmri.voxelsize fmri.voxelsize fmri.voxelsize]; % change to match the resolution of acquistion
     matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 7; % change to 7 to achieve higher normalization quality
     

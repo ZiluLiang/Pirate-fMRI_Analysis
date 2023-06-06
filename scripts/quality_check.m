@@ -37,7 +37,7 @@ end
 n_tasks = 2;
 n_runs  = [4,1];
 n_volumes = {[296,296,296,296],[326]};
-for isub = 17%:participants.nsub
+for isub = 1:participants.nsub
     subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
     for task = 1:n_tasks
         for run = 1%:n_runs(task)

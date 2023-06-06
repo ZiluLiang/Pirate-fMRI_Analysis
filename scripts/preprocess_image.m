@@ -1,4 +1,4 @@
-% fmri data preprocessing: convert, rename to annonymized files and organize
+% fmri data preprocessing
 % The script contains six steps controlled by six flags in the preprocess_flags struct:
 %       calVDM:         calculated voxel displacement map
 %       realign_unwarp: realign and unwarp using vdm
@@ -9,9 +9,8 @@
 % Quality inspection should be taken in between steps to check preprocessing quality
 % 
 % After preprocessing: nuisance regressors are created for conducting first
-% level glm analysis, preprocessed images are copied to cleaned folders for
+% level glm analysis, preprocessed images are copied to new folders for
 % subsequent analysis
-%
 %
 % ------ written by Zilu Liang(2023.4,Oxford)------
 
