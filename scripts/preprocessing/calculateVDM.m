@@ -4,7 +4,7 @@ function calculateVDM(subimg_dir,varargin)
 % output:
 %  vdm5_sc*:
 %  wfmag_*: forward warpped magnitude image
-% ------ written by Zillu Liang(2023.4,Oxford)------
+% ------ written by Zilu Liang(2023.4,Oxford)------
     
     % get flags
     use_reorient = true;

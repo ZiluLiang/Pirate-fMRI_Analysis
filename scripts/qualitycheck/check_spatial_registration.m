@@ -1,6 +1,13 @@
 function check_spatial_registration(comparetype,subimg_dir,varargin)
-%
+% shortcut to display different images side by side to check spatial registration quality
+% shortcuts for three types of comparisons are specified:
+%     1) compare all to template
+%     2) compare t1 to epi
+%     3) compare epi to template
+% see documentions in each embedded functions for details on what images
+% are selected for display
 % example usage: check_spatial_registration(comparetype,subimg_dir)
+% ------ written by Zilu Liang(2023.5,Oxford)------
      
     % find images to display and configure display settings
     config_handles = struct('all2template',@compare_all2template,...
@@ -33,7 +40,7 @@ function [captions,images,overlays] = compare_all2template(subimg_dir,filepatter
     else
         flag_display_pre_reorientaion = false;
     end
-    
+
     % get reoriented images
     if ~flag_display_pre_reorientaion
         nii_files   = structfun(@(scantype) ...

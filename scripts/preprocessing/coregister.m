@@ -2,7 +2,7 @@ function coregister(subimg_dir,varargin)
 % coregister the T1(source) to the mean epi image(reference)
 %
 % created files r*(a coregistered T1 image)
-% ------ written by Zillu Liang(2023.4,Oxford)------
+% ------ written by Zilu Liang(2023.4,Oxford)------
 
     % get flags
     use_reorient = true;
