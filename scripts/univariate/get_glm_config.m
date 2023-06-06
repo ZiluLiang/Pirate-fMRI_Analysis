@@ -34,7 +34,7 @@ function glms = glm_gallery
     glms(3).modelopt    = struct('use_stick', {true,true,false});
     glms(3).pmods       = {{'dist2d'}};
     glms(3).contrasts(1).name = 'euclidean distance';
-    glms(3).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
+    glms(3).contrasts(1).wvec = [0,1,0];% weight vector for task regressors
     
     glms(4).name        = 'rs_resploc2d_navigation';
     glms(4).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
@@ -42,14 +42,14 @@ function glms = glm_gallery
     glms(4).modelopt    = struct('use_stick', {true,true,false});
     glms(4).pmods       = {{'dist2d_resp'}};
     glms(4).contrasts(1).name = 'euclidean distance';
-    glms(4).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
+    glms(4).contrasts(1).wvec = [0,1,0];% weight vector for task regressors
     
     glms(5).name        = 'rs_loc2d_localizer';
     glms(5).filepattern = 'sub-.*_task-localizer_run-[1]';
     glms(5).conditions  = {'rstrials'};
     glms(5).pmods       = {{'dist2d'}};
     glms(5).contrasts(1).name = 'euclidean distance';
-    glms(5).contrasts(1).wvec = [0,1,0];% weight vector for task regressors
+    glms(5).contrasts(1).wvec = [0,1];% weight vector for task regressors
     
     glms(6).name = 'traintest_navigation';
     glms(6).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
