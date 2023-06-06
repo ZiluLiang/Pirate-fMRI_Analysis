@@ -29,7 +29,7 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
     err_tracker = {cell(nsub,2),{}};
     
     %% run first-level analysis
-    for isub = 1:nsub
+    for isub = 16:nsub
         subimg_dir = fullfile(preproc_img_dir,subidlist{isub});
         glm_config = get_glm_config(glm_name);    
         output_dir = fullfile(glm_dir,'first',subidlist{isub});
@@ -58,7 +58,7 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
                                               {glm_config.contrasts.name},...
                                               contrast_weights);
                     fprintf('%s: Completed first-level contrast for %s %d/%d subject\n',glm_name,subidlist{isub}, isub, nsub)
-                    report_results(output_dir)
+                    %report_results(output_dir)
                 end
             catch err
                 err_tracker{1}{isub,2} = err;
