@@ -2,7 +2,14 @@ function [rangeCon,meanResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_
 % This function finds the gives some summary statistics on the statistical
 % results of first level glm analysis for sanity check of model fitting
 % results.
+% INPUT: 
+%      glm_name: string, to get glm configuration using get_glm_config
+%      glm_dir:  string, directory to search from
+%      masks:    cell array with number of elements equal to the number of
+%      contrast in the glm configuration. Each element specify a Region of 
+%      Interest(ROI) mask from which the stat values of the corresponding contrast are extracted. 
 % TODO: calculate measure of model fitting quality?
+
     [directory,participants]  = get_pirate_defaults(false,'directory','participants');
     contrast_names = {get_glm_config(glm_name).contrasts.name};
     if nargin<2
