@@ -7,7 +7,7 @@ Then we build the following contrasts:
 We extracted the 25 stimuli contrast to constructs a $N_{stimuli}\times N_{voxels}$ activity pattern matrix for visualization.
 
 (2) a contrast for each of the stimuli in odd/even runs, this yields 25*2 = 50 contrasts  
-We extracted the 50 stimuli contrasts separating odd and even runs to construct two $N_{stimuli}$$\times$$N_{voxels}$ activity pattern matrices for calculating reliability map and running RSA.
+We extracted the 50 stimuli contrasts separating odd and even runs to construct two $N_{stimuli}\times N_{voxels}$ activity pattern matrices for calculating reliability map and running RSA.
 
 ### 2. Reliability Map calculation
 Using a [split-half approach](https://doi.org/10.1016/j.neuroimage.2019.116350), we calculate the reliability map for each participant.
