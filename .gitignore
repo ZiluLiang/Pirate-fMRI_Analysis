@@ -7,8 +7,8 @@ probdf
 *.Rproj.user
 *.code-workspace
 *.asv
+__pycache__
 
-scripts/multivariate
 scripts/RSA*
 scripts/LegacyCodes
 scripts/prepare_image.m
