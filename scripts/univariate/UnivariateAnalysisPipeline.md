@@ -25,7 +25,7 @@ Two variants of this model is constructed, one with groundtruth euclidean distan
 Repetition supression model for the localizer task is similar to the one above for navigation task, except that button presses are not modeled. Only one model with euclidean distance between pirate locations in successive trials are included.
 
 ### Models for extracting beta series
-To extract activity related to stimuli, we adopted the LSA approach. We build first level GLM in which each stimuli is modeled with one regressor in each session. This yields 25 stimuli regressors for each session in the navigation task (100 beta series in total) and 9 regressors for the localizer task (oen session, only 9 training locations are showed in the localizer task). For more details of the RSA analysis please refer to [MultivariateAnalysisPipeline](scripts/multivariate/MultivariateAnalysisPipeline.md)
+To extract activity related to stimuli, we adopted the LSA approach. We build first level GLM in which each stimuli is modeled with one regressor in each session. This yields 25 stimuli regressors for each session in the navigation task (100 beta series in total) and 9 regressors for the localizer task (oen session, only 9 training locations are showed in the localizer task). For more details of the RSA analysis please refer to [MultivariateAnalysisPipeline](/scripts/multivariate/MultivariateAnalysisPipeline.md)
 
 ## SPM settings
 All univariate analysis are conducted with canonical HRF without temporal and dispersion derivatives. We use spm's intracranial volume mask as explicit mask (mask_ICV.nii in the `spm/tpm` directory) combined with a lowered implicit masking threshold of 0.2. 
