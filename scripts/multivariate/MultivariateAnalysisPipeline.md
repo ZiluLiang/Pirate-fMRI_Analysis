@@ -14,6 +14,9 @@ Using a [split-half approach](https://doi.org/10.1016/j.neuroimage.2019.116350),
 Let $M1$ and $M2$ be the $N_{stimuli}\times N_{voxels}$ activity pattern matrices for the odd and even runs respectively. Then $M1_{i}$ and $M2_{i}$ (column $i$ in $M1$ and $M2$) defines the response profile of voxel $i$ in odd and even runs. Reliability is defined as the stability of the response profile, i.e., the reliabity of a given voxel $i$ is computed by  
 $$R_{i} = pearsonr(M1_{i},M2_{i})$$ 
 A nifti file of the reliability map is saved in the first level directory of the participants. Then a threshold of 0 is applied to binarize the map into a reliability mask which specifies the reliable voxels.
+This is implemented in the [`create_reliability_mask` script](/scripts/multivariate/create_reliability_mask.py)
 
-### Brain parcellation based RSA
-### Whole brain searchlight RSA
+## Brain parcellation based RSA
+### obtaining ROI mask from parcellations 
+### running analysis 
+## Whole brain searchlight RSA
