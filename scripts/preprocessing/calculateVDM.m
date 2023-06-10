@@ -44,7 +44,7 @@ function calculateVDM(subimg_dir,varargin)
     matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.sessname = 'session';
     matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.writeunwarped = 1; % save the unwarped image for quality check
     matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.anat = nii_files.anatomical.T1;
-    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.matchanat = 1;
+    matlabbatch{1}.spm.tools.fieldmap.calculatevdm.subj.matchanat = 0; % do not match to anatomical as the anatomical scan has not been coregistered with the mean EPI yet
     
     save(fullfile(subimg_dir,'calculate_VDM.mat'),'matlabbatch')
     spm('defaults', 'FMRI');

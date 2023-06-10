@@ -40,7 +40,8 @@ n_volumes = {[296,296,296,296],[326]};
 for isub = 1:participants.nsub
     subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
     for task = 1:n_tasks
-        for run = 1%:n_runs(task)
+        rand_run = randi(n_runs(task));
+        for run = rand_run%1:n_runs(task)
             vol = randi(n_volumes{task}(run));
             check_distortion_correction(subimg_dir,task,run,vol);
             fprintf('showing %s-task%d-run%d-vol-%d',participants.ids{isub},task,run,vol)
