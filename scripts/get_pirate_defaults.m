@@ -69,7 +69,7 @@ function pirate_defaults = setdefaults
     
     %% --------------  Specify directory  --------------      
     pirate_defaults.directory.pm_default   = fullfile(wk_dir,'scripts','preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
-    pirate_defaults.directory.mni_template = 'C:\MRIcroGL_windows\MRIcroGL\standard\mni152.nii.gz'; % mni template used for visualization and estimate parameters for auto-reorientation
+    pirate_defaults.directory.mni_template = fullfile(spm('dir'),'canonical','avg152T1.nii'); % mni template used for visualization and estimate parameters for auto-reorientation
     pirate_defaults.directory.fmri_data    = fullfile(wk_dir,'data','fmri');
     pirate_defaults.directory.fmribehavior = fullfile(wk_dir,'data','fmri','beh');
     pirate_defaults.directory.preprocess   = fullfile(wk_dir,'data','fmri','preprocess'); % directory to images created during preprocessing
