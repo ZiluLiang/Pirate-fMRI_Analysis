@@ -8,7 +8,7 @@ probdf
 *.code-workspace
 *.asv
 **/__pycache__/
-**/bspmview.mat
+**/bspmview**.mat
 
 scripts/RSA*
 scripts/prepare_image.m
