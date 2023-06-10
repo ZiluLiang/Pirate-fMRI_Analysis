@@ -10,12 +10,9 @@ probdf
 __pycache__
 
 scripts/RSA*
-scripts/LegacyCodes
 scripts/prepare_image.m
 scripts/behavior
 scripts/generic
-scripts/history
 scripts/tidydata
 scripts/behavior.Rmd
-FILESCTRUCTURE.md
 .Rproj.user

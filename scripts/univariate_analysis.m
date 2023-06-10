@@ -8,7 +8,7 @@ if flag_runGLM
     err_tracker   = struct(); %#ok<*UNRCH>
     for j = 1:numel(RSglm_names)
         glm_name = RSglm_names{j};
-        err_tracker.(glm_name) = run_glm(glm_name,{'contrast','second_level'});
+        err_tracker.(glm_name) = run_glm(glm_name, {'spec2est','contrast','second_level'});
     end
 end
 % extract residuals to double check if models are running okay
@@ -21,34 +21,26 @@ end
 %% run LSA beta series extrator GLMs - smoothed
 LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer'};
 flag_runGLM  = true;
-if flag_runGLM
-    for j = 1:numel(LSAglm_names)
-    glm_name = LSAglm_names{j};
-    err_tracker.(glm_name) = run_glm(glm_name,{'spec2est'},...
-                                     fullfile(directory.fmri_data,'smoothed5mmLSA',glm_name),...
-                                     directory.smoothed);
+lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
+for jdir = 1:numel(lsa_dir)     
+    if flag_runGLM
+        for j = 1:numel(LSAglm_names)
+        glm_name = LSAglm_names{j};
+        glm_dir = fullfile(directory.fmri_data,lsa_dir{jdir},glm_name);
+        checkdir(glm_dir)
+        err_tracker.(glm_name) = run_glm(glm_name,{'spec2est'},...
+                                         glm_dir,...
+                                         directory.smoothed);
+        end
     end
 end
-
-%% run LSA beta series extrator GLMs - unsmoothed
-LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer'};
-flag_runGLM  = true;
-if flag_runGLM
-    for j = 1:numel(LSAglm_names)
-    glm_name = LSAglm_names{j};
-    err_tracker.(glm_name) = run_glm(glm_name,{'spec2est'},...
-                                     fullfile(directory.fmri_data,'unsmoothedLSA',glm_name),...
-                                     directory.unsmoothed);
-    end
-end
-
 
 %% extract residuals to double check if models are running okay
 for j = 1:numel(LSAglm_names)
     glm_name = LSAglm_names{j};
     masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\wfu','.*.nii'));
-    [rangeCon.(glm_name),meanResMS1.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,'unsmoothedLSA',glm_name),masks);
-    [rangeCon.(glm_name),meanResMS2.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,'smoothed5mmLSA',glm_name),masks);
+    [rangeCon.(glm_name),meanResMS1.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{1},glm_name),masks);
+    [rangeCon.(glm_name),meanResMS2.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{2},glm_name),masks);
 end
 
 %% generate contrast for odd and even runs for LSA beta series extractor GLMs
@@ -56,7 +48,7 @@ glm_name = 'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
 for jdir = 1:numel(lsa_dir)
-    glm_dir = fullfile(directory.fmri_data,lsa_dir{j},glm_name);
+    glm_dir = fullfile(directory.fmri_data,lsa_dir{jdir},glm_name);
     for isub  = 1:participants.nvalidsub
         fprintf('Specifying Contrast for %s\n',participants.validids{isub})
         firstlvl_dir = fullfile(glm_dir,'first',participants.validids{isub});
@@ -93,6 +85,7 @@ end
 glm_name = 'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 for jdir = 1:numel(lsa_dir)
+    glm_dir = fullfile(directory.fmri_data,lsa_dir{jdir},glm_name);
     for isub  = 1:participants.nvalidsub
         fprintf('Specifying Contrast for %s\n',participants.validids{isub})
         firstlvl_dir = fullfile(glm_dir,'first',participants.validids{isub});
@@ -119,5 +112,3 @@ for jdir = 1:numel(lsa_dir)
         fprintf('Completed specifying Contrast for %s\n',participants.validids{isub})
     end
 end
-
-

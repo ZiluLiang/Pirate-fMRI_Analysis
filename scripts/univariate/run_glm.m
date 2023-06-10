@@ -18,7 +18,7 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
 % TODO: make second level accommodate different types of first level
 % contrasts
     spm('defaults','FMRI')
-    [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
+    [directory,participants]  = get_pirate_defaults(false,'directory','participants');
     
     if nargin < 2, steps = {'spec2est','contrast','second_level'}; end %'spec2est','contrast','second_level'}
     if nargin < 3, glm_dir  = fullfile(directory.fmri_data,glm_name); end
@@ -26,47 +26,21 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
     if nargin < 5, subidlist = participants.validids; end
     
     nsub = numel(subidlist);
-    err_tracker = {cell(nsub,2),{}};
+    err_tracker = cell(2,1);
     
     %% run first-level analysis
-    for isub = 16:nsub
-        subimg_dir = fullfile(preproc_img_dir,subidlist{isub});
-        glm_config = get_glm_config(glm_name);    
-        output_dir = fullfile(glm_dir,'first',subidlist{isub});
-
-        if ismember('spec2est',steps)
-            try
-                fprintf('%s: Estimating first-level GLM for %s %d/%d subject\n', glm_name, subidlist{isub}, isub, nsub)        
-                nii_files      = cellstr(spm_select('FPList',subimg_dir,[glm_config.filepattern,'.*.nii'])); 
-                [~,m_files]    = setup_multiconditions(glm_name,subidlist{isub},fullfile(glm_dir,'beh',subidlist{isub}),glm_config.modelopt);
-                nuisance_files = cellstr(spm_select('FPList',subimg_dir,[filepattern.preprocess.nuisance,glm_config.filepattern,'.*.txt']));
-
-                specify_estimate_glm(nii_files,m_files,nuisance_files,output_dir);
-                fprintf('%s: Completed first-level GLM for %s %d/%d subject\n',glm_name, subidlist{isub}, isub, nsub)
-            catch err
-                err_tracker{1}{isub,1} = err;
-            end
+    err_tracker_1st = cell(nsub,2);
+    firstlevelsteps = {'spec2est','contrast','report1stlvl'};
+    if any(ismember(steps,firstlevelsteps))
+        num_workers   = feature('NumCores')-3;
+        poolobj       =  parpool(num_workers);%set up parallel processing
+        parfor isub = 1:nsub
+            err_tracker_1st(isub,:) = run_firstlevel(subidlist{isub},glm_name,glm_dir,preproc_img_dir,steps)
         end
-        
-        if ismember('contrast',steps)
-            try
-                if ~isempty(glm_config.contrasts)
-                    fprintf('%s: Computing first-level contrast for %s %d/%d subject\n', glm_name, subidlist{isub}, isub, nsub)
-                    contrast_weights = cellfun(@(v) gen_contrast_matrix(fullfile(output_dir,'SPM.mat'),v),{glm_config.contrasts.wvec},'uni',0);
-
-                    specify_estimate_contrast(output_dir,...
-                                              {glm_config.contrasts.name},...
-                                              contrast_weights);
-                    fprintf('%s: Completed first-level contrast for %s %d/%d subject\n',glm_name,subidlist{isub}, isub, nsub)
-                    %report_results(output_dir)
-                end
-            catch err
-                err_tracker{1}{isub,2} = err;
-            end
-        end
-        
+        err_tracker{1} = err_tracker_1st;
+        delete(poolobj)
     end
-    
+
     %% run second-level analysis
     if ismember('second_level',steps)
         try
@@ -90,6 +64,46 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
         catch err
             err_tracker{2} = err;
         end
+    end
+end
+
+function err_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,steps)
+    filepattern  = get_pirate_defaults(false,'filepattern');
+    subimg_dir = fullfile(preproc_img_dir,subid);
+    glm_config = get_glm_config(glm_name);    
+    output_dir = fullfile(glm_dir,'first',subid);
+    err_tracker = cell(1,2);
+    if ismember('spec2est',steps)
+        try
+            fprintf('%s: Estimating first-level GLM for %s \n', glm_name, subid)        
+            nii_files      = cellstr(spm_select('FPList',subimg_dir,[glm_config.filepattern,'.*.nii'])); 
+            [~,m_files]    = setup_multiconditions(glm_name,subid,fullfile(glm_dir,'beh',subid),glm_config.modelopt);
+            nuisance_files = cellstr(spm_select('FPList',subimg_dir,[filepattern.preprocess.nuisance,glm_config.filepattern,'.*.txt']));
+
+            specify_estimate_glm(nii_files,m_files,nuisance_files,output_dir);
+            fprintf('%s: Completed first-level GLM for %s\n',glm_name, subid)
+        catch err
+            err_tracker{1} = err;
+        end
+    end
+    
+    if ismember('contrast',steps)
+        try
+            if ~isempty(glm_config.contrasts)
+                fprintf('%s: Computing first-level contrast for %s \n', glm_name, subid)
+                contrast_weights = cellfun(@(v) gen_contrast_matrix(fullfile(output_dir,'SPM.mat'),v),{glm_config.contrasts.wvec},'uni',0);
+
+                specify_estimate_contrast(output_dir,...
+                                          {glm_config.contrasts.name},...
+                                          contrast_weights);
+                fprintf('%s: Completed first-level contrast for %s \n',glm_name,subid)
+            end
+        catch err
+            err_tracker{2} = err;
+        end
+    end
+    if ismember('report1stlvl',steps)
+        report_results(output_dir)
     end
 end
 
