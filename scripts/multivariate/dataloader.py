@@ -6,7 +6,7 @@ from nilearn.masking import apply_mask
 import sklearn
 
 class ActivityPatternDataLoader:
-    def __init__(self,data_nii_paths: list, conditions: list, condition_names: list = None, mask_nii_path=None, dropNA_flag = True):
+    def __init__(self,data_nii_paths: list, conditions: list, condition_names: list = None, mask_img=None, dropNA_flag = True):
         
         # validate input
         if not np.all([os.path.exists(x) for x in data_nii_paths]): 
@@ -20,8 +20,14 @@ class ActivityPatternDataLoader:
         
         #extract activity pattern for each condition
         data_imgs = [nib.load(data_nii_path) for data_nii_path in data_nii_paths]
-        if mask_nii_path is not None:  
-            mask_img = nib.load(mask_nii_path)
+        if mask_img is not None:
+            if isinstance(mask_img, str):
+                mask_img = nib.load(mask_img)
+            elif isinstance(mask_img, np.ndarray):
+                reshapeimg = np.reshape(mask_img,data_imgs[0].shape).astype(np.int8)
+                mask_img = nib.Nifti1Image(reshapeimg, data_imgs[0].affine,data_imgs[0].header)
+            else:
+                mask_img = mask_img
             resampled_mask = nib.processing.resample_from_to(mask_img, data_imgs[0]) # this assumes that all the input image have the same dimsion, the next extraction step will throw error if not
             X = apply_mask(data_imgs, resampled_mask,ensure_finite = False)
         else:
