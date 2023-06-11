@@ -69,7 +69,7 @@ for mn in ['between_loc2d','between_feature2d']:
     regress_modelsBS.append(model_rdmOE.models[mn]) 
 
 regress_modelsAGG = []
-model_rdmAGG = ModelRDM(stim_id,stim_loc,stim_feature,n_session=2,cv_sess=False).models    
+model_rdmAGG = ModelRDM(stim_id,stim_loc,stim_feature,n_session=2,cv_sess=False)   
 for mn in ['between_loc2d','between_feature2d']:
     regress_modelsAGG.append(model_rdmAGG.models[mn]) 
 
@@ -90,9 +90,9 @@ for subid,n_paths,m_paths,_ in RSA_Searchlight_specsOE:
 
 
 ## run on four separated sessions
-print('retrieving participants contrast image directory\n')
+print('retrieving participants regressor image directory\n')
 RSA_Searchlight_specs4S = [get_sessionreg_img(subid) for subid in subid_list]
-print('finished retrieving participants contrast image directory\n')
+print('finished retrieving participants regressor image directory\n')
 
 model_rdm4S = ModelRDM(stim_id,stim_loc,stim_feature,n_session=4)
 regress_modelsWS = []
@@ -104,7 +104,7 @@ for mn in ['between_loc2d','between_feature2d']:
     regress_modelsBS.append(model_rdm4S.models[mn]) 
 
 regress_modelsAGG = []
-model_rdm4SAGG = ModelRDM(stim_id,stim_loc,stim_feature,n_session=4,cv_sess=False).models    
+model_rdm4SAGG = ModelRDM(stim_id,stim_loc,stim_feature,n_session=4,cv_sess=False)
 for mn in ['between_loc2d','between_feature2d']:
     regress_modelsAGG.append(model_rdm4SAGG.models[mn]) 
 
