@@ -10,7 +10,7 @@ import nibabel as nib
 import nibabel.processing
 from joblib import Parallel, delayed, cpu_count
 from scipy.sparse import vstack, find
-from multivariate.helper import compute_rdm
+from multivariate.helper import compute_rdm,checkdir
 
 import nilearn
 from nilearn.maskers.nifti_spheres_masker import _apply_mask_and_get_affinity
@@ -18,8 +18,7 @@ from nilearn.decoding.searchlight import GroupIterator
 
 class RSASearchLight:
     def __init__(self,patternimg_paths,mask_img_path,radius,
-                 estimator,
-                 outputpath,outputregexp,njobs:int=1):
+                 estimator,njobs:int=1):
         self.mask_img    = nib.load(mask_img_path)
         self.radius      = radius
         self.estimator   = estimator
@@ -27,11 +26,7 @@ class RSASearchLight:
         print("concatenating images")
         self.pattern_img = nib.funcs.concat_images(patternimg_paths)
         print("finished concatenating images")
-        self.outputpath   = outputpath
-        if '.nii' in outputregexp:
-            self.outputregexp = outputregexp
-        else:
-            self.outputregexp = outputregexp + '.nii'
+
         
     def find_neighbour_idx(self):
         voxel_neighbours = []
@@ -40,7 +35,11 @@ class RSASearchLight:
             voxel_neighbours.append(vidx) 
         return voxel_neighbours
 
-    def run(self,model,verbose):
+    def run(self,model,outputpath,outputregexp,verbose):
+        if not '.nii' in outputregexp:
+            outputregexp = outputregexp + '.nii'
+        checkdir(outputpath)
+
         self.X, self.A = self.genPatches(self.pattern_img)
         neighbour_idx_lists = self.find_neighbour_idx()
         # split patches for parallelization
@@ -65,7 +64,7 @@ class RSASearchLight:
             result_3D = np.zeros(self.mask_img.shape)
             result_3D[maskdata] = result[:,k]
             curr_img = nilearn.image.new_img_like(self.mask_img, result_3D)
-            curr_fn = os.path.join(self.outputpath,self.outputregexp % (k))
+            curr_fn = os.path.join(outputpath,outputregexp % (k))
             nib.save(curr_img, curr_fn)
             result_img.append(curr_img)
         self.result_img = result_img
@@ -83,7 +82,7 @@ class RSASearchLight:
             # perform estimation
             voxel_results.append(curr_estimator.fit().result)
             if verbose:
-                step = 1000 # print every 1000 voxels
+                step = 10000 # print every 1000 voxels
                 if  i % step == 0:
                     crlf = "\r" if total == len(neighbour_idx_list) else "\n"
                     pt = round(float(i)/len(neighbour_idx_list)*100,2)
