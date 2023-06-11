@@ -26,7 +26,8 @@ class RSASearchLight:
         print("concatenating images")
         self.pattern_img = nib.funcs.concat_images(patternimg_paths)
         print("finished concatenating images")
-
+        self.X, self.A = self.genPatches(self.pattern_img)
+        self.neighbour_idx_lists = self.find_neighbour_idx()
         
     def find_neighbour_idx(self):
         voxel_neighbours = []
@@ -40,14 +41,12 @@ class RSASearchLight:
             outputregexp = outputregexp + '.nii'
         checkdir(outputpath)
 
-        self.X, self.A = self.genPatches(self.pattern_img)
-        neighbour_idx_lists = self.find_neighbour_idx()
         # split patches for parallelization
-        group_iter = GroupIterator(len(neighbour_idx_lists), self.njobs)
+        group_iter = GroupIterator(len(self.neighbour_idx_lists), self.njobs)
         with Parallel(n_jobs=self.njobs) as parallel:
             results = parallel(
                 delayed(self.fitPatchGroup)(
-                    [neighbour_idx_lists[i] for i in list_i],
+                    [self.neighbour_idx_lists[i] for i in list_i],
                     model,
                     thread_id + 1,
                     self.A.shape[0],
