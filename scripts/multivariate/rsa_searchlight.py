@@ -72,13 +72,16 @@ class RSASearchLight:
         return self
     
     def fitPatchGroup(self,neighbour_idx_list, model,thread_id,total,verbose:bool = True):
-        voxel_results = np.empty(len(neighbour_idx_list))
+        voxel_results = []
         t0 = time.time()
         for i,neighbour_idx in enumerate(neighbour_idx_list):
             # instantiate estimator for current voxel
-            curr_estimator =  self.estimator(compute_rdm(self.X[:,neighbour_idx],"correlation"),model)
+            neuralrdm = compute_rdm(self.X[:,neighbour_idx],"correlation")
+            curr_estimator =  self.estimator(
+                neuralrdm,
+                model)
             # perform estimation
-            voxel_results[i] = curr_estimator.fit().result
+            voxel_results.append(curr_estimator.fit().result)
             if verbose:
                 step = 1000 # print every 1000 voxels
                 if  i % step == 0:
@@ -89,8 +92,8 @@ class RSASearchLight:
                     sys.stderr.write(
                         f"job # {thread_id}, processed{i}/{len(neighbour_idx_list)} voxels"
                         f"({pt:0.2f}%, {remaining} seconds remaining){crlf}"
-                    )
-        return voxel_results    
+                    )        
+        return np.asarray(voxel_results)    
 
     def genPatches(self,patternimg,use_parallel:bool = True):
         print("generating searchlight patches")
