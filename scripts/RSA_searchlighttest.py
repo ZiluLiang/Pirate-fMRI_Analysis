@@ -83,8 +83,9 @@ for subid,n_paths,m_paths in RSA_Searchlight_specs:
     checkdir(subrsa_dir)
     outputregexp = 'beta%04d.nii'
     subRSA = RSASearchLight(n_paths,m_paths,10,MultipleRDMRegression,subrsa_dir,outputregexp,njobs=5)
-    subRSA = subRSA.run(model_rdm.models,True)
+    subRSA = subRSA.run(regress_models,True)
 
+regress_models = []
 for mn in ['between_loc2d','between_feature2d']:
     regress_models.append(model_rdm.models[mn]) 
 for subid,n_paths,m_paths in RSA_Searchlight_specs:
@@ -93,8 +94,9 @@ for subid,n_paths,m_paths in RSA_Searchlight_specs:
     checkdir(subrsa_dir)
     outputregexp = 'beta%04d.nii'
     subRSA = RSASearchLight(n_paths,m_paths,10,MultipleRDMRegression,subrsa_dir,outputregexp,njobs=5)
-    subRSA = subRSA.run(model_rdm.models,True)
+    subRSA = subRSA.run(regress_models,True)
 
+regress_models = []
 model_rdm = ModelRDM(stim_id,stim_loc,stim_feature,n_session=2,cv_sess=False)
 for mn in ['session','loc2d','feature2d']:
     regress_models.append(model_rdm.models[mn]) 
@@ -104,5 +106,5 @@ for subid,n_paths,m_paths in RSA_Searchlight_specs:
     checkdir(subrsa_dir)
     outputregexp = 'beta%04d.nii'
     subRSA = RSASearchLight(n_paths,m_paths,10,MultipleRDMRegression,subrsa_dir,outputregexp,njobs=5)
-    subRSA = subRSA.run(model_rdm.models,True)
+    subRSA = subRSA.run(regress_models,True)
     
