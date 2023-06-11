@@ -70,7 +70,7 @@ for mn in ['between_loc2d','between_feature2d']:
 
 regress_modelsAGG = []
 model_rdmAGG = ModelRDM(stim_id,stim_loc,stim_feature,n_session=2,cv_sess=False)   
-for mn in ['between_loc2d','between_feature2d']:
+for mn in ['loc2d','feature2d']:
     regress_modelsAGG.append(model_rdmAGG.models[mn]) 
 
 for subid,n_paths,m_paths,_ in RSA_Searchlight_specsOE:
@@ -105,7 +105,7 @@ for mn in ['between_loc2d','between_feature2d']:
 
 regress_modelsAGG = []
 model_rdm4SAGG = ModelRDM(stim_id,stim_loc,stim_feature,n_session=4,cv_sess=False)
-for mn in ['between_loc2d','between_feature2d']:
+for mn in ['loc2d','feature2d']:
     regress_modelsAGG.append(model_rdm4SAGG.models[mn]) 
 
 for subid,n_paths,m_paths,_ in RSA_Searchlight_specs4S:
