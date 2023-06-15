@@ -3,7 +3,7 @@ clear;clc
 [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
 %% run Repetition Supression GLMs
 RSglm_names = {'rs_loc2d_navigation','rs_resploc2d_navigation','rs_loc2d_localizer','traintest_navigation'};
-flag_runGLM  = true;
+flag_runGLM  = false;
 if flag_runGLM
     err_tracker   = struct(); %#ok<*UNRCH>
     for j = 1:numel(RSglm_names)
