@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 def standardize_2D(X:numpy.ndarray,dim:int=2)->numpy.ndarray:
-    """ standardize a 2D numpy array by using ZX = (X - mean)/std
+    """ standardize a 1D or 2D numpy array by using ZX = (X - mean)/std
 
     Parameters
     ----------
@@ -23,7 +23,7 @@ def standardize_2D(X:numpy.ndarray,dim:int=2)->numpy.ndarray:
     Returns
     -------
     numpy.ndarray
-        standardized 2D array X
+        standardized 1D or 2D array ZX
     """
     assert isinstance(X,numpy.ndarray), "X must be numpy array"
     assert X.ndim <= 2, "X must be 1D or 2D"
