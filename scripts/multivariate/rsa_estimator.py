@@ -33,6 +33,9 @@ class PatternCorrelation:
         else:
             self.type = type
     
+    def __str__(self) -> str:
+        return "PatternCorrelation with "+self.type
+    
     def fit(self):
         if self.type == "spearman":
             self.result   = scipy.stats.spearmanr(self.X,self.Y).correlation
@@ -86,6 +89,9 @@ class MultipleRDMRegression:
         self.X = standardize(X_dropNA,1)
         # standardize Y
         self.Y = standardize(Y[na_filters])
+    
+    def __str__(self) -> str:
+        return "MultipleRDMRegression"
     
     def fit(self):
         reg = LinearRegression().fit(self.X,self.Y)
