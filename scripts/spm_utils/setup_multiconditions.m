@@ -33,7 +33,7 @@ end
 function multi = gen_multi(data,cond_names,pmod_names,custom_cfg)
 % generate the variables saved to the multi-cond.mat file which can be used
 % directly when specifying first level models in SPM.
-% example usage: gen_multi(data,names,cfg,pmod) cfg and pmod are optional
+% example usage: gen_multi(data,names,pmod,cfg) cfg and pmod are optional
 % INPUT
 %     data: the data table
 %     names: names of the event
