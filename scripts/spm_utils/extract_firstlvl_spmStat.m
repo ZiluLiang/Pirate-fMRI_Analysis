@@ -11,7 +11,11 @@ function [rangeCon,meanResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_
 % TODO: calculate measure of model fitting quality?
 
     [directory,participants]  = get_pirate_defaults(false,'directory','participants');
-    contrast_names = {get_glm_config(glm_name).contrasts.name};
+    try
+        contrast_names = {get_glm_config(glm_name).contrasts.name};
+    catch
+        contrast_names = {};
+    end
     if nargin<2
         glm_dir    = fullfile(directory.fmri_data,glm_name);
     end
