@@ -34,8 +34,8 @@ stim_list =  pd.read_csv(stim_list_fn, sep=",", header=0)
 stim_id = np.array(stim_list['stim_id'])
 
 glm_name = 'LSA_stimuli_navigation'
-LSA_GLM_dir = os.path.join(fmri_output_path,'unsmoothedLSA',glm_name)
-
+LSA_GLM_dir = os.path.join(fmri_output_path,'smoothed5mmLSA',glm_name)
+#smoothed5mmLSA
 if os.path.exists(os.path.join(LSA_GLM_dir,'wholebrain_oddeven_navistim.pkl')):
     WB_beta = joblib.load(os.path.join(LSA_GLM_dir,'wholebrain_oddeven_navistim.pkl'))
 else:
@@ -71,13 +71,13 @@ else:
 
 # voxel selection based on correlation between odd and even runs
 def compute_voxel_reliability(subActivityPattern,splits,LSA_GLM_dir,subid):
-    _,valid_voxels = subActivityPattern.drop_na() #this essentially like applying first level mask generated after spm model estimation
+    _,valid_voxels = subActivityPattern.drop_na() #this is essentially like applying first level mask generated after spm model estimation
     splitted_X,_ = subActivityPattern.split_data(splits)
     pattern_oddrun,pattern_evenrun = splitted_X
     vox_reliability = np.empty((subActivityPattern.X.shape[1],))
     for j in np.arange(subActivityPattern.X.shape[1]):
         if valid_voxels[j]:
-            vox_reliability[j] = scipy.stats.pearsonr(pattern_oddrun[:,j], pattern_evenrun[:,j]).correlation
+            vox_reliability[j] = scipy.stats.spearmanr(pattern_oddrun[:,j], pattern_evenrun[:,j]).correlation
         else:
             vox_reliability[j] = np.nan
     sub_rmaskdata = np.logical_and(vox_reliability>0, ~np.isnan(vox_reliability))
@@ -102,7 +102,7 @@ def compute_voxel_reliability(subActivityPattern,splits,LSA_GLM_dir,subid):
     return {"reliability":vox_reliability,"retentionrate":vox_retention_rate}
 
 splits = np.concatenate((np.ones_like(stim_id),np.ones_like(stim_id)*2))    
-WB_reliability = Parallel(n_jobs = 5)(delayed(compute_voxel_reliability)(sAP,splits,LSA_GLM_dir,subid) for (sAP,subid) in zip(WB_beta,subid_list))
+WB_reliability = Parallel(n_jobs = 10)(delayed(compute_voxel_reliability)(sAP,splits,LSA_GLM_dir,subid) for (sAP,subid) in zip(WB_beta,subid_list))
 joblib.dump(WB_reliability,os.path.join(LSA_GLM_dir,'wholebrain_reliability.pkl'))
 
 import seaborn as sns
