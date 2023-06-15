@@ -5,6 +5,43 @@ import pandas
 import os
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib
+
+def standardize_2D(X:numpy.ndarray,dim:int=2)->numpy.ndarray:
+    """ standardize a 2D numpy array by using ZX = (X - mean)/std
+
+    Parameters
+    ----------
+    X : numpy.ndarray
+        the 1D or 2D numpy array that needs to be normalized
+    dim : int, optional
+        if 0, will perfrom standardization independently for each row
+        if 1, will perform standardization independently for each column
+        if 2, will perform standardization on the whole matrix
+        by default 2
+
+    Returns
+    -------
+    numpy.ndarray
+        standardized 2D array X
+    """
+    assert isinstance(X,numpy.ndarray), "X must be numpy array"
+    assert X.ndim <= 2, "X must be 1D or 2D"
+    
+    if X.ndim == 1:
+        dim = 2
+    if dim == 2:
+        ZX = (X - numpy.mean(X)) / numpy.std(X)
+    else:
+        if dim == 1:
+            X = X.T
+        row_means = X.mean(axis=1)
+        row_stds  = X.std(axis=1)
+        ZX = (X - row_means[:, numpy.newaxis]) / row_stds[:, numpy.newaxis]
+        if dim == 1:
+            ZX = ZX.T
+    return ZX
+
 
 def lower_tri(rdm:numpy.ndarray) -> tuple:
     """return the lower triangular part of the RDM, excluding the diagonal elements
@@ -20,6 +57,9 @@ def lower_tri(rdm:numpy.ndarray) -> tuple:
         rdm_tril: the lower triangular part of the RDM, excluding the diagonal elements
         lower_tril_idx: the index of the lower triangular part of the RDM, excluding the diagonal elements
     """
+    assert isinstance(rdm,numpy.ndarray), "rdm must be 2D numpy array"
+    assert rdm.ndim == 2, "rdm must be 2D numpy array"
+    
     lower_tril_idx = numpy.tril_indices(rdm.shape[0], k = -1)
     rdm_tril = rdm[lower_tril_idx]
     return rdm_tril,lower_tril_idx
@@ -38,6 +78,10 @@ def upper_tri(rdm:numpy.ndarray) -> tuple:
         rdm_tril: a 1D numpy array. the upper triangular part of the RDM, excluding the diagonal elements
         upper_tril_idx: a 1D numpy array. the index of the upper triangular part of the RDM, excluding the diagonal elements
     """
+
+    assert isinstance(rdm,numpy.ndarray), "rdm must be 2D numpy array"
+    assert rdm.ndim == 2, "rdm must be 2D numpy array"
+
     upper_triu_idx = numpy.triu_indices(rdm.shape[0], k = 1)
     rdm_triu = rdm[upper_triu_idx]
     return rdm_triu,upper_triu_idx
@@ -87,13 +131,13 @@ def compute_rdm(pattern_matrix:numpy.ndarray,metric:str) -> numpy.ndarray:
     Exception
         pattern matrix must be 2D
     """
-    if not pattern_matrix.ndim == 2:
-        raise Exception("pattern matrix must be 2D")
-    else:
-        X = pattern_matrix
-        na_filters = numpy.all([~numpy.isnan(X[j,:]) for j in range(numpy.shape(X)[0])],0)
-        X_drop_na = X[:,na_filters]
-        rdm = squareform(pdist(X_drop_na, metric=metric))    
+    assert isinstance(pattern_matrix,numpy.ndarray), "pattern_matrix must be 2D numpy array"
+    assert pattern_matrix.ndim == 2, "pattern_matrix must be 2D numpy array"
+    
+    X = pattern_matrix
+    na_filters = numpy.all([~numpy.isnan(X[j,:]) for j in range(numpy.shape(X)[0])],0)
+    X_drop_na = X[:,na_filters]
+    rdm = squareform(pdist(X_drop_na, metric=metric))    
     return rdm
 
 def checkdir(dirs:list or str):
@@ -113,7 +157,7 @@ def checkdir(dirs:list or str):
         if isinstance(dirs,str):
             dirs = [dirs]
     else:
-        raise Exception("invalid input type")
+        raise AssertionError("dirs must be a list of directory strings or a directory string")
     
     for dir in dirs:
         if not os.path.exists(dir):
@@ -262,7 +306,7 @@ class ModelRDM:
         modelrdm = 1-abs(X==Y)# if same stimuli, distance=0
         return modelrdm
     
-    def visualize(self,modelname:str or list="all",tri:int=0,annot:bool=False)->sns.FacetGrid:
+    def visualize(self,modelname:str or list="all",tri:int=0,annot:bool=False)->matplotlib.figure:
         """plot model rdms using seaborn heatmap
 
         Parameters
@@ -276,8 +320,8 @@ class ModelRDM:
 
         Returns
         -------
-        seaborn.FacetGrid
-            the seaborn facetgrid figure
+        matplotlib.figure
+            the plotted figure
         """
         if isinstance(modelname,list):
             if numpy.all([m in self.models.keys() for m in modelname]):
