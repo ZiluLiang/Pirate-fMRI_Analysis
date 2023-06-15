@@ -21,7 +21,7 @@ stim_feature = np.array(stim_list[['stim_attrx','stim_attry']])
 
 
 glm_name = 'LSA_stimuli_navigation'
-LSA_GLM_dir = os.path.join(fmri_output_path,'unsmoothedLSA',glm_name)
+LSA_GLM_dir = os.path.join(fmri_output_path,'smoothed5mmLSA',glm_name)
 
 def get_oddeven_img(subid):
     #eng = matlab.engine.start_matlab()
@@ -88,27 +88,31 @@ model_rdm["oddeven"] = [ModelRDM(stim_id,stim_loc,stim_feature,n_session=2),
                         ModelRDM(stim_id,stim_loc,stim_feature,n_session=2,cv_sess=False)]
 model_rdm["allsess"] = [ModelRDM(stim_id,stim_loc,stim_feature,n_session=4),
                         ModelRDM(stim_id,stim_loc,stim_feature,n_session=4,cv_sess=False)]
+for vselect in ["wholebrain","reliability_ths0"]:
+    for k,v in RSA_specs.items():
+        regress_modelsWS = []
+        for mn in ['within_stimuli']:
+            regress_modelsWS.append(model_rdm[k][0].models[mn])
+        regress_modelsBS = []
+        for mn in ['between_stimuli']:
+            regress_modelsBS.append(model_rdm[k][0].models[mn])
+        regress_modelsALLS = []
+        for mn in ['session','stimuli']:
+            regress_modelsALLS.append(model_rdm[k][1].models[mn])
 
-for k,v in RSA_specs.items():
-    regress_modelsWS = []
-    for mn in ['within_loc2d','within_feature2d']:
-        regress_modelsWS.append(model_rdm[k][0].models[mn])
-    regress_modelsBS = []
-    for mn in ['between_loc2d','between_feature2d']:
-        regress_modelsBS.append(model_rdm[k][0].models[mn])
-    regress_modelsALLS = []
-    for mn in ['session','loc2d','feature2d']:
-        regress_modelsALLS.append(model_rdm[k][1].models[mn])
-
-    for subid,n_paths,m_paths,_ in v:
-        print(f'{k}: Running Searchlight RSA in {subid}')
-        WS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa',k,'withins_reg') 
-        BS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa',k,'betweens_reg')    
-        ALLS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa',k,'alls_reg')    
-        
-        outputregexp = 'beta_%04d.nii'
-        subRSA = RSASearchLight(n_paths,m_paths,10,MultipleRDMRegression,njobs=10)
-        subRSA.run(regress_modelsWS,   os.path.join(WS_dir,subid),   outputregexp, True)
-        subRSA.run(regress_modelsBS,   os.path.join(BS_dir,subid),   outputregexp, True)
-        subRSA.run(regress_modelsALLS, os.path.join(ALLS_dir,subid), outputregexp, True)
-        print(f'{k}: Completed searchlight in {subid}')
+        for subid,n_paths,m_paths,_ in v:
+            print(f'{vselect} - {k}: Running Searchlight RSA in {subid}')
+            
+            WS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa_sc',vselect,k,'withins_reg','first') 
+            BS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa_sc',vselect,k,'betweens_reg','first')    
+            ALLS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa_sc',vselect,k,'alls_reg','first')    
+            
+            if vselect == "reliability_ths0":
+                m_paths = os.path.join(os.path.dirname(m_paths),'reliability_mask.nii')
+            
+            outputregexp = 'beta_%04d.nii'
+            subRSA = RSASearchLight(n_paths,m_paths,10,MultipleRDMRegression,njobs=10)
+            #subRSA.run(regress_modelsWS,   os.path.join(WS_dir,subid),   outputregexp, True)
+            subRSA.run(regress_modelsBS,   os.path.join(BS_dir,subid),   outputregexp, True)
+            subRSA.run(regress_modelsALLS, os.path.join(ALLS_dir,subid), outputregexp, True)
+            print(f'{k}: Completed searchlight in {subid}')

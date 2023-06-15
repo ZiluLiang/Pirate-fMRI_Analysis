@@ -13,10 +13,10 @@ class LinearEncoder:
         X = featurematrix
         Y = patternmatrix
 
-        self.trainX = self.standardize(X[np.where(group==0)])
-        self.trainY = self.standardize(Y[np.where(group==0)])
-        self.testX  = self.standardize(X[np.where(group==1)])
-        self.testY  = self.standardize(Y[np.where(group==1)])
+        self.trainX = self.standardize(X[np.where(group==0)],dim=0)
+        self.trainY = self.standardize(Y[np.where(group==0)],dim=0)
+        self.testX  = self.standardize(X[np.where(group==1)],dim=0)
+        self.testY  = self.standardize(Y[np.where(group==1)],dim=0)
 
         self.Nf = np.shape(X)[1] # number of features
         if Y.ndim > 1:
@@ -43,7 +43,10 @@ class LinearEncoder:
         self.score_sklearn = self.encoder.score(self.testX, self.testY)
         return self
         
-    def standardize(self,X):
-        # standardize
-        X_standardized = (X - np.mean(X))/np.std(X)
+    def standardize(self,X,dim):
+        # standardize each column
+        if X.ndim>1:
+            X_standardized = (X - X.mean(axis=dim,keepdims=True))  / X.std(axis=dim,keepdims=True)
+        else:
+            X_standardized = (X - X.mean())  / X.std()
         return X_standardized

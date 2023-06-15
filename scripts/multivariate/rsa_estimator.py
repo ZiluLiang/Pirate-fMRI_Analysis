@@ -40,6 +40,7 @@ class MultipleRDMRegression:
 
         sX = []
         X_dropNA = X[na_filters,:]
+        #standardize each column
         for j in range(self.n_reg):
             sX.append(self.standardize(X_dropNA[:,j]))        
         self.X = np.array(sX).T

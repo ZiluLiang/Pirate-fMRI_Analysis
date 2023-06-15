@@ -2,11 +2,11 @@ import os
 import numpy as np
 import nibabel as nib
 import nibabel.processing
-from nilearn.masking import apply_mask
+from nilearn.masking import apply_mask,intersect_masks
 import sklearn
-
+from nilearn.image import math_img
 class ActivityPatternDataLoader:
-    def __init__(self,data_nii_paths: list, conditions: list, condition_names: list = None, mask_img=None, dropNA_flag = True):
+    def __init__(self,data_nii_paths: list, conditions: list, condition_names: list = None, mask_imgs=None, dropNA_flag = True):
         
         # validate input
         if not np.all([os.path.exists(x) for x in data_nii_paths]): 
@@ -20,7 +20,7 @@ class ActivityPatternDataLoader:
         
         #extract activity pattern for each condition
         data_imgs = [nib.load(data_nii_path) for data_nii_path in data_nii_paths]
-        if mask_img is not None:
+        def load_singlemask(mask_img,ref_maskimg):
             if isinstance(mask_img, str):
                 mask_img = nib.load(mask_img)
             elif isinstance(mask_img, np.ndarray):
@@ -28,8 +28,17 @@ class ActivityPatternDataLoader:
                 mask_img = nib.Nifti1Image(reshapeimg, data_imgs[0].affine,data_imgs[0].header)
             else:
                 mask_img = mask_img
-            resampled_mask = nib.processing.resample_from_to(mask_img, data_imgs[0]) # this assumes that all the input image have the same dimsion, the next extraction step will throw error if not
-            X = apply_mask(data_imgs, resampled_mask,ensure_finite = False)
+            resampled_maskimg = nib.processing.resample_from_to(mask_img, ref_maskimg) 
+            return resampled_maskimg
+        # combine masks
+        if mask_imgs is not None:
+            if isinstance(mask_imgs,list):
+                loaded_imgs = [load_singlemask(mask_img,data_imgs[0]) for mask_img in mask_imgs]
+                mask_img = intersect_masks(loaded_imgs,threshold=1)
+            else:
+                mask_img = load_singlemask(mask_imgs,data_imgs[0])       
+            
+            X = apply_mask(data_imgs, mask_img,ensure_finite = False)
         else:
             X = np.array([img.get_fdata().flatten() for img in data_imgs])
         
