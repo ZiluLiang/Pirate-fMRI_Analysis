@@ -7,7 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
 
-def standardize_2D(X:numpy.ndarray,dim:int=2)->numpy.ndarray:
+def standardize(X:numpy.ndarray,dim:int=2)->numpy.ndarray:
     """ standardize a 1D or 2D numpy array by using ZX = (X - mean)/std
 
     Parameters
@@ -15,9 +15,9 @@ def standardize_2D(X:numpy.ndarray,dim:int=2)->numpy.ndarray:
     X : numpy.ndarray
         the 1D or 2D numpy array that needs to be normalized
     dim : int, optional
-        if 0, will perfrom standardization independently for each row
-        if 1, will perform standardization independently for each column
-        if 2, will perform standardization on the whole matrix
+        if 0, will perfrom standardization independently for each row  \n
+        if 1, will perform standardization independently for each column  \n      
+        if 2, will perform standardization on the whole matrix  \n
         by default 2
 
     Returns
