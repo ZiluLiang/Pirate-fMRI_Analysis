@@ -179,14 +179,13 @@ class ModelRDM:
     split_sess : bool, optional
         split the rdm into within-session and between-session or not, by default True
     """
-    def __init__(self,stimid:numpy.ndarray,stimloc:numpy.ndarray,stimfeature:numpy.ndarray,n_session:int=1,split_sess:bool=True):
+    def __init__(self,stimid:numpy.ndarray,stimloc:numpy.ndarray,stimfeature:numpy.ndarray,n_session:int=1):
         self.n_session   = n_session
         self.n_stim      = len(stimid)
         self.stimid      = numpy.tile(stimid,(n_session,1))
         self.stimloc     = numpy.tile(stimloc,(n_session,1))
         self.stimfeature = numpy.tile(stimfeature,(n_session,1))
-        models = {"session":self.session(),
-                  "loc2d":self.euclidean2d(),
+        models = {"loc2d":self.euclidean2d(),
                   "loc1dx":self.euclidean1d(0),
                   "loc1dy":self.euclidean1d(1),
                   "feature2d":self.feature2d(),
@@ -194,21 +193,22 @@ class ModelRDM:
                   "feature1dy":self.feature1d(1),
                   "stimuli":self.stimuli(),
                 }
-        if not split_sess:
-            self.models = models
-        else:
+
+        # split into sessions
+        if n_session>1:
             BS = self.session() # 0 - within session; 1 - within session
             WS = 1 - BS         # 0 - between session; 1 - between session
             BS[BS==0]=numpy.nan
             WS[WS==0]=numpy.nan
-            models_split = dict({"session":models.pop("session")})
-            for k,v in models.items():
+            tmp = list(models.items())
+            for k,v in tmp:
                 ws_n  = 'within_'+k
                 rdmws = numpy.multiply(v,WS)
                 bs_n  = 'between_'+k
                 rdmbs = numpy.multiply(v,BS)
-                models_split.update({ws_n:rdmws,bs_n:rdmbs})
-            self.models = models_split
+                models.update({ws_n:rdmws,bs_n:rdmbs})
+            models.update({"session":self.session()})
+        self.models = models
 
     def __str__(self):
         summary = 'The following model rdms are created:\n' + ',\n'.join(self.models.keys())
@@ -291,7 +291,7 @@ class ModelRDM:
             2D numpy array of model rdm
         """
         X,Y = numpy.meshgrid(self.stimfeature[:,dim],self.stimfeature[:,dim])
-        modelrdm = 1-abs(X==Y) # if same feature, distance=0
+        modelrdm = 1. - abs(X==Y) # if same feature, distance=0
         return modelrdm
 
     def stimuli(self)->numpy.ndarray:
@@ -303,7 +303,7 @@ class ModelRDM:
             2D numpy array of model rdm
         """
         X,Y = numpy.meshgrid(self.stimid,self.stimid)
-        modelrdm = 1-abs(X==Y)# if same stimuli, distance=0
+        modelrdm = 1. - abs(X==Y)# if same stimuli, distance=0
         return modelrdm
     
     def visualize(self,modelname:str or list="all",tri:int=0,annot:bool=False)->matplotlib.figure:
