@@ -5,9 +5,11 @@ The code is adapted from nilearn.decoding.searchlight module.
 import os
 import sys
 import time
+import json
 import numpy as np
 import nibabel as nib
 import nibabel.processing
+from copy import deepcopy
 from joblib import Parallel, delayed, cpu_count
 from scipy.sparse import vstack, find
 from multivariate.helper import compute_rdm,checkdir
@@ -28,7 +30,14 @@ class RSASearchLight:
         print("finished concatenating images")
         self.X, self.A = self.genPatches(self.pattern_img)
         self.neighbour_idx_lists = self.find_neighbour_idx()
-        
+
+        ## create a searchlight summary
+        self.config ={"mask":mask_img_path,
+                      "radius":radius,
+                      "estimator":str(estimator),
+                      "scans":patternimg_paths,
+                      "njobs":njobs}
+
     def find_neighbour_idx(self):
         voxel_neighbours = []
         for _,row in enumerate(self.A):
@@ -36,10 +45,7 @@ class RSASearchLight:
             voxel_neighbours.append(vidx) 
         return voxel_neighbours
 
-    def run(self,model,outputpath,outputregexp,verbose):
-        if not '.nii' in outputregexp:
-            outputregexp = outputregexp + '.nii'
-        checkdir(outputpath)
+    def run(self,models,modelnames,outputpath,outputregexp,verbose):
 
         # split patches for parallelization
         group_iter = GroupIterator(len(self.neighbour_idx_lists), self.njobs)
@@ -47,7 +53,7 @@ class RSASearchLight:
             results = parallel(
                 delayed(self.fitPatchGroup)(
                     [self.neighbour_idx_lists[i] for i in list_i],
-                    model,
+                    models,
                     thread_id + 1,
                     self.A.shape[0],
                     verbose,
@@ -56,18 +62,28 @@ class RSASearchLight:
             )
 
         result = np.vstack(results)
-
+        self.write(result,models,modelnames,outputpath,outputregexp)
+        return self
+    
+    def write(self,result,models,modelnames,outputpath,outputregexp):
+        if not '.nii' in outputregexp:
+            outputregexp = outputregexp + '.nii'
+        checkdir(outputpath)
         maskdata, _ = nilearn.masking._load_mask_img(self.mask_img)
-        result_img = []
         for k in np.arange(np.shape(result)[1]):
             result_3D = np.zeros(self.mask_img.shape)
             result_3D[maskdata] = result[:,k]
             curr_img = nilearn.image.new_img_like(self.mask_img, result_3D)
             curr_fn = os.path.join(outputpath,outputregexp % (k))
             nib.save(curr_img, curr_fn)
-            result_img.append(curr_img)
-        self.result_img = result_img
-        return self
+        # create a json file storing regressor information
+        json_fn = os.path.join(outputpath,'searchlight.json')
+        config = deepcopy(self.config)
+        X = {"names":modelnames,
+             "xX":[m.tolist() for m in models]}
+        with open(os.path.join(outputpath,json_fn), "w") as outfile:
+            json.dump({"config":config,"X":X}, outfile)
+
     
     def fitPatchGroup(self,neighbour_idx_list, model,thread_id,total,verbose:bool = True):
         voxel_results = []
