@@ -34,7 +34,7 @@ stim_list =  pd.read_csv(stim_list_fn, sep=",", header=0)
 stim_id = np.array(stim_list['stim_id'])
 
 glm_name = 'LSA_stimuli_navigation'
-LSA_GLM_dir = os.path.join(fmri_output_path,'smoothed5mmLSA',glm_name)
+LSA_GLM_dir = os.path.join(fmri_output_path,'unsmoothedLSA',glm_name)
 #smoothed5mmLSA
 if os.path.exists(os.path.join(LSA_GLM_dir,'wholebrain_oddeven_navistim.pkl')):
     WB_beta = joblib.load(os.path.join(LSA_GLM_dir,'wholebrain_oddeven_navistim.pkl'))

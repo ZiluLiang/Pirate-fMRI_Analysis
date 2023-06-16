@@ -1,7 +1,7 @@
 ## Activity pattern
 To run multivariate analysis, we need to get the activity pattern matrix. To achive that, we adopted the ['LS-A' approach](https://doi.org/10.1016/j.neuroimage.2011.08.076).
 ### 1. the LS-A approach and the activity pattern matrix
-For each participant, we build first level GLMs with 25 regressors (one for each stimuli) in each session (run), this yields a totoal of 25*4 = 100 condition regressors. Realignment parameters and their first derivatives are included as nuisance regressors (see [Univariate Analaysis Pipeline](/scripts/univariate/UnivariateAnalysisPipeline.md)).  
+For each participant, we build first level GLMs with 25 regressors (one for each stimuli) in each session (run), this yields a totoal of 25*4 = 100 condition regressors. Response stage was modeled with a boxcar function with a duration corresponding to participant's actual navigation time in the task. Realignment parameters and their first derivatives are included as nuisance regressors (see [Univariate Analaysis Pipeline](/scripts/univariate/UnivariateAnalysisPipeline.md)).  
 Then we build the following contrasts:  
 (1) a contrast for each of the stimuli, this yields 25 contrasts  
 We extracted the 25 stimuli contrast to constructs a $N_{stimuli}\times N_{voxels}$ activity pattern matrix for visualization.
