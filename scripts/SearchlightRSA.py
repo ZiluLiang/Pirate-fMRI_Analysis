@@ -84,35 +84,36 @@ print('finished retrieving participants regressor image directory\n')
 eng.quit()
 
 model_rdm =dict()
-model_rdm["oddeven"] = [ModelRDM(stim_id,stim_loc,stim_feature,n_session=2),
-                        ModelRDM(stim_id,stim_loc,stim_feature,n_session=2,cv_sess=False)]
-model_rdm["allsess"] = [ModelRDM(stim_id,stim_loc,stim_feature,n_session=4),
-                        ModelRDM(stim_id,stim_loc,stim_feature,n_session=4,cv_sess=False)]
+model_rdm["oddeven"] = ModelRDM(stim_id,stim_loc,stim_feature,n_session=2)
+model_rdm["allsess"] = ModelRDM(stim_id,stim_loc,stim_feature,n_session=4)
+
+analysis = {"sc_betweens_stimuli":   ['between_stimuli'],
+            "sc_alls_stimuli":       ['stimuli'],
+            "sc_withins_feature2d":  ['within_feature2d'],
+            "sc_betweens_feature2d": ['between_feature2d'],
+            "sc_alls_feature2d":     ['feature2d'],
+            "betweens_loc2d":  ["between_loc2d"],
+            "withins_loc2d":   ["within_loc2d"],
+            "alls_loc2d":      ["loc2d"],
+            "betweens_loc1d":  ["between_loc1dx","between_loc1dy"],
+            "withins_loc1d":   ["within_loc1dx","within_loc1dy"],
+            "alls_loc1d":      ["loc1dx","loc1dy"],
+        }
 for vselect in ["wholebrain","reliability_ths0"]:
     for k,v in RSA_specs.items():
-        regress_modelsWS = []
-        for mn in ['within_stimuli']:
-            regress_modelsWS.append(model_rdm[k][0].models[mn])
-        regress_modelsBS = []
-        for mn in ['between_stimuli']:
-            regress_modelsBS.append(model_rdm[k][0].models[mn])
-        regress_modelsALLS = []
-        for mn in ['session','stimuli']:
-            regress_modelsALLS.append(model_rdm[k][1].models[mn])
-
         for subid,n_paths,m_paths,_ in v:
             print(f'{vselect} - {k}: Running Searchlight RSA in {subid}')
-            
-            WS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa_sc',vselect,k,'withins_reg','first') 
-            BS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa_sc',vselect,k,'betweens_reg','first')    
-            ALLS_dir = os.path.join(LSA_GLM_dir,'searchlightrsa_sc',vselect,k,'alls_reg','first')    
-            
             if vselect == "reliability_ths0":
                 m_paths = os.path.join(os.path.dirname(m_paths),'reliability_mask.nii')
-            
             outputregexp = 'beta_%04d.nii'
             subRSA = RSASearchLight(n_paths,m_paths,10,MultipleRDMRegression,njobs=10)
-            #subRSA.run(regress_modelsWS,   os.path.join(WS_dir,subid),   outputregexp, True)
-            subRSA.run(regress_modelsBS,   os.path.join(BS_dir,subid),   outputregexp, True)
-            subRSA.run(regress_modelsALLS, os.path.join(ALLS_dir,subid), outputregexp, True)
+
+            for a_n,a_reg in analysis.items():
+                print(f'Analysis - {a_n}')
+                regress_models = []
+                for mn in a_reg:
+                    regress_models.append(model_rdm[k].models[mn])
+                output_dir = os.path.join(LSA_GLM_dir,'searchlightrsa_sc',vselect,k,a_n,'first')
+                subRSA.run(regress_models,a_reg,os.path.join(output_dir,subid), outputregexp, True)            
+            
             print(f'{k}: Completed searchlight in {subid}')
