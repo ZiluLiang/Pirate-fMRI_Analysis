@@ -5,7 +5,7 @@ function specify_estimate_contrast(varargin)
     
     err_flag = 1;
     
-    if all(cellfun(@(arg) iscell(arg),varargin(2:3))) && ischar(varargin{1})
+    if all(cellfun(@(arg) iscell(arg),varargin(2:3))) && (ischar(varargin{1}) || isstring(varargin{1}))
         SPMmat_dir = varargin{1};
         contrast_names = varargin{2};
         contrast_weights = varargin{3};
