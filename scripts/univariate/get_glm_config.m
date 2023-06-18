@@ -66,12 +66,12 @@ function glms = glm_gallery
     glms(7).name = 'LSA_stimuli_navigation';
     glms(7).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(7).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
-    glms(7).modelopt    = struct('use_stick', [repmat({false},size(glms(7).conditions)),{false}]);
+    glms(7).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
    
     trainingstimid = [2,7,10,11,12,13,14,17,22];
     glms(8).name = 'LSA_stimuli_localizer';
     glms(8).filepattern = 'sub-.*_task-localizer_run-[1]';
     glms(8).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),trainingstimid,'uni',0),{'response'}];
-    glms(8).modelopt    = struct('use_stick', [repmat({false},size(glms(8).conditions)),{true}]);
+    glms(8).modelopt    = struct('use_stick', [repmat({false},size(trainingstimid)),{true}]);
 
 end
