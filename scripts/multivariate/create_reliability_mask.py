@@ -24,13 +24,14 @@ project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
 fmri_output_path = os.path.join(project_path,'data','fmri')
 glm_name = 'LSA_stimuli_navigation'
 
-preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
 with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
 
+preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
 for p in preprocess: 
     LSA_GLM_dir = os.path.join(fmri_output_path,p,glm_name)
+    print(p)
     def getsubWB(subid):
         # retrieve pattern data from the contrast images
         # do not drop na values so that the reliavility value can be transformed back to same nifti image dimension
@@ -64,13 +65,15 @@ for p in preprocess:
     WB_reliability = Parallel(n_jobs = 10)(delayed(compute_voxel_reliability)(sAP,opdir,subid) for (sAP,opdir,subid) in zip(WB_beta,firstlvl_dirs,subid_list))
     joblib.dump(WB_reliability,os.path.join(LSA_GLM_dir,'wholebrain_reliability.pkl'))
 
-    M = np.array([t["reliability"] for t in WB_reliability])
-    R = np.array([t["retentionrate"] for t in WB_reliability])
-    df = pd.DataFrame({"r":M.ravel(),"sub":np.repeat(np.arange(M.shape[0]), M.shape[1])})
+    M = [t["reliability"] for t in WB_reliability]
+    R = [t["retentionrate"] for t in WB_reliability]
+    df = pd.DataFrame({"r":np.concatenate(M),
+                       "sub": np.concatenate([np.repeat(s,x.size) for s,x in enumerate(M)])})
+    
     df["row"] = np.floor(df["sub"]/10)
     df["col"] = np.mod(df["sub"],10)
     r_displot = sns.displot(data = df, x = "r",col="col",row="row")
     for ax, sub, rsub in zip(r_displot.axes.flat, subid_list, R):
-        txt = "%s - retained approx. '%0.2f' percent" % (sub,rsub*100)
+        txt = "%s - approx. %0.2f%% voxels' r> 0" % (sub,rsub*100)
         ax.set_title(txt)
     r_displot.savefig(os.path.join(LSA_GLM_dir,'WB_reliability_distribution.png'))
