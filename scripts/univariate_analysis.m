@@ -20,7 +20,7 @@ end
 
 %% run LSA beta series extrator GLMs
 LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer'};
-flag_runGLM  = true;
+flag_runGLM  = false;
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 for jdir = 1:numel(lsa_dir)     
     if flag_runGLM
@@ -43,7 +43,7 @@ for j = 1:numel(LSAglm_names)
     [rangeCon.(glm_name),meanResMS2.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{2},glm_name),masks);
 end
 
-%% generate contrast for odd and even runs for LSA beta series extractor GLMs
+%% generate contrast for odd and even runs for LSA beta series extractor GLMs - navigation task
 glm_name = 'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
@@ -81,7 +81,7 @@ for jdir = 1:numel(lsa_dir)
     end
 end
 
-%% generate contrast for each stimul for LSA beta series extractor GLMs
+%% generate contrast for each stimul for LSA beta series extractor GLMs - navigation task
 glm_name = 'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
@@ -114,7 +114,7 @@ for jdir = 1:numel(lsa_dir)
     end
 end
 
-%% concatenate into 4D series
+%% concatenate into 4D series - navigation task
 % 1 - 25 contrasts one for each stimuli
 % 2 - 50 contrasts one for each stimuli in odd/even run
 % 3 - 100 regressors one for each stimuli in each run
@@ -161,6 +161,31 @@ for jdir = 1:numel(lsa_dir)
         else
             error('failed to find enough file to concatenate')            
         end
-        %clear firstlvl_dir subSPM contrast_img1 contrast_imgo contrast_imge reg_img tmp
+        clear firstlvl_dir subSPM contrast_img1 contrast_imgo contrast_imge reg_img tmp
+    end
+end
+
+%% concatenate into 4D series - localizer task
+% 9 regressors one for each training stimuli
+glm_name = 'LSA_stimuli_localizer';
+lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
+trainingstimid = [2,7,10,11,12,13,14,17,22];
+for jdir = 1:numel(lsa_dir)
+    glm_dir = fullfile(directory.fmri_data,lsa_dir{jdir},glm_name);
+    for isub  = 1:participants.nvalidsub
+        fprintf('Concatenating 4D activity pattern images for %s\n',participants.validids{isub})
+        firstlvl_dir = fullfile(glm_dir,'first',participants.validids{isub});
+        subSPM = load(fullfile(firstlvl_dir,'SPM.mat'),'SPM').SPM;
+        [~,reg_img] = arrayfun(@(stimid) find_regressor_idx(subSPM,sprintf('stim%02d',stimid)),trainingstimid);
+        
+        fprintf('%s - reg_img: %d/9\n', numel(reg_img))
+        if all(~isempty(reg_img))
+            % ordered by stim[2,7,10,11,12,13,14,17,22]
+            spm_file_merge(char(fullfile(firstlvl_dir,reg_img)),fullfile(firstlvl_dir,'stimuli_1r.nii'));
+            fprintf('Completed concatenating 4D activity pattern images for %s\n',participants.validids{isub})
+        else
+            error('failed to find enough file to concatenate')            
+        end
+        clear firstlvl_dir subSPM reg_img
     end
 end
