@@ -1,119 +1,119 @@
 import numpy as np
 import os
-import matlab.engine
+import json
+import glob
 import pandas as pd
 from multivariate.rsa_searchlight import RSASearchLight
 from multivariate.rsa_estimator import MultipleRDMRegression
 from multivariate.helper import ModelRDM
 
 project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
-
-eng = matlab.engine.start_matlab()
-subid_list = eng.eval("get_pirate_defaults(false,'participants').validids")
-#eng.quit()
-
 fmri_output_path = os.path.join(project_path,'data','fmri')
-stim_list_fn = os.path.join(project_path,'scripts','generic','stimlist.txt')
-stim_list =  pd.read_csv(stim_list_fn, sep=",", header=0)
-stim_id = np.array(stim_list['stim_id'])
-stim_loc = np.array(stim_list[['stim_x','stim_y']])
-stim_feature = np.array(stim_list[['stim_attrx','stim_attry']])
-
-
 glm_name = 'LSA_stimuli_navigation'
-LSA_GLM_dir = os.path.join(fmri_output_path,'smoothed5mmLSA',glm_name)
 
-def get_oddeven_img(subid):
-    #eng = matlab.engine.start_matlab()
-    firstlvl_dir = os.path.join(LSA_GLM_dir,'first',subid)
-    contrast_imgo = []
-    contrast_imge = []
-    for sid in stim_id:
-        # call find_contrast_idx function in matlab to find the index of the corresponding contrasts
-        eng.evalc("[~,contrast_imgo,~] = find_contrast_idx(fullfile('%s','SPM.mat'),'stim%02d_odd')" % (firstlvl_dir,sid))
-        eng.evalc("[~,contrast_imge,~] = find_contrast_idx(fullfile('%s','SPM.mat'),'stim%02d_even')" % (firstlvl_dir,sid))
-        contrast_imgo.append(eng.eval("contrast_imgo")) 
-        contrast_imge.append(eng.eval("contrast_imge"))
-    contrast_fns   = np.concatenate((contrast_imgo,contrast_imge))
-    contrast_paths = [os.path.join(firstlvl_dir,fn) for fn in contrast_fns]
-    conditions     = np.concatenate((['stim'+str(s)+'_odd' for s in stim_id],['stim'+str(s)+'_even' for s in stim_id]))
-    mask_path = os.path.join(firstlvl_dir,'mask.nii')
-    #eng.quit()
-    return subid,contrast_paths,mask_path,conditions
+preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
+with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
+    pirate_defaults = json.load(f)
+    subid_list = pirate_defaults['participants']['validids']
+    voxel_size = pirate_defaults['fmri']['voxelsize']
+n_run = 4
 
-def get_contrast_img(subid):
-    #eng = matlab.engine.start_matlab()
-    firstlvl_dir = os.path.join(LSA_GLM_dir,'first',subid)
-    stimcon_fn = []
-    for sid in stim_id:
-        # call find_regressor_idx function in matlab to find the index of the corresponding regressor
-        eng.evalc("[~,contrast_img,~] = find_contrast_idx(fullfile('%s','SPM.mat'),{regexpPattern('^stim%02d$')})" % (firstlvl_dir,sid))
-        stimcon_fn.append(eng.eval("contrast_img")) 
-    #eng.quit()
-    conditions = ['stim%02d' % (s) for s in stim_id]
-    mask_path = os.path.join(firstlvl_dir,'mask.nii')
-    stimcon_paths = [os.path.join(firstlvl_dir,fn) for fn in stimcon_fn]
-    return subid,stimcon_paths,mask_path,conditions
+for p in preprocess: 
+    LSA_GLM_dir = os.path.join(fmri_output_path,p,glm_name)
+    beta_flist4r = []
+    beta_flistoe = []
+    fmask_flist = []
+    pmask_flist = []
+    run_stim_labels = []
+    y_dict = {"id":[],
+            "image":[],
+            "locx":[],
+            "locy":[],
+            "color":[],
+            "shape":[]} 
 
-def get_sessionreg_img(subid):
-    #eng = matlab.engine.start_matlab()
-    firstlvl_dir = os.path.join(LSA_GLM_dir,'first',subid)
-    stimreg_fn = []
-    for sid in stim_id:
-        # call find_regressor_idx function in matlab to find the index of the corresponding regressor
-        eng.evalc("[~,regimgnames] = find_regressor_idx(fullfile('%s','SPM.mat'),'stim%02d')" % (firstlvl_dir,sid))
-        stimreg_fn.append(eng.eval("regimgnames")) 
-    #eng.quit()
-    conditions = ['stim%02d_run%d' % (s,r+1) for s in stim_id for r in range(4)]
-    mask_path = os.path.join(firstlvl_dir,'mask.nii')
-    stimreg_fn = np.concatenate(stimreg_fn, axis=0)
-    stimreg_paths = [os.path.join(firstlvl_dir,fn) for fn in stimreg_fn]
-    return subid,stimreg_paths,mask_path,conditions
+    for subid in subid_list:
+        print(f"retrieving data from {subid}")
 
-RSA_specs = dict()
-## run on odd and even separated
-print('retrieving participants contrast image directory\n')
-RSA_specs["oddeven"] = [get_oddeven_img(subid) for subid in subid_list]
-print('finished retrieving participants contrast image directory\n')
+        # load stimuli list
+        stim_list_fn = glob.glob(os.path.join(fmri_output_path,'beh',subid,'sub*_stimlist.txt'))[0]
+        stim_list =  pd.read_csv(stim_list_fn, sep=",", header=0).sort_values(by = ['stim_id'], ascending=True,inplace=False)
+        # get stimuli id
+        stim_id = np.array(stim_list['stim_id'])
+        # get stimuli image
+        stim_image = np.array([x.replace('.png','') for x in stim_list["stim_img"]])
+        # get 2d location
+        stim_locx = np.array(stim_list['stim_x'])
+        stim_locy = np.array(stim_list['stim_y'])
+        # get visual features
+        stim_color = np.array([x.replace('.png','').split('_')[0] for x in stim_list["stim_img"]])
+        stim_shape = np.array([x.replace('.png','').split('_')[1] for x in stim_list["stim_img"]])
 
-## run on four separated sessions
-print('retrieving participants regressor image directory\n')
-RSA_specs["allsess"] = [get_sessionreg_img(subid) for subid in subid_list]
-print('finished retrieving participants regressor image directory\n')
+        # build list of beta maps
+        firstlvl_dir = os.path.join(LSA_GLM_dir,'first',subid)
 
-eng.quit()
+        y_dict["id"].append(stim_id)
+        y_dict["image"].append(stim_image)
+        y_dict["locx"].append(stim_locx)
+        y_dict["locy"].append(stim_locy)
+        y_dict["color"].append(stim_color)
+        y_dict["shape"].append(stim_shape)
 
-model_rdm =dict()
-model_rdm["oddeven"] = ModelRDM(stim_id,stim_loc,stim_feature,n_session=2)
-model_rdm["allsess"] = ModelRDM(stim_id,stim_loc,stim_feature,n_session=4)
+        beta_flist4r.append(os.path.join(firstlvl_dir,'stimuli_4r.nii'))
+        beta_flistoe.append(os.path.join(firstlvl_dir,'stimuli_oe.nii'))
+        fmask_flist.append(os.path.join(firstlvl_dir,'mask.nii'))
+        pmask_flist.append(os.path.join(firstlvl_dir,'reliability_mask.nii'))
 
-analysis = {"sc_betweens_stimuli":   ['between_stimuli'],
-            "sc_alls_stimuli":       ['stimuli'],
-            "sc_withins_feature2d":  ['within_feature2d'],
-            "sc_betweens_feature2d": ['between_feature2d'],
-            "sc_alls_feature2d":     ['feature2d'],
-            "betweens_loc2d":  ["between_loc2d"],
-            "withins_loc2d":   ["within_loc2d"],
-            "alls_loc2d":      ["loc2d"],
-            "betweens_loc1d":  ["between_loc1dx","between_loc1dy"],
-            "withins_loc1d":   ["within_loc1dx","within_loc1dy"],
-            "alls_loc1d":      ["loc1dx","loc1dy"],
-        }
-for vselect in ["wholebrain","reliability_ths0"]:
-    for k,v in RSA_specs.items():
-        for subid,n_paths,m_paths,_ in v:
-            print(f'{vselect} - {k}: Running Searchlight RSA in {subid}')
-            if vselect == "reliability_ths0":
-                m_paths = os.path.join(os.path.dirname(m_paths),'reliability_mask.nii')
-            outputregexp = 'beta_%04d.nii'
-            subRSA = RSASearchLight(n_paths,m_paths,10,MultipleRDMRegression,njobs=10)
+analysis = {
+    # image-based rdm
+    "sc_betweens_stimuli":   ['between_stimuli'],
+    "sc_alls_stimuli":       ['stimuli'],
+    # feature-based: color(x) or shape(y)
+    "sc_withins_feature1d":  ['within_feature1dx','within_feature1dy'],
+    "sc_betweens_feature1d": ['between_feature1dx','between_feature1dy'],
+    "sc_alls_feature1d":     ['feature1dx','feature1dy'],
+    # map-based
+    "betweens_loc2d":  ["between_loc2d"],
+    "withins_loc2d":   ["within_loc2d"],
+    "alls_loc2d":      ["loc2d"],
+    "betweens_loc1d":  ["between_loc1dx","between_loc1dy"],
+    "withins_loc1d":   ["within_loc1dx","within_loc1dy"],
+    "alls_loc1d":      ["loc1dx","loc1dy"]
+    }
 
-            for a_n,a_reg in analysis.items():
-                print(f'Analysis - {a_n}')
-                regress_models = []
-                for mn in a_reg:
-                    regress_models.append(model_rdm[k].models[mn])
-                output_dir = os.path.join(LSA_GLM_dir,'searchlightrsa_sc',vselect,k,a_n,'first')
-                subRSA.run(regress_models,a_reg,os.path.join(output_dir,subid), outputregexp, True)            
-            
-            print(f'{k}: Completed searchlight in {subid}')
+beta_flist = {"fourruns":beta_flist4r,
+              "oddeven":beta_flistoe}
+n_sess = {"fourruns":4,
+          "oddeven":2}
+mask_flist = {"noselection":fmask_flist,
+              "reliability_ths0":pmask_flist}
+
+radius = voxel_size*5
+outputregexp = 'beta_%04d.nii'
+for ds_name, ds in beta_flist.items():
+    for vselect in mask_flist:
+        for j,(subid,beta_path,m_path) in enumerate(zip(subid_list, ds, mask_flist[vselect])):
+            print(f'{vselect} : Running Searchlight RSA in {subid}')
+
+            # instantiate RSA searchlight class
+            subRSA = RSASearchLight(
+                beta_path, m_path, radius, MultipleRDMRegression, njobs=10
+                )
+            # build model rdm
+            model_rdm = ModelRDM(y_dict["image"][j],
+                                np.vstack([y_dict["locx"][j],y_dict["locy"][j]]).T,
+                                np.vstack([y_dict["color"][j],y_dict["shape"][j]]).T, # feature-based: color(x) or shape(y)
+                                n_session=4)
+
+            # run search light
+            for a_name,m_regs in analysis.items():
+                print(f'Analysis - {a_name}')
+                regress_models = [model_rdm.models[m] for m in m_regs]
+                output_dir = os.path.join(LSA_GLM_dir,'searchlightrsa',vselect,ds_name,a_name,'first')
+                subRSA.run(regress_models,a_name,os.path.join(output_dir,subid), outputregexp, True)            
+
+            print(f'{ds_name}: Completed searchlight in {subid}')
+
+    #"sc_withins_feature2d":  ['within_feature2d'],
+    #"sc_betweens_feature2d": ['between_feature2d'],
+    #"sc_alls_feature2d":     ['feature2d'],

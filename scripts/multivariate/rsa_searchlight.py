@@ -25,9 +25,12 @@ class RSASearchLight:
         self.radius      = radius
         self.estimator   = estimator
         self.njobs       = njobs
-        print("concatenating images")
-        self.pattern_img = nib.funcs.concat_images(patternimg_paths)
-        print("finished concatenating images")
+        if isinstance(patternimg_paths,list):
+            print("concatenating images")
+            self.pattern_img = nib.funcs.concat_images(patternimg_paths)
+            print("finished concatenating images")
+        else:
+            self.pattern_img = nib.load(patternimg_paths)
         self.X, self.A = self.genPatches(self.pattern_img)
         self.neighbour_idx_lists = self.find_neighbour_idx()
 
@@ -66,12 +69,12 @@ class RSASearchLight:
         return self
     
     def write(self,result,models,modelnames,outputpath,outputregexp):
-        if not '.nii' in outputregexp:
-            outputregexp = outputregexp + '.nii'
+        if '.nii' not in outputregexp:
+            outputregexp = f'{outputregexp}.nii'
         checkdir(outputpath)
         maskdata, _ = nilearn.masking._load_mask_img(self.mask_img)
         for k in np.arange(np.shape(result)[1]):
-            result_3D = np.zeros(self.mask_img.shape)
+            result_3D = np.full(self.mask_img.shape,False)# TODO: check how to better initialize the matrix so that second level will not include outof mask voxels
             result_3D[maskdata] = result[:,k]
             curr_img = nilearn.image.new_img_like(self.mask_img, result_3D)
             curr_fn = os.path.join(outputpath,outputregexp % (k))
@@ -97,14 +100,14 @@ class RSASearchLight:
             # perform estimation
             voxel_results.append(curr_estimator.fit().result)
             if verbose:
-                step = 10000 # print every 1000 voxels
+                step = 10000 # print every 10000 voxels
                 if  i % step == 0:
                     crlf = "\r" if total == len(neighbour_idx_list) else "\n"
                     pt = round(float(i)/len(neighbour_idx_list)*100,2)
                     dt = time.time()-t0
                     remaining = (100-pt)/max(0.01,pt)*dt
                     sys.stderr.write(
-                        f"job # {thread_id}, processed{i}/{len(neighbour_idx_list)} voxels"
+                        f"job # {thread_id}, processed {i}/{len(neighbour_idx_list)} voxels"
                         f"({pt:0.2f}%, {remaining} seconds remaining){crlf}"
                     )        
         return np.asarray(voxel_results)    
