@@ -20,10 +20,10 @@ end
 
 %% run LSA beta series extrator GLMs
 LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer'};
-flag_runGLM  = true;
+flag_runGLM  = false;
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 preproc_dir = {directory.unsmoothed,directory.smoothed};
-for jdir = 1%:numel(lsa_dir)     
+for jdir = 1:numel(lsa_dir)     
     if flag_runGLM
         for j = 1:numel(LSAglm_names)
         glm_name = LSAglm_names{j};
