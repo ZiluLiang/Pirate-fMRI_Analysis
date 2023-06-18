@@ -32,13 +32,10 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
     err_tracker_1st = cell(nsub,2);
     firstlevelsteps = {'spec2est','contrast','report1stlvl'};
     if any(ismember(steps,firstlevelsteps))
-        num_workers   = feature('NumCores')-3;
-        poolobj       =  parpool(num_workers);%set up parallel processing
-        parfor isub = 1:nsub
-            err_tracker_1st(isub,:) = run_firstlevel(subidlist{isub},glm_name,glm_dir,preproc_img_dir,steps)
+        for isub = 1:nsub
+            err_tracker_1st(isub,:) = run_firstlevel(subidlist{isub},glm_name,glm_dir,preproc_img_dir,steps);
         end
         err_tracker{1} = err_tracker_1st;
-        delete(poolobj)
     end
 
     %% run second-level analysis
