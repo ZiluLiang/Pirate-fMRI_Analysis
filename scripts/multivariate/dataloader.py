@@ -57,5 +57,8 @@ class ActivityPatternDataLoader:
             data_img = new_img_like(self.mask_img, data_3D)
             data_3D_list.append(data_3D)
             data_img_list.append(data_img)
-
-        return data_3D_list,nib.funcs.concat_images(data_img_list)
+        if len(data_img_list) == 1: # do not save as 4D if it is not 4D
+            img = data_img_list[0]
+        else:
+            img = nib.funcs.concat_images(data_img_list)
+        return data_3D_list, img
