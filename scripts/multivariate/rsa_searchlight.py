@@ -31,8 +31,9 @@ class RSASearchLight:
             print("finished concatenating images")
         else:
             self.pattern_img = nib.load(patternimg_paths)
-        self.X, self.A = self.genPatches(self.pattern_img)
+        self.X, self.A = self.genPatches()
         self.neighbour_idx_lists = self.find_neighbour_idx()
+        print(f"total number of voxels to perform searchlight: {len(self.neighbour_idx_lists)}")
 
         ## create a searchlight summary
         self.config ={"mask":mask_img_path,
@@ -72,11 +73,13 @@ class RSASearchLight:
         if '.nii' not in outputregexp:
             outputregexp = f'{outputregexp}.nii'
         checkdir(outputpath)
+        mean_img = nilearn.image.mean_img(self.pattern_img)
         maskdata, _ = nilearn.masking._load_mask_img(self.mask_img)
         for k in np.arange(np.shape(result)[1]):
-            result_3D = np.full(self.mask_img.shape,False)# TODO: check how to better initialize the matrix so that second level will not include outof mask voxels
+            result_3D = np.zeros(self.mask_img.shape)# TODO: check how to better initialize the matrix so that second level will not include outof mask voxels
             result_3D[maskdata] = result[:,k]
-            curr_img = nilearn.image.new_img_like(self.mask_img, result_3D)
+            print(f"len_result = {len(result[:,k])}")
+            curr_img = nilearn.image.new_img_like(mean_img, result_3D)
             curr_fn = os.path.join(outputpath,outputregexp % (k))
             nib.save(curr_img, curr_fn)
         # create a json file storing regressor information
@@ -112,7 +115,7 @@ class RSASearchLight:
                     )        
         return np.asarray(voxel_results)    
 
-    def genPatches(self,patternimg,use_parallel:bool = True):
+    def genPatches(self,use_parallel:bool = True):
         print("generating searchlight patches")
         mask_img_data  = self.mask_img.get_fdata()
         process_coords = np.where(mask_img_data!=0)
@@ -124,10 +127,10 @@ class RSASearchLight:
                 self.mask_img.affine
                 )
             ).T
-        def get_patch_data(coords,patternimg):
+        def get_patch_data(coords):
             X,A = _apply_mask_and_get_affinity(
             seeds  = coords,
-            niimg  = patternimg,
+            niimg  = self.pattern_img,
             radius = self.radius,
             allow_overlap = True,
             mask_img      = self.mask_img)
@@ -137,11 +140,11 @@ class RSASearchLight:
             njobs = cpu_count() - 2            
             split_idx = np.array_split(np.arange(len(process_coords)), njobs)
             pc_chunks = [process_coords[idx] for idx in split_idx]           
-            XA_list = Parallel(n_jobs = njobs)(delayed(get_patch_data)(coords,patternimg) for coords in pc_chunks)
+            XA_list = Parallel(n_jobs = njobs)(delayed(get_patch_data)(coords) for coords in pc_chunks)
             X = XA_list[0][0] # X is the same for each chunk
             A = vstack([l[1] for l in XA_list])
         else:
-            X,A = get_patch_data(process_coords,patternimg)
+            X,A = get_patch_data(process_coords)
         A = A.tocsr()
         print("finished generating searchlight patches")        
         return X, A 

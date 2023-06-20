@@ -10,14 +10,13 @@ from multivariate.helper import ModelRDM
 project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
 fmri_output_path = os.path.join(project_path,'data','fmri')
 glm_name = 'LSA_stimuli_navigation'
-
-preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
 with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
     voxel_size = pirate_defaults['fmri']['voxelsize']
-n_run = 4
 
+preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
+outputregexp = 'beta_%04d.nii'
 for p in preprocess: 
     LSA_GLM_dir = os.path.join(fmri_output_path,p,glm_name)
     beta_flist4r = []
@@ -64,56 +63,51 @@ for p in preprocess:
         fmask_flist.append(os.path.join(firstlvl_dir,'mask.nii'))
         pmask_flist.append(os.path.join(firstlvl_dir,'reliability_mask.nii'))
 
-analysis = {
-    # image-based rdm
-    "sc_betweens_stimuli":   ['between_stimuli'],
-    "sc_alls_stimuli":       ['stimuli'],
-    # feature-based: color(x) or shape(y)
-    "sc_withins_feature1d":  ['within_feature1dx','within_feature1dy'],
-    "sc_betweens_feature1d": ['between_feature1dx','between_feature1dy'],
-    "sc_alls_feature1d":     ['feature1dx','feature1dy'],
-    # map-based
-    "betweens_loc2d":  ["between_loc2d"],
-    "withins_loc2d":   ["within_loc2d"],
-    "alls_loc2d":      ["loc2d"],
-    "betweens_loc1d":  ["between_loc1dx","between_loc1dy"],
-    "withins_loc1d":   ["within_loc1dx","within_loc1dy"],
-    "alls_loc1d":      ["loc1dx","loc1dy"]
-    }
+    analysis = {
+        # image-based rdm
+        "sc_betweens_stimuli":   ['between_stimuli'],
+        "sc_alls_stimuli":       ['stimuli'],
+        # feature-based: color(x) or shape(y)
+        "sc_withins_feature1d":  ['within_feature1dx','within_feature1dy'],
+        "sc_betweens_feature1d": ['between_feature1dx','between_feature1dy'],
+        "sc_alls_feature1d":     ['feature1dx','feature1dy'],
+        # map-based
+        "betweens_loc2d":  ["between_loc2d"],
+        "withins_loc2d":   ["within_loc2d"],
+        "alls_loc2d":      ["loc2d"],
+        "betweens_loc1d":  ["between_loc1dx","between_loc1dy"],
+        "withins_loc1d":   ["within_loc1dx","within_loc1dy"],
+        "alls_loc1d":      ["loc1dx","loc1dy"]
+        }
 
-beta_flist = {"fourruns":beta_flist4r,
-              "oddeven":beta_flistoe}
-n_sess = {"fourruns":4,
-          "oddeven":2}
-mask_flist = {"noselection":fmask_flist,
-              "reliability_ths0":pmask_flist}
+    beta_flist = {"fourruns":beta_flist4r,
+                  "oddeven":beta_flistoe}
+    n_sess = {"fourruns":4,
+              "oddeven":2}
+    mask_flist = {"noselection":fmask_flist,
+                  "reliability_ths0":pmask_flist}
+    
+    radius = voxel_size*5
+    for ds_name, ds in beta_flist.items():
+        for vselect in mask_flist:
+            for j,(subid,beta_path,m_path) in enumerate(zip(subid_list, ds, mask_flist[vselect])):
+                print(f'{p} {vselect} : Running Searchlight RSA in {subid}')
 
-radius = voxel_size*5
-outputregexp = 'beta_%04d.nii'
-for ds_name, ds in beta_flist.items():
-    for vselect in mask_flist:
-        for j,(subid,beta_path,m_path) in enumerate(zip(subid_list, ds, mask_flist[vselect])):
-            print(f'{vselect} : Running Searchlight RSA in {subid}')
+                # instantiate RSA searchlight class
+                subRSA = RSASearchLight(
+                    beta_path, m_path, radius, MultipleRDMRegression, njobs=20
+                    )
+                # build model rdm
+                model_rdm = ModelRDM(y_dict["image"][j],
+                                    np.vstack([y_dict["locx"][j],y_dict["locy"][j]]).T,
+                                    np.vstack([y_dict["color"][j],y_dict["shape"][j]]).T, # feature-based: color(x) or shape(y)
+                                    n_session=n_sess[ds_name])
 
-            # instantiate RSA searchlight class
-            subRSA = RSASearchLight(
-                beta_path, m_path, radius, MultipleRDMRegression, njobs=10
-                )
-            # build model rdm
-            model_rdm = ModelRDM(y_dict["image"][j],
-                                np.vstack([y_dict["locx"][j],y_dict["locy"][j]]).T,
-                                np.vstack([y_dict["color"][j],y_dict["shape"][j]]).T, # feature-based: color(x) or shape(y)
-                                n_session=4)
+                # run search light
+                for a_name,m_regs in analysis.items():
+                    print(f'Analysis - {a_name}')
+                    regress_models = [model_rdm.models[m] for m in m_regs]
+                    output_dir = os.path.join(LSA_GLM_dir,'searchlightrsa',vselect,ds_name,a_name,'first')
+                    subRSA.run(regress_models,a_name,os.path.join(output_dir,subid), outputregexp, j == 0) # only show details at the first sub
 
-            # run search light
-            for a_name,m_regs in analysis.items():
-                print(f'Analysis - {a_name}')
-                regress_models = [model_rdm.models[m] for m in m_regs]
-                output_dir = os.path.join(LSA_GLM_dir,'searchlightrsa',vselect,ds_name,a_name,'first')
-                subRSA.run(regress_models,a_name,os.path.join(output_dir,subid), outputregexp, True)            
-
-            print(f'{ds_name}: Completed searchlight in {subid}')
-
-    #"sc_withins_feature2d":  ['within_feature2d'],
-    #"sc_betweens_feature2d": ['between_feature2d'],
-    #"sc_alls_feature2d":     ['feature2d'],
+                print(f'{ds_name}: Completed searchlight in {subid}')
