@@ -148,16 +148,14 @@ for p in preprocess:
 df = pd.concat(all_df,axis=0)
 df.to_csv(os.path.join(fmri_output_path,'roirsa.csv'))
 
-""" id_cols = ["ds","preprocess","voxselect","roi","laterality",'subid','analysis']
-k = "sc_withins_feature1d"
-v = analysis[k]
-plot_df = df.loc[df["analysis"]==k,tuple(id_cols+v)]
-plot_df["roi_l"] = plot_df[['roi', 'laterality']].apply(lambda x: '_'.join(x), axis=1)
-plot_df["ds_preproc"] = plot_df[['ds', 'preprocess']].apply(lambda x: '_'.join(x), axis=1)
-plot_df = pd.wide_to_long(plot_df, stubnames='estimates',
-i=id_cols+["roi_l","ds_preproc"],
-j="regressor")
-g = sns.catplot(data=plot_df, x="roi_l", y="estimates",
-hue="voxselect",row="regressor",col="ds_preproc",
-kind="box", aspect=3,sharex=True,sharey=True)
-newax = [plt.setp(ax.get_xticklabels(), rotation=45) for ax in g.axes.flat] """
+id_cols = ["ds","preprocess","voxselect","roi","laterality",'subid','analysis']
+for k,v in analysis.items():
+    plot_df = df.loc[df["analysis"]==k,tuple(id_cols+v)]
+    plot_df["roi_l"] = plot_df[['roi', 'laterality']].apply(lambda x: '_'.join(x), axis=1)
+    plot_df["ds_preproc"] = plot_df[['ds', 'preprocess']].apply(lambda x: '_'.join(x), axis=1)
+    plot_df = pd.melt(plot_df, id_vars=id_cols+["roi_l","ds_preproc"], value_vars=v)
+    g = sns.catplot(data=plot_df, x="roi_l", y="value",
+    hue="voxselect",col="variable",row="ds_preproc",
+    kind="box", aspect=3,sharex=True,sharey=True)
+    tmp = [plt.setp(ax.get_xticklabels(), rotation=45) for ax in g.axes.flat]
+    g.savefig(os.path.join(fmri_output_path,f'{k}.png'))
