@@ -43,23 +43,12 @@ for j = 1:numel(LSAglm_names)
     [rangeCon.(glm_name),meanResMS2.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{2},glm_name),masks);
 end
 
-<<<<<<< Updated upstream
 
 %% run neural-axis analysis
 NAglm_names = {'axis_loc_navigation','axis_resploc_navigation','axis_loc_localizer'};
 flag_runGLM  = true;
 if flag_runGLM
     for j = 1:numel(NAglm_names)
-=======
-<<<<<<< Updated upstream
-=======
-
-%% run neural-axis analysis
-NAglm_names = {'axis_loc_navigation2','axis_resploc_navigation','axis_loc_localizer'};
-flag_runGLM  = true;
-if flag_runGLM
-    for j = 1%:numel(NAglm_names)
->>>>>>> Stashed changes
         glm_name = NAglm_names{j};
         err_tracker.(glm_name) = run_glm(glm_name, {'spec2est','contrast','second_level'});
     end
@@ -70,10 +59,6 @@ end
 %     [rangeCon.(glm_name),meanResMS.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name);
 % end
 
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 %% generate contrast for odd and even runs for LSA beta series extractor GLMs - navigation task
 glm_name = 'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
