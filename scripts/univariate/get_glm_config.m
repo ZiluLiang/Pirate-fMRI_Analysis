@@ -97,11 +97,22 @@ function glms = glm_gallery
     glms(8).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),trainingstimid,'uni',0),{'response'}];
     glms(8).modelopt    = struct('use_stick', [repmat({false},size(trainingstimid)),{true}]);
 
+<<<<<<< Updated upstream
     glms(9).name = 'axis_loc_navigation'; % location based on ground truth
     glms(9).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(9).conditions  = {'stimuli','response'};
     glms(9).modelopt    = struct('use_stick', {false,false});
     glms(9).pmods       = {{'stim_y','stim_x'}};
+=======
+<<<<<<< Updated upstream
+end
+=======
+    glms(9).name = 'axis_loc_navigation2'; % location based on ground truth
+    glms(9).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(9).conditions  = {'stimuli','response'};
+    glms(9).modelopt    = struct('use_stick', {false,false});
+    glms(9).pmods       = {{'stim_x','stim_y'}};
+>>>>>>> Stashed changes
     glms(9).contrasts   = struct('name',{},'type',{},'wvec',{});
     glms(9).contrasts(1).name = 'stim_x';
     glms(9).contrasts(1).wvec = [1,0,0];% weight vector for task regressors
@@ -122,7 +133,11 @@ function glms = glm_gallery
     glms(11).name = 'axis_loc_localizer'; % location based on ground truth
     glms(11).filepattern = 'sub-.*_task-localizer_run-[1]';
     glms(11).conditions  = {'stimuli','response'};
+<<<<<<< Updated upstream
     glms(11).modelopt    = struct('use_stick', {false,false});
+=======
+    glms(11).modelopt    = struct('use_stick', {false,true});
+>>>>>>> Stashed changes
     glms(11).pmods       = {{'stim_x','stim_y'}};
     glms(11).contrasts   = struct('name',{},'type',{},'wvec',{});
     glms(11).contrasts(1).name = 'stim_x';
@@ -130,4 +145,14 @@ function glms = glm_gallery
     glms(11).contrasts(2).name = 'stim_y';
     glms(11).contrasts(2).wvec = [0,1,0];% weight vector for task regressors
 
+<<<<<<< Updated upstream
 end
+=======
+    allstimid = 0:24;
+    glms(12).name = 'LSA_stimuli_navigation_addtraintest';
+    glms(12).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(12).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response','training','test'}];
+    glms(12).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false,false,false}]);
+   end
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
