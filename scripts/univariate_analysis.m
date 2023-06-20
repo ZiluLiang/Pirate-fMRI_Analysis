@@ -26,23 +26,38 @@ preproc_dir = {directory.unsmoothed,directory.smoothed};
 for jdir = 1:numel(lsa_dir)     
     if flag_runGLM
         for j = 1:numel(LSAglm_names)
-        glm_name = LSAglm_names{j};
-        glm_dir = fullfile(directory.fmri_data,lsa_dir{jdir},glm_name);
-        checkdir(glm_dir)
-        err_tracker.(glm_name) = run_glm(glm_name,{'spec2est'},...
-                                         glm_dir,...
-                                         preproc_dir{jdir});
+            glm_name = LSAglm_names{j};
+            glm_dir = fullfile(directory.fmri_data,lsa_dir{jdir},glm_name);
+            checkdir(glm_dir)
+            err_tracker.(glm_name) = run_glm(glm_name,{'spec2est'},...
+                                             glm_dir,...
+                                             preproc_dir{jdir});
         end
     end
 end
-
-%% extract residuals to double check if models are running okay
+% extract residuals to double check if models are running okay
 for j = 1:numel(LSAglm_names)
     glm_name = LSAglm_names{j};
     masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\wfu','.*.nii'));
     [rangeCon.(glm_name),meanResMS1.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{1},glm_name),masks);
     [rangeCon.(glm_name),meanResMS2.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{2},glm_name),masks);
 end
+
+
+%% run neural-axis analysis
+NAglm_names = {'axis_loc_navigation','axis_resploc_navigation','axis_loc_localizer'};
+flag_runGLM  = true;
+if flag_runGLM
+    for j = 1:numel(NAglm_names)
+        glm_name = NAglm_names{j};
+        err_tracker.(glm_name) = run_glm(glm_name, {'spec2est','contrast','second_level'});
+    end
+end
+% extract residuals to double check if models are running okay
+% for j = 1:numel(NAglm_names)
+%     glm_name = NAglm_names{j};
+%     [rangeCon.(glm_name),meanResMS.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name);
+% end
 
 %% generate contrast for odd and even runs for LSA beta series extractor GLMs - navigation task
 glm_name = 'LSA_stimuli_navigation';
