@@ -26,6 +26,12 @@ A nifti file of the reliability map is saved in the first level directory of the
 This is implemented in the [`create_reliability_mask` script](/scripts/multivariate/create_reliability_mask.py)
 
 ## Brain parcellation based RSA
-### obtaining ROI mask from parcellations 
-### running analysis 
+### 1. obtaining ROI mask from parcellations
+AAL3v1 parcellation is used to generate anatomical masks for ROIs. The procedure was carried out in marsbar. Each anatomical masks is a binarize and resampled to match the resolution of the participants' functional images.  
+Details on what parcellation is included in each anatomical mask are in [`anatomical_masks.json`](/scripts/anatomical_masks.json). This is read in by [`anatomical_masks.m`](/scripts/anatomical_masks.m) to generate the mask file in nii format. 
+
+### 2. running analysis
+activity pattern within each mask is extracted to compute the neural rdm. We then regress the neural rdm on different model rdms to see how much they are correlated.
+
 ## Whole brain searchlight RSA
+whole brain searchlight rsa is performed similarly as the brain parcellation based rsa, with the exception that, neural rdm is not calculated based on ROI, instead it is based on a sphere centered around a voxel. The whole brain searchlight uses a radius of 12.5mm which is equivalent to 5 times the voxel size.

@@ -51,7 +51,8 @@ class ActivityPatternDataLoader:
 
         data_3D_list, data_img_list = [],[]
         for data1d in data:
-            data_3D = np.full(self.mask_img.shape,False)
+#            data_3D = np.full(self.mask_img.shape,np.nan)
+            data_3D = np.empty(self.mask_img.shape)
             maskdata, _ = _load_mask_img(self.mask_img)
             data_3D[maskdata] = data1d
             data_img = new_img_like(self.mask_img, data_3D)
