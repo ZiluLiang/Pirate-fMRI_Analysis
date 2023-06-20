@@ -19,13 +19,13 @@ end
 
 
 %% run LSA beta series extrator GLMs
-LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer'};
-flag_runGLM  = false;
+LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer','LSA_stimuli_navigation_modeltraintest'};
+flag_runGLM  = true;
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 preproc_dir = {directory.unsmoothed,directory.smoothed};
 for jdir = 1:numel(lsa_dir)     
     if flag_runGLM
-        for j = 1:numel(LSAglm_names)
+        for j = 3%1:numel(LSAglm_names)
             glm_name = LSAglm_names{j};
             glm_dir = fullfile(directory.fmri_data,lsa_dir{jdir},glm_name);
             checkdir(glm_dir)
@@ -60,7 +60,7 @@ end
 % end
 
 %% generate contrast for odd and even runs for LSA beta series extractor GLMs - navigation task
-glm_name = 'LSA_stimuli_navigation';
+glm_name = 'LSA_stimuli_navigation_modeltraintest';%'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
 for jdir = 1:numel(lsa_dir)
@@ -98,7 +98,7 @@ for jdir = 1:numel(lsa_dir)
 end
 
 %% generate contrast for each stimul for LSA beta series extractor GLMs - navigation task
-glm_name = 'LSA_stimuli_navigation';
+glm_name = 'LSA_stimuli_navigation_modeltraintest';%'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
 for jdir = 1:numel(lsa_dir)
@@ -134,7 +134,7 @@ end
 % 1 - 25 contrasts one for each stimuli
 % 2 - 50 contrasts one for each stimuli in odd/even run
 % 3 - 100 regressors one for each stimuli in each run
-glm_name = 'LSA_stimuli_navigation';
+glm_name = 'LSA_stimuli_navigation_modeltraintest';%'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
 for jdir = 1:numel(lsa_dir)

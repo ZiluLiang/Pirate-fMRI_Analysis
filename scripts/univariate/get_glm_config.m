@@ -122,12 +122,18 @@ function glms = glm_gallery
     glms(11).name = 'axis_loc_localizer'; % location based on ground truth
     glms(11).filepattern = 'sub-.*_task-localizer_run-[1]';
     glms(11).conditions  = {'stimuli','response'};
-    glms(11).modelopt    = struct('use_stick', {false,false});
+    glms(11).modelopt    = struct('use_stick', {false,true});
     glms(11).pmods       = {{'stim_x','stim_y'}};
     glms(11).contrasts   = struct('name',{},'type',{},'wvec',{});
     glms(11).contrasts(1).name = 'stim_x';
     glms(11).contrasts(1).wvec = [1,0,0];% weight vector for task regressors
     glms(11).contrasts(2).name = 'stim_y';
     glms(11).contrasts(2).wvec = [0,1,0];% weight vector for task regressors
+
+    allstimid = 0:24;
+    glms(12).name = 'LSA_stimuli_navigation_modeltraintest';
+    glms(12).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(12).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'training','test','response'}];
+    glms(12).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false,false,false}]);
 
 end
