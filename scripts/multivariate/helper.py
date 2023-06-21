@@ -1,20 +1,23 @@
 import scipy
 from scipy.spatial.distance import pdist, squareform
 import numpy
+import nibabel
+import nibabel.processing
 import pandas
 import os
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
 
-def standardize(X:numpy.ndarray,dim:int=2)->numpy.ndarray:
+def standardize(X:numpy.ndarray,s_dir:int=2) -> numpy.ndarray:
     """ standardize a 1D or 2D numpy array by using ZX = (X - mean)/std
 
     Parameters
     ----------
     X : numpy.ndarray
         the 1D or 2D numpy array that needs to be normalized
-    dim : int, optional
+    s_dir : int, optional
+        the direction along which to perform standardization
         if 0, will perfrom standardization independently for each row  \n
         if 1, will perform standardization independently for each column  \n      
         if 2, will perform standardization on the whole matrix  \n
@@ -27,20 +30,24 @@ def standardize(X:numpy.ndarray,dim:int=2)->numpy.ndarray:
     """
     assert isinstance(X,numpy.ndarray), "X must be numpy array"
     assert X.ndim <= 2, "X must be 1D or 2D"
-    
+
     if X.ndim == 1:
-        dim = 2
-    if dim == 2:
+        s_dir = 2
+    if s_dir == 1:
+        X = X.T
+        ZX = _rowwise_standardize(X)
+        ZX = ZX.T
+    elif s_dir == 2:
         ZX = (X - numpy.mean(X)) / numpy.std(X)
     else:
-        if dim == 1:
-            X = X.T
-        row_means = X.mean(axis=1)
-        row_stds  = X.std(axis=1)
-        ZX = (X - row_means[:, numpy.newaxis]) / row_stds[:, numpy.newaxis]
-        if dim == 1:
-            ZX = ZX.T
+        ZX = _rowwise_standardize(X)
     return ZX
+
+
+def _rowwise_standardize(X):
+    row_means = X.mean(axis=1)
+    row_stds  = X.std(axis=1)
+    return (X - row_means[:, numpy.newaxis]) / row_stds[:, numpy.newaxis]
 
 
 def lower_tri(rdm:numpy.ndarray) -> tuple:
@@ -153,15 +160,47 @@ def checkdir(dirs:list or str):
     Exception
         input must be list or string
     """
-    if not isinstance(dirs, list):
-        if isinstance(dirs,str):
-            dirs = [dirs]
-    else:
+    if isinstance(dirs, list):
         raise AssertionError("dirs must be a list of directory strings or a directory string")
-    
+
+    if isinstance(dirs,str):
+        dirs = [dirs]
     for dir in dirs:
         if not os.path.exists(dir):
             os.makedirs(dir)
+
+def load_maskimg(mask_img: str or nibabel.Nifti1Image or numpy.ndarray, ref_maskimg: str or nibabel.Nifti1Image) -> nibabel.Nifti1Image:
+    """load a mask image and reslice to the same resolution as the reference image
+
+    Parameters
+    ----------
+    mask_img : str or nibabel.Nifti1Image
+        the loaded mask image, or directory to the mask image, or ndarray containing the mask image data
+    ref_maskimg : str or nibabel.Nifti1Image
+        the loaded reference image or directory to the reference image
+
+    Returns
+    -------
+    nibabel.Nifti1Image
+        loaded and resampled mask image
+    """
+    if ref_maskimg(mask_img, str):
+        ref_maskimg = nibabel.load(ref_maskimg)
+    elif isinstance(ref_maskimg,nibabel.Nifti1Image):
+        ref_maskimg = ref_maskimg
+    else:
+        raise AssertionError("ref_maskimg must be the path to nii image or nibabel loaded nii image")
+
+    if isinstance(mask_img, str):
+        mask_img = nibabel.load(mask_img)
+    elif isinstance(mask_img, numpy.ndarray):
+        reshapeimg = numpy.reshape(mask_img,ref_maskimg).astype(numpy.int8)
+        mask_img = nibabel.Nifti1Image(reshapeimg, ref_maskimg.affine, ref_maskimg.header)
+    elif isinstance(ref_maskimg,nibabel.Nifti1Image):
+        mask_img = mask_img
+    else:
+        raise AssertionError("mask_img must be the path to nii image or nibabel loaded nii image, or a ndarry of mask image data")
+    return nibabel.processing.resample_from_to(mask_img, ref_maskimg)
 
 class ModelRDM:
     """ set up the model rdms
@@ -206,13 +245,14 @@ class ModelRDM:
                 rdmws = numpy.multiply(v,WS)
                 bs_n  = 'between_'+k
                 rdmbs = numpy.multiply(v,BS)
-                models.update({ws_n:rdmws,bs_n:rdmbs})
-            models.update({"session":self.session()})
+                models |= {ws_n:rdmws,bs_n:rdmbs}
+            models["session"] = self.session()
         self.models = models
 
     def __str__(self):
-        summary = 'The following model rdms are created:\n' + ',\n'.join(self.models.keys())
-        return summary
+        return 'The following model rdms are created:\n' + ',\n'.join(
+            self.models.keys()
+        )
 
     def session(self)->numpy.ndarray:
         """calculate model rdm based on session, if the pair is in the same session, distance will be 0, otherwise will be 1

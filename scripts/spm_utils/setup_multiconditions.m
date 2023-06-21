@@ -81,7 +81,7 @@ function multi = gen_multi(data,cond_names,pmod_names,custom_cfg)
     % default configurations
     def_cfg = struct('use_stick', true,... %by default uses stick function (durtation = 0)
                      'tmod',      0,... % the order of time modulation,
-                     'orth',      1); % orthogonalise the parametric modulators within the condition or not
+                     'orth',      0); % orthogonalise the parametric modulators within the condition or not
     
     % if input specifies cfg, combine cfg with default cfg
     if nargin<4, custom_cfg = struct('use_stick',{},'tmod',{},'orth',{}); end
