@@ -1,14 +1,22 @@
 clear;clc
 
 [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
+participants.nonlearnerids     = {'sub010','sub012','sub013','sub027','sub017'}; 
+participants.nongeneralizerids = {'sub010','sub012','sub013','sub027','sub004','sub023','sub002','sub014','sub021','sub017'};
+participants.learnerids        = participants.validids(~ismember(participants.validids,participants.nonlearnerids));
+participants.generalizerids    = participants.validids(~ismember(participants.validids,participants.nongeneralizerids));
+
+
 %% run Repetition Supression GLMs
 RSglm_names = {'rs_loc2d_navigation','rs_resploc2d_navigation','rs_loc2d_localizer','traintest_navigation'};
-flag_runGLM  = false;
+flag_runGLM  = true;
 if flag_runGLM
     err_tracker   = struct(); %#ok<*UNRCH>
     for j = 1:numel(RSglm_names)
         glm_name = RSglm_names{j};
         err_tracker.(glm_name) = run_glm(glm_name, {'spec2est','contrast','second_level'});
+        run_glm(glm_name,{'second_level'},'','',participants.learnerids,'learner_');
+        run_glm(glm_name,{'second_level'},'','',participants.generalizerids,'generalizer_');
     end
 end
 % extract residuals to double check if models are running okay
@@ -31,7 +39,8 @@ for jdir = 1:numel(lsa_dir)
             checkdir(glm_dir)
             err_tracker.(glm_name) = run_glm(glm_name,{'spec2est'},...
                                              glm_dir,...
-                                             preproc_dir{jdir});
+                                             preproc_dir{jdir}, ...
+                                             participants.validids);
         end
     end
 end
@@ -45,22 +54,25 @@ end
 
 
 %% run neural-axis analysis
-NAglm_names = {'axis_loc_navigation','axis_resploc_navigation','axis_loc_localizer'};
+NAglm_names = {'axis_loc_navigation','axis_resploc_navigation','axis_loc_localizer','axis_attrloc_navigation','axis_attryloc_navigation'};
 flag_runGLM  = true;
 if flag_runGLM
-    for j = 1:numel(NAglm_names)
+    for j = numel(NAglm_names)
         glm_name = NAglm_names{j};
         err_tracker.(glm_name) = run_glm(glm_name, {'spec2est','contrast','second_level'});
+        run_glm(glm_name,{'second_level'});
+        run_glm(glm_name,{'second_level'},'','',participants.learnerids,'learner_');
+        run_glm(glm_name,{'second_level'},'','',participants.generalizerids,'generalizer_');
     end
 end
-% extract residuals to double check if models are running okay
-% for j = 1:numel(NAglm_names)
-%     glm_name = NAglm_names{j};
-%     [rangeCon.(glm_name),meanResMS.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name);
-% end
+%extract residuals to double check if models are running okay
+for j = 1:numel(NAglm_names)
+    glm_name = NAglm_names{j};
+    [rangeCon.(glm_name),meanResMS.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name);
+end
 
 %% generate contrast for odd and even runs for LSA beta series extractor GLMs - navigation task
-glm_name = 'LSA_stimuli_navigation_modeltraintest';%'LSA_stimuli_navigation';
+glm_name = 'LSA_stimuli_navigation';%'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
 for jdir = 1:numel(lsa_dir)
@@ -98,7 +110,7 @@ for jdir = 1:numel(lsa_dir)
 end
 
 %% generate contrast for each stimul for LSA beta series extractor GLMs - navigation task
-glm_name = 'LSA_stimuli_navigation_modeltraintest';%'LSA_stimuli_navigation';
+glm_name = 'LSA_stimuli_navigation';%'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
 for jdir = 1:numel(lsa_dir)
@@ -134,7 +146,7 @@ end
 % 1 - 25 contrasts one for each stimuli
 % 2 - 50 contrasts one for each stimuli in odd/even run
 % 3 - 100 regressors one for each stimuli in each run
-glm_name = 'LSA_stimuli_navigation_modeltraintest';%'LSA_stimuli_navigation';
+glm_name = 'LSA_stimuli_navigation';%'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 allstimid = 0:24;
 for jdir = 1:numel(lsa_dir)
