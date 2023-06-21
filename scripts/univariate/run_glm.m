@@ -1,4 +1,4 @@
-function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist,groupglm_pref,groupglm_cov)
+function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist)
 % run first and second level analysis for different glms
 % INPUT:
 % - glm_name: name of the glm, this will be used to find glm
@@ -11,10 +11,6 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist,
 % - glm_dir: output directory for the glm model results
 % - preproc_img_dir: directory for preprocessed fmri data
 % - subidlist: list of participants to be included in the analysis
-% - groupglm_pref: prefix added to second level (group level) glm names
-% - groupglm_cov: covariate for group level glm. should be like:
-%                   struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}) or
-%                   struct('files', {}, 'iCFI', {}, 'iCC', {})
 % OUTPUT:
 % - error_tracker: this function do not pause when spm job runs into error,
 %                  errors are returned for tracking which participants' 
@@ -24,13 +20,11 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist,
     spm('defaults','FMRI')
     [directory,participants]  = get_pirate_defaults(false,'directory','participants');
     
-    if nargin < 2 || isempty(steps),           steps = {'spec2est','contrast','second_level'}; end %'spec2est','contrast','second_level'}
-    if nargin < 3 || isempty(glm_dir),         glm_dir  = fullfile(directory.fmri_data,glm_name); end
-    if nargin < 4 || isempty(preproc_img_dir), preproc_img_dir = directory.smoothed; end
-    if nargin < 5 || isempty(subidlist),       subidlist = participants.validids; end
-    if nargin < 6 || isempty(groupglm_pref),   groupglm_pref = ''; end
-    if nargin < 7 || isempty(groupglm_cov),    groupglm_cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}); end
-
+    if nargin < 2, steps = {'spec2est','contrast','second_level'}; end %'spec2est','contrast','second_level'}
+    if nargin < 3, glm_dir  = fullfile(directory.fmri_data,glm_name); end
+    if nargin < 4, preproc_img_dir = directory.smoothed; end
+    if nargin < 5, subidlist = participants.validids; end
+    
     nsub = numel(subidlist);
     err_tracker = cell(2,1);
     
@@ -38,10 +32,13 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist,
     err_tracker_1st = cell(nsub,2);
     firstlevelsteps = {'spec2est','contrast','report1stlvl'};
     if any(ismember(steps,firstlevelsteps))
+        num_workers   = feature('NumCores')-3;
+        poolobj       =  parpool(num_workers);%set up parallel processing
         parfor isub = 1:nsub
-            err_tracker_1st(isub,:) = run_firstlevel(subidlist{isub},glm_name,glm_dir,preproc_img_dir,steps);
+            err_tracker_1st(isub,:) = run_firstlevel(subidlist{isub},glm_name,glm_dir,preproc_img_dir,steps)
         end
         err_tracker{1} = err_tracker_1st;
+        delete(poolobj)
     end
 
     %% run second-level analysis
@@ -56,21 +53,11 @@ function err_tracker = run_glm(glm_name,steps,glm_dir,preproc_img_dir,subidlist,
                     [~,contrast_img,~] = find_contrast_idx(fullfile(firstlvlSPM_dirs{isub},'SPM.mat'),glm_config.contrasts(j).name);
                     scans{1,1}{isub} = fullfile(firstlvlSPM_dirs{isub},contrast_img);
                 end
-                % secondlvl_dir = fullfile(glm_dir,'second',[groupglm_pref,glm_config.contrasts(j).name])
-                % if exist(secondlvl_dir)
-                %   rmdir(secondlvl_dir)
-                % end
-                specify_estimate_grouplevel(fullfile(glm_dir,'second',[groupglm_pref,glm_config.contrasts(j).name]), ...
-                                            scans, ...
-                                            {glm_config.contrasts(j).name}, ...
-                                            groupglm_cov)
-                ncov = numel(groupglm_cov);
-                groupcon_wv   = num2cell(eye(ncov+1),2);
-                groupcon_name = [{glm_config.contrasts(j).name},{groupglm_cov.cname}];                    
-                specify_estimate_contrast(fullfile(glm_dir,'second',[groupglm_pref,glm_config.contrasts(j).name]),...
-                                          groupcon_name,...
-                                          groupcon_wv);
-                report_results(fullfile(glm_dir,'second',[groupglm_pref,glm_config.contrasts(j).name]))
+                specify_estimate_grouplevel(fullfile(glm_dir,'second',glm_config.contrasts(j).name),scans,{glm_config.contrasts(j).name})
+                specify_estimate_contrast(fullfile(glm_dir,'second',glm_config.contrasts(j).name),...
+                                          {glm_config.contrasts(j).name},...
+                                          {[1]});
+                report_results(fullfile(glm_dir,'second',glm_config.contrasts(j).name))
             end
             
             fprintf('%s: Completed second-level\n', glm_name)

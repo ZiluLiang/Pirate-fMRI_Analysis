@@ -17,8 +17,8 @@ function [contrast_idx,contrast_img,stat_img] = find_contrast_idx(subSPM,contras
     elseif ~isstruct(subSPM)
         error('first input must be full path to SPM.mat file or the loaded SPM struct')
     end
-    if ischar(contrasts_names) || isa(contrasts_names,'pattern')
-        contrasts_names = {contrasts_names};
+    if ischar(contrasts_names)
+        contrasts_names = cellstr(contrasts_names);
     elseif ~iscell(contrasts_names)
         error('second input must be a contrast name or a cell array of contrast names')
     end
@@ -28,10 +28,8 @@ function [contrast_idx,contrast_img,stat_img] = find_contrast_idx(subSPM,contras
     contrast_idx = cell2mat(contrast_idx);
     [contrast_img,stat_img] = deal(cell(size(contrast_idx)));
     for j = 1:numel(contrast_idx)
-        if ~isnan(contrast_idx(j))
-            contrast_img{j} = sprintf('con_%04d.nii',contrast_idx(j));
-            stat_img{j} = sprintf('spm%s_%04d.nii',subSPM.xCon(contrast_idx(j)).STAT,contrast_idx(j));
-        end
+        contrast_img{j} = sprintf('con_%04d.nii',contrast_idx);
+        stat_img{j} = sprintf('spm%s_%04d.nii',subSPM.xCon(contrast_idx(j)).STAT,contrast_idx(j));
     end
     if numel(numel(contrast_idx)) == 1
         contrast_idx = contrast_idx(1);
