@@ -1,4 +1,4 @@
-function [rangeCon,meanResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_dir,masks)
+function [rangeCon,meanCon,meanResMS,rangeStat,meanStat] = extract_firstlvl_spmStat(glm_name,glm_dir,masks)
 % This function finds the gives some summary statistics on the statistical
 % results of first level glm analysis for sanity check of model fitting
 % results.
@@ -26,6 +26,7 @@ function [rangeCon,meanResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_
     mask_names = cell(size(unique_masks));
 
     rangeStat  = cell(numel(participants.validids),numel(contrast_names));
+    meanStat  = cell(numel(participants.validids),numel(contrast_names));    
     rangeCon   = cell(numel(participants.validids),numel(contrast_names));
     meanResMS  = nan(numel(participants.validids), numel(unique_masks));
     for isub = 1:numel(participants.validids)
@@ -36,10 +37,14 @@ function [rangeCon,meanResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_
                 voxelwise_Stat  = spm_summarise(fullfile(firstlevel_dir,stat_img),masks{j});
                 voxelwise_Con   = spm_summarise(fullfile(firstlevel_dir,con_img),masks{j});
                 rangeStat{isub,j} = [min(voxelwise_Stat),max(voxelwise_Stat)];
+                meanStat{isub,j} = mean(voxelwise_Stat);
                 rangeCon{isub,j} = [min(voxelwise_Con),max(voxelwise_Con)];
+                meanCon{isub,j} = mean(voxelwise_Con);
             catch
                 rangeStat{isub,j} = [nan,nan];
+                meanStat{isub,j} = [nan,nan];
                 rangeCon{isub,j} = [nan,nan];
+                meanCon{isub,j} = [nan,nan];
             end           
         end
         for k = 1:numel(unique_masks)
@@ -50,5 +55,7 @@ function [rangeCon,meanResMS,rangeStat] = extract_firstlvl_spmStat(glm_name,glm_
     end
     rangeStat = cell2table(rangeStat,'VariableNames',contrast_names);
     rangeCon  = cell2table(rangeCon,'VariableNames',contrast_names);
+    meanStat  = cell2table(meanStat,'VariableNames',contrast_names);
+    meanCon  = cell2table(meanCon,'VariableNames',contrast_names);
     meanResMS = array2table(meanResMS,'VariableNames',mask_names);
 end

@@ -48,7 +48,8 @@ for (a_name in names(analysis)){
     dplyr::select(all_of(c(id_cols,analysis[[a_name]])))
   curr_df_long = curr_df%>%
     pivot_longer(cols = analysis[[a_name]],names_to ="regressors",values_to = "estimates")%>%
-    mutate(roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")))
+    mutate(roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")),
+           preprocess = factor(preprocess,levels = c("unsmoothedLSA","smoothed5mmLSA")))
   g_cols = c("roi","laterality","voxselect","ds","preprocess","regressors")
   sum_df = aggregate_data(curr_df_long,groupbyvars = g_cols,yvars = "estimates")
   
