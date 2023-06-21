@@ -260,9 +260,9 @@ laterality = ["left","right","bilateral"]
 def run_ROIRSA(beta_img, mask_imgs, regression_models, regressor_names,subid, group=None):
     APD = ActivityPatternDataLoader(beta_img,mask_imgs)
     activitypattern = APD.X
-    # for k in group:
-    #     group_mean_pervoxel = np.mean(activitypattern[np.where(group == k),:],1)
-    #     activitypattern[np.where(group == k),:] = activitypattern[np.where(group == k),:] - group_mean_pervoxel
+    for k in group:
+        group_mean_pervoxel = np.mean(activitypattern[np.where(group == k),:],1)
+        activitypattern[np.where(group == k),:] = activitypattern[np.where(group == k),:] - group_mean_pervoxel
     result = dict(zip(regression_models.keys(),[[]] * len(regression_models.keys())))
     for k,v in regression_models.items():
         MR = MultipleRDMRegression(compute_rdm(activitypattern,'correlation'),v)
