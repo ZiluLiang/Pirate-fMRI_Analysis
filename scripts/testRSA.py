@@ -229,14 +229,57 @@ project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
 fmri_output_path = os.path.join(project_path,'data','fmri')
 glm_name = 'LSA_stimuli_navigation'
 
-preprocess = ["smoothed5mmLSA","unsmoothedLSA"]
 with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
-n_run = 4
 
+preprocess = ["smoothed5mmLSA","unsmoothedLSA"]
+
+analysis = {
+    # image-based rdm
+    "sc_betweens_stimuli":   ['between_stimuli'],
+    "sc_alls_stimuli":       ['stimuli'],
+    # feature-based: color(x) or shape(y)
+    "sc_withins_feature1d":  ['within_feature1dx','within_feature1dy'],
+    "sc_betweens_feature1d": ['between_feature1dx','between_feature1dy'],
+    "sc_alls_feature1d":     ['feature1dx','feature1dy'],
+    # map-based
+    "betweens_loc2d":  ["between_loc2d"],
+    "withins_loc2d":   ["within_loc2d"],
+    "alls_loc2d":      ["loc2d"],
+    "betweens_loc1d":  ["between_loc1dx","between_loc1dy"],
+    "withins_loc1d":   ["within_loc1dx","within_loc1dy"],
+    "alls_loc1d":      ["loc1dx","loc1dy"]
+    }
+
+anatmaskdir = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\anat'
+
+anat_roi = ["hippocampus","parahippocampus","occipital","ofc"]
+laterality = ["left","right","bilateral"]
+
+def run_ROIRSA(beta_img, mask_imgs, regression_models, regressor_names,subid, group=None):
+    APD = ActivityPatternDataLoader(beta_img,mask_imgs)
+    activitypattern = APD.X
+    # for k in group:
+    #     group_mean_pervoxel = np.mean(activitypattern[np.where(group == k),:],1)
+    #     activitypattern[np.where(group == k),:] = activitypattern[np.where(group == k),:] - group_mean_pervoxel
+    result = dict(zip(regression_models.keys(),[[]] * len(regression_models.keys())))
+    for k,v in regression_models.items():
+        MR = MultipleRDMRegression(compute_rdm(activitypattern,'correlation'),v)
+        MR.fit()
+        result[k] = MR.result
+    df = []
+    for k, v in regressor_names.items():
+        reg_name_dict = dict(zip(range(len(v)),v))
+        res_df = pd.DataFrame(result[k]).T.rename(columns = reg_name_dict).assign(analysis=k,subid=subid)
+        df.append(res_df)
+    return pd.concat(df,axis=0)
+
+# preprocess - ds - vselect - roi -laterality
+all_df = []
 for p in preprocess: 
     LSA_GLM_dir = os.path.join(fmri_output_path,p,glm_name)
+    ########################## Get Stimuli Data ##############################################
     beta_flist4r = []
     beta_flistoe = []
     fmask_flist = []
@@ -284,57 +327,15 @@ for p in preprocess:
         beta_flistoe.append(os.path.join(firstlvl_dir,'stimuli_oe.nii'))    
         fmask_flist.append(os.path.join(firstlvl_dir,'mask.nii'))
         pmask_flist.append(os.path.join(firstlvl_dir,'reliability_mask.nii'))
+    
+    ########################## Run RSA ##############################################
+    n_sess = {"fourruns":4,
+              "oddeven":2}
+    beta_flist = {"fourruns":beta_flist4r,
+                "oddeven":beta_flistoe}
+    mask_flist = {"noselection":fmask_flist,
+                "reliability_ths0":pmask_flist}
 
-analysis = {
-    # image-based rdm
-    "sc_betweens_stimuli":   ['between_stimuli'],
-    "sc_alls_stimuli":       ['stimuli'],
-    # feature-based: color(x) or shape(y)
-    "sc_withins_feature1d":  ['within_feature1dx','within_feature1dy'],
-    "sc_betweens_feature1d": ['between_feature1dx','between_feature1dy'],
-    "sc_alls_feature1d":     ['feature1dx','feature1dy'],
-    # map-based
-    "betweens_loc2d":  ["between_loc2d"],
-    "withins_loc2d":   ["within_loc2d"],
-    "alls_loc2d":      ["loc2d"],
-    "betweens_loc1d":  ["between_loc1dx","between_loc1dy"],
-    "withins_loc1d":   ["within_loc1dx","within_loc1dy"],
-    "alls_loc1d":      ["loc1dx","loc1dy"]
-    }
-anatmaskdir = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\anat'
-
-anat_roi = ["hippocampus","parahippocampus","occipital","ofc"]
-laterality = ["left","right","bilateral"]
-
-beta_flist = {"fourruns":beta_flist4r,
-              "oddeven":beta_flistoe}
-n_sess = {"fourruns":4,
-          "oddeven":2}
-mask_flist = {"noselection":fmask_flist,
-              "reliability_ths0":pmask_flist}
-
-def run_ROIRSA(beta_img, mask_imgs, regression_models, regressor_names,subid, group=None):
-    APD = ActivityPatternDataLoader(beta_img,mask_imgs)
-    activitypattern = APD.X
-    for k in group:
-        group_mean_pervoxel = np.mean(activitypattern[np.where(group == k),:],1)
-        activitypattern[np.where(group == k),:] = activitypattern[np.where(group == k),:] - group_mean_pervoxel
-    result = dict(zip(regression_models.keys(),[[]] * len(regression_models.keys())))
-    for k,v in regression_models.items():
-        MR = MultipleRDMRegression(compute_rdm(activitypattern,'correlation'),v)
-        MR.fit()
-        result[k] = MR.result
-    df = []
-    for k, v in regressor_names.items():
-        reg_name_dict = dict(zip(range(len(v)),v))
-        res_df = pd.DataFrame(result[k]).T.rename(columns = reg_name_dict).assign(analysis=k,subid=subid)
-        df.append(res_df)
-    return pd.concat(df,axis=0)
-
-# preprocess - ds - vselect - roi -laterality
-all_df = []
-for p in preprocess: 
-    LSA_GLM_dir = os.path.join(fmri_output_path,p,glm_name)
     for ds_name, ds in beta_flist.items():
         for vselect in mask_flist:            
             result = dict(zip(analysis.keys(),[[]] * len(analysis.keys())))            
@@ -362,14 +363,14 @@ checkdir(ROIRSA_output_path)
 df = pd.concat(all_df,axis=0)
 df.to_csv(os.path.join(ROIRSA_output_path,'roirsa.csv'))
 
-id_cols = ["ds","preprocess","voxselect","roi","laterality",'subid','analysis']
-for k,v in analysis.items():
-    plot_df = df.loc[df["analysis"]==k,tuple(id_cols+v)]
-    plot_df["roi_l"] = plot_df[['roi', 'laterality']].apply(lambda x: '_'.join(x), axis=1)
-    plot_df["ds_preproc"] = plot_df[['ds', 'preprocess']].apply(lambda x: '_'.join(x), axis=1)
-    plot_df = pd.melt(plot_df, id_vars=id_cols+["roi_l","ds_preproc"], value_vars=v)
-    g = sns.catplot(data=plot_df, x="roi_l", y="value",
-    hue="voxselect",col="variable",row="ds_preproc",
-    kind="box", aspect=3,sharex=True,sharey=True)
-    tmp = [plt.setp(ax.get_xticklabels(), rotation=45) for ax in g.axes.flat]
-    g.savefig(os.path.join(ROIRSA_output_path,f'{k}.png'))
+# id_cols = ["ds","preprocess","voxselect","roi","laterality",'subid','analysis']
+# for k,v in analysis.items():
+#     plot_df = df.loc[df["analysis"]==k,tuple(id_cols+v)]
+#     plot_df["roi_l"] = plot_df[['roi', 'laterality']].apply(lambda x: '_'.join(x), axis=1)
+#     plot_df["ds_preproc"] = plot_df[['ds', 'preprocess']].apply(lambda x: '_'.join(x), axis=1)
+#     plot_df = pd.melt(plot_df, id_vars=id_cols+["roi_l","ds_preproc"], value_vars=v)
+#     g = sns.catplot(data=plot_df, x="roi_l", y="value",
+#     hue="voxselect",col="variable",row="ds_preproc",
+#     kind="box", aspect=3,sharex=True,sharey=True)
+#     tmp = [plt.setp(ax.get_xticklabels(), rotation=45) for ax in g.axes.flat]
+#     g.savefig(os.path.join(ROIRSA_output_path,f'{k}.png'))

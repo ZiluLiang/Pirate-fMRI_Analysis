@@ -1,4 +1,4 @@
-function specify_estimate_grouplevel(outputdir,scans,factor_names,cov)
+function specify_estimate_grouplevel(outputdir,scans,factor_names)
 % specify_estimate_grouplevel(outputdir,scans)
 % INPUT:
 %  - otputdir: output directory of second level analysis
@@ -28,8 +28,7 @@ function specify_estimate_grouplevel(outputdir,scans,factor_names,cov)
     end
     % number of factors
     nF  = numel(factor_names);
-
-    if nargin<4, cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}); end
+    
         
     %% Directory
     checkdir(outputdir)
@@ -62,7 +61,7 @@ function specify_estimate_grouplevel(outputdir,scans,factor_names,cov)
     end
     
     %%covariate
-    design.cov = cov;
+    design.cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {});
     design.multi_cov = struct('files', {}, 'iCFI', {}, 'iCC', {});
     %%masking and other settings
     design.masking.tm.tm_none = 1;
