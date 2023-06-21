@@ -1,0 +1,82 @@
+---
+title: "testROIRSA"
+output: html_document
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE)
+
+rm(list = ls())
+wk_dir = rstudioapi::getActiveProject();
+generic_dir = file.path(wk_dir, "scripts/generic", fsep="/")
+
+spec_dir = file.path(wk_dir, "scripts/behavior", fsep="/")
+data_dir = file.path(wk_dir, "data", fsep="/")
+save_dir = file.path(wk_dir, "plot", fsep="/")
+prob_df_dir =  file.path(wk_dir, "probdf", fsep="/")
+  
+
+source(file.path(generic_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(generic_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(generic_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+library(ggpubr)
+```
+
+## load data
+```{r}
+res_path = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigationseparatecentering\\roirsa.csv'
+roirsa_df = read.csv(res_path,header = TRUE)
+analysis = list(sc_betweens_stimuli = c("between_stimuli"),
+                sc_alls_stimuli = c("stimuli"),
+                sc_withins_feature1d = c("within_feature1dx","within_feature1dy"),
+                sc_betweens_feature1d = c("between_feature1dx","between_feature1dy"),
+                sc_alls_feature1d = c("feature1dx","feature1dy"),
+                betweens_loc2d = c("between_loc2d"),
+                withins_loc2d = c("within_loc2d"),
+                alls_loc2d = c("loc2d"),
+                betweens_loc1d = c("between_loc1dx","between_loc1dy"),
+                withins_loc1d = c("within_loc1dx","within_loc1dy"),
+                alls_loc1d = c("loc1dx","loc1dy"))
+id_cols = c("subid","roi","laterality","voxselect","ds","preprocess")
+```
+
+```{r}
+pval_list = list()
+for (a_name in names(analysis)){
+  curr_df = roirsa_df%>%
+    filter(analysis == a_name)%>%
+    dplyr::select(all_of(c(id_cols,analysis[[a_name]])))
+  curr_df_long = curr_df%>%
+    pivot_longer(cols = analysis[[a_name]],names_to ="regressors",values_to = "estimates")%>%
+    mutate(roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")))
+  g_cols = c("roi","laterality","voxselect","ds","preprocess","regressors")
+  sum_df = aggregate_data(curr_df_long,groupbyvars = g_cols,yvars = "estimates")
+  
+  pval_list[[a_name]] = curr_df_long %>%
+    group_by_at(g_cols) %>%
+    t_test(data =., estimates ~ 1, mu=0) %>%
+    adjust_pvalue(method = "bonferroni") %>%
+    add_significance("p.adj")%>%
+    ungroup()
+  
+  p = curr_df_long%>%
+    ggplot(aes(x=roi,color=preprocess))+
+    facet_nested(cols=vars(ds,laterality),rows = vars(voxselect,regressors))+
+    geom_point(aes(y=estimates),position = position_dodge(1),alpha=0.8,size=0.5)+
+    geom_col(data = sum_df,aes(y=mu_estimates),position = position_dodge(1),fill=NA)+
+    geom_errorbar(data = sum_df,
+                  aes(ymin=mu_estimates-se_estimates,ymax=mu_estimates+se_estimates),
+                  position = position_dodge(1),width = 0.5)+
+    theme(aspect.ratio = 1/2, axis.text.x = element_text(angle=15),legend.position = "top")
+
+  ggsave(
+  file.path('D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigationseparatecentering',str_c(a_name,'.png')),
+  plot = p,
+  device = "png",
+  scale = 1,
+  width = 16,
+  height = 9,
+  dpi = 300)
+}
+```
+
