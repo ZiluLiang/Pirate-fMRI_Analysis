@@ -7,7 +7,7 @@ function [regressor_idx,regressor_img] = find_regressor_idx(subSPM,regname_patte
 %                        of `contain` and `pattern` for details.
 % OUTPUT:
 %    - regressor_idx: the index/indices of the regressor(s) in SPM.xX.name;
-%    - regressor_idx: the index/indices of the regressor(s) in SPM.xX.name;
+%    - regressor_img: the name of the corresponding beta image;
     if ischar(subSPM)
         if exist(subSPM,'file')
             subSPM = load(subSPM).SPM;
