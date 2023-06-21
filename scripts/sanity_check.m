@@ -23,7 +23,7 @@ if flag_runGLM
 end
 
 %% examine sanity check results - extract stats
-masks = {fullfile('D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks','AAL_Occipital.nii'),...
+masks = {fullfile('D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks','occipital_bilateral.nii'),...
          fullfile('D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks','HMAT_Motor.nii')};
 if flag_getStat
     rangeCon = struct();
@@ -31,7 +31,7 @@ if flag_getStat
     rangeStat = struct();
     for j = 1:numel(glm_names)
         glm_name = glm_names{j};
-        [rangeCon.(glm_name),meanResMS.(glm_name),rangeStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,glm_name),masks);
+        [rangeCon.(glm_name),meanCon.(glm_name),meanResMS.(glm_name),rangeStat.(glm_name),meanStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,glm_name),masks);
         rangeStat.(glm_name).Properties.RowNames = participants.validids;
     end
 end
