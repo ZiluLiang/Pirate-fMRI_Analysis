@@ -24,6 +24,7 @@ class PatternCorrelation:
         X,_ = lower_tri(neuralrdm)
         Y,_ = lower_tri(modelrdm)
         na_filters = numpy.logical_and(~numpy.isnan(X),~numpy.isnan(Y))
+        self.na_filters = na_filters
         self.X = X[na_filters]
         self.Y = Y[na_filters]
         
@@ -34,7 +35,7 @@ class PatternCorrelation:
             self.type = type
     
     def __str__(self) -> str:
-        return "PatternCorrelation with "+self.type
+        return f"PatternCorrelation with {self.type}"
     
     def fit(self):
         if self.type == "spearman":
@@ -50,7 +51,7 @@ class PatternCorrelation:
     def visualize(self):
         try:
             self.result
-        except:
+        except Exception:
             self.fit()
         plot_models = [self.X,self.Y]
         plot_titles = ["neural rdm", "model rdm"]
@@ -59,7 +60,8 @@ class PatternCorrelation:
         for j,(t,m) in enumerate(zip(plot_titles,plot_models)):
             v = numpy.full(self.rdm_shape,numpy.nan)
             _,idx = lower_tri(v)
-            v[idx] = m
+            fillidx = (idx[0][self.na_filters],idx[1][self.na_filters])
+            v[fillidx] = m
             sns.heatmap(v,ax=axes.flatten()[j],square=True,cbar_kws={"shrink":0.85})
             axes.flatten()[j].set_title(t)
         fig.suptitle(f'{self.type} correlation: {self.result}')
@@ -69,7 +71,7 @@ class MultipleRDMRegression:
     def __init__(self,neuralrdm,modelrdms,modelnames:list=None) -> None:
 
         if modelnames is None:
-            modelnames = ['m'+str(j) for j in range(len(modelrdms))]
+            modelnames = [f'm{str(j)}' for j in range(len(modelrdms))]
         assert len(modelnames) == len(modelrdms), 'number of model names must be equal to number of model rdms'
         self.rdm_shape = neuralrdm.shape
         self.modelnames = modelnames
@@ -83,6 +85,7 @@ class MultipleRDMRegression:
 
         xna_filters = numpy.all([~numpy.isnan(X[:,j]) for j in range(numpy.shape(X)[1])],0)
         na_filters = numpy.logical_and(~numpy.isnan(Y),xna_filters)
+        self.na_filters = na_filters
 
         #standardize design matrix independently within each column
         X_dropNA = X[na_filters,:]
@@ -105,7 +108,7 @@ class MultipleRDMRegression:
     def visualize(self):
         try:
             self.result
-        except:
+        except Exception:
             self.fit()
         plot_models = list(numpy.concatenate((numpy.atleast_2d(self.Y),self.X.T),axis=0))
         plot_titles = ["neural rdm"] + self.modelnames
@@ -114,7 +117,8 @@ class MultipleRDMRegression:
         for j,(t,m) in enumerate(zip(plot_titles,plot_models)):
             v = numpy.full(self.rdm_shape,numpy.nan)
             _,idx = lower_tri(v)
-            v[idx] = m
+            fillidx = (idx[0][self.na_filters],idx[1][self.na_filters])
+            v[fillidx] = m
             sns.heatmap(v,ax=axes.flatten()[j],square=True,cbar_kws={"shrink":0.85})
             if j == 0:
                 axes.flatten()[j].set_title(t)

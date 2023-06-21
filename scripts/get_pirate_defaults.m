@@ -59,7 +59,8 @@ function pirate_defaults = setdefaults
     % packages that do not need to add with subfolders
     pirate_defaults.packages.SPM12        = 'C:\Program Files\MATLAB\matlab toolbox\spm12';
     pirate_defaults.packages.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
-    pirate_defaults.packages.jsonlab      = 'C:\Program Files\MATLAB\matlab toolbox\jsonlab-master';
+    pirate_defaults.packages.jsonlab      = 'C:\Program Files\MATLAB\matlab toolbox\marsbar-0.45';
+    pirate_defaults.packages.marsbar      = 'C:\Program Files\MATLAB\matlab toolbox\jsonlab-master';
     pirate_defaults.packages.SPM12OldNorm = fullfile(pirate_defaults.packages.SPM12,'toolbox','OldNorm'); % this is so that auto reorientation runs
     pirate_defaults.packages.SPM12batch   = fullfile(pirate_defaults.packages.SPM12,'matlabbatch');         % this is so that batch management runs
     % packages that need to add with subfolders
@@ -128,4 +129,7 @@ function pirate_defaults = setdefaults
     pirate_defaults.fmri.tr        = 1.73;% TR in seconds
     pirate_defaults.fmri.nuisance_terms = {'raw','fw'}; 
     
+    %% --------------  saving to json file for python reading  ------------------
+    %pirate_defaults.participants = rmfield(pirate_defaults.participants,{'ids','nsub'});
+    savejson('',pirate_defaults,'FileName',fullfile(wk_dir,'scripts','pirate_defaults.json'),'SingletCell',0,'ForceRootName',0);
 end
