@@ -8,7 +8,7 @@ end
 %% glms designs
 % ==============================================================================================
 % columns in data table of navigation task:
-% 'stim_id','stim_img','stim_x','stim_y','start_x','start_y','resp_x','resp_y','resp_dist','respmap_x','respmap_y',...% fields in the orginal data table
+% 'stim_id','stim_img','stim_x','stim_y','stimattr_x','stimattr_y','resp_x','resp_y','resp_dist','respmap_x','respmap_y',...% fields in the orginal data table
 % 'onset_stimuli','duration_stimuli',... % stimuli event
 % 'onset_response','duration_response',... % response event                
 % 'onset_rstrials','duration_rstrials',...  % repetition suppression event
@@ -19,7 +19,7 @@ end
 % 'onset_stimxx','duration_stimxx', % event for each stimuli
 % ==============================================================================================
 % columns in data table of localizer task:
-% 'stim_id','stim_img','stim_x','stim_y','response','acc',...% fields in the orginal data table
+% 'stim_id','stim_img','stim_x','stim_y','stimattr_x','stimattr_y','response','acc',...% fields in the orginal data table
 % 'dist2d','excluders','rstrials',...% fields in the orginal data table
 % 'onset_stimuli',  'duration_stimuli',... % stimuli event
 % 'onset_response',... % response event, no duration of response, will be set as stick function in glm                
@@ -101,12 +101,12 @@ function glms = glm_gallery
     glms(9).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(9).conditions  = {'stimuli','response'};
     glms(9).modelopt    = struct('use_stick', {false,false});
-    glms(9).pmods       = {{'stim_y','stim_x'}};
+    glms(9).pmods       = {{'stim_x','stim_y'}};
     glms(9).contrasts   = struct('name',{},'type',{},'wvec',{});
     glms(9).contrasts(1).name = 'stim_x';
-    glms(9).contrasts(1).wvec = [1,0,0];% weight vector for task regressors
+    glms(9).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
     glms(9).contrasts(2).name = 'stim_y';
-    glms(9).contrasts(2).wvec = [0,1,0];% weight vector for task regressors
+    glms(9).contrasts(2).wvec = [0,0,1,0];% weight vector for task regressors
 
     glms(10).name = 'axis_resploc_navigation'; % location based on ground truth
     glms(10).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
@@ -115,9 +115,9 @@ function glms = glm_gallery
     glms(10).pmods       = {{'respmap_x','respmap_y'}};
     glms(10).contrasts   = struct('name',{},'type',{},'wvec',{});
     glms(10).contrasts(1).name = 'respmap_x';
-    glms(10).contrasts(1).wvec = [1,0,0];% weight vector for task regressors
+    glms(10).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
     glms(10).contrasts(2).name = 'respmap_y';
-    glms(10).contrasts(2).wvec = [0,1,0];% weight vector for task regressors
+    glms(10).contrasts(2).wvec = [0,0,1,0];% weight vector for task regressors
 
     glms(11).name = 'axis_loc_localizer'; % location based on ground truth
     glms(11).filepattern = 'sub-.*_task-localizer_run-[1]';
@@ -126,14 +126,27 @@ function glms = glm_gallery
     glms(11).pmods       = {{'stim_x','stim_y'}};
     glms(11).contrasts   = struct('name',{},'type',{},'wvec',{});
     glms(11).contrasts(1).name = 'stim_x';
-    glms(11).contrasts(1).wvec = [1,0,0];% weight vector for task regressors
+    glms(11).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
     glms(11).contrasts(2).name = 'stim_y';
-    glms(11).contrasts(2).wvec = [0,1,0];% weight vector for task regressors
+    glms(11).contrasts(2).wvec = [0,0,1,0];% weight vector for task regressors
 
-    allstimid = 0:24;
-    glms(12).name = 'LSA_stimuli_navigation_modeltraintest';
+    glms(12).name = 'axis_attrloc_navigation'; % location based on ground truth
     glms(12).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
-    glms(12).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'training','test','response'}];
-    glms(12).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false,false,false}]);
+    glms(12).conditions  = {'stimuli','response'};
+    glms(12).modelopt    = struct('use_stick', {true,false});
+    glms(12).pmods       = {{'stim_attrx','stim_attry'}};
+    glms(12).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(12).contrasts(1).name = 'stim_attrx';
+    glms(12).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
+    glms(12).contrasts(2).name = 'stim_attry';
+    glms(12).contrasts(2).wvec = [0,0,1,0];% weight vector for task regressors
 
+    glms(13).name = 'axis_attryloc_navigation'; % location based on ground truth
+    glms(13).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(13).conditions  = {'stimuli','response'};
+    glms(13).modelopt    = struct('use_stick', {true,false});
+    glms(13).pmods       = {{'stim_attry'}};
+    glms(13).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(13).contrasts(1).name = 'stim_attry';
+    glms(13).contrasts(1).wvec = [0,1,0];% weight vector for task regressors
 end
