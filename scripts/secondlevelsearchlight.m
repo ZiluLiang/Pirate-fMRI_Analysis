@@ -1,7 +1,53 @@
-searchlight_rsa_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\LSA_stimuli_navigation\searchlightrsa';
+clear;clc
 
-vselect = {'noselection','reliability_ths0'};
+[directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
 
-analysis = 
-
-fullfile(searchlight_rsa_dir,vselect)
+par_dirs = {'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\LSA_stimuli_navigation\searchlightrsa',...
+    'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\LSA_stimuli_navigation\searchlightrsa'};
+for x = 1:2
+    searchlight_rsa_dir = par_dirs{x};
+    
+    vselect = {'noselection','reliability_ths0'};
+    ds      = {'oddeven','fourruns'};
+    analysis = struct(...
+            ...% image-based rdm
+            "sc_betweens_stimuli",   {{'between_stimuli'}},...
+            "sc_alls_stimuli",       {{'stimuli'}},...
+            ...% feature-based: color(x) or shape(y)
+            "sc_withins_feature1d",  {{'within_feature1dx','within_feature1dy'}},...
+            "sc_betweens_feature1d", {{'between_feature1dx','between_feature1dy'}},...
+            "sc_alls_feature1d",     {{'feature1dx','feature1dy'}},...
+            ...% map-based
+            "betweens_loc2d",  {{"between_loc2d"}},...
+            "withins_loc2d",   {{"within_loc2d"}},...
+            "alls_loc2d",      {{"loc2d"}},...
+            "betweens_loc1d",  {{"between_loc1dx","between_loc1dy"}},...
+            "withins_loc1d",   {{"within_loc1dx","within_loc1dy"}},...
+            "alls_loc1d",      {{"loc1dx","loc1dy"}}...
+            );
+    
+    a_names = fieldnames(analysis);
+    for v = 1:numel(vselect)
+        for d = 1:numel(ds)
+            for j = 1:numel(a_names)        
+                a = a_names{j};
+                rsa_dir = fullfile(searchlight_rsa_dir,vselect{v},ds{d},a);
+                for k = 1:numel(analysis.(a))
+                    cd('D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\scripts')
+                    regressor_name = analysis.(a){k};
+                    outputdir = fullfile(rsa_dir,'second',regressor_name);
+                    if exist(outputdir)
+                        rmdir(outputdir,'s')
+                    end
+                    
+                    
+                    beta_img = sprintf("beta_%04d.nii",k-1);
+                    scans = cellstr(fullfile(rsa_dir,'first',participants.validids,beta_img));
+                    specify_estimate_grouplevel(outputdir,{scans},{regressor_name});
+                    specify_estimate_contrast(outputdir,cellstr(regressor_name),{[1]});
+                    report_results(outputdir)
+                end
+            end
+        end
+    end
+end
