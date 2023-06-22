@@ -33,7 +33,7 @@ function specify_estimate_grouplevel(outputdir,scans,factor_names,cov)
         
     %% Directory
     checkdir(outputdir)
-    design.dir = {outputdir};
+    design.dir = cellstr(outputdir);
 
     %% Design
     if nF == 1 && nLs(1) ==1

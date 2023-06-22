@@ -41,7 +41,7 @@ function specify_estimate_contrast(varargin)
                 contrast.consess{j}.fcon.sessrep = 'none';                
         end
     end
-    contrast.spmmat = {fullfile(SPMmat_dir,'SPM.mat')};
+    contrast.spmmat = cellstr(fullfile(SPMmat_dir,'SPM.mat'));
     contrast.delete = 1*flag_replace;%1 delete current contrasts;0 do not delete
 
     matlabbatch{1}.spm.stats.con = contrast;
