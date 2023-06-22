@@ -25,7 +25,7 @@ function report_results(SPMmat_dir,ths_cfg,output_fmt,masks)
     
     if nargin<4, apply_mask  = false; end
 	
-    results.spmmat(1) = {fullfile(SPMmat_dir,'SPM.mat')};
+    results.spmmat(1) = cellstr(fullfile(SPMmat_dir,'SPM.mat'));
     for k = 1:nC
         results.conspec(k).titlestr = '';
         results.conspec(k).contrasts = k;
