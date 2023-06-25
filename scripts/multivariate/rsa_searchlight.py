@@ -15,7 +15,7 @@ import nibabel as nib
 import nibabel.processing
 from joblib import Parallel, delayed, cpu_count
 from scipy.sparse import vstack, find
-from multivariate.helper import compute_rdm,checkdir
+from multivariate.helper import compute_rdm,checkdir,scale_feature
 
 import nilearn
 from nilearn import image, masking
@@ -124,17 +124,15 @@ def _apply_mask_and_get_affinity(seeds,
         mask_coords = list(np.ndindex(niimg.shape[:3]))
 
     # For each seed, get coordinates of nearest voxel
-    nearests = []
-    for sx, sy, sz in seeds:
-        nearest = np.round(image.resampling.coord_transform(
-            sx, sy, sz, np.linalg.inv(affine)
-        ))
-        nearest = nearest.astype(int)
-        nearest = (nearest[0], nearest[1], nearest[2])
+    tmp_nearests = np.round(image.resampling.coord_transform(
+            np.array(seeds)[:,0], np.array(seeds)[:,1], np.array(seeds)[:,2], np.linalg.inv(affine)
+        )).T.astype(int)
+    def find_ind(mask_coords, nearest):
         try:
-            nearests.append(mask_coords.index(nearest))
+            return mask_coords.index(nearest)
         except ValueError:
-            nearests.append(None)
+            return None
+    nearests = [find_ind(mask_coords,tuple(nearest)) for nearest in tmp_nearests]
 
     mask_coords = np.asarray(list(zip(*mask_coords)))
     mask_coords = image.resampling.coord_transform(
@@ -288,8 +286,10 @@ class RSASearchLight:
         voxel_results = []
         t0 = time.time()
         for i,neighbour_idx in enumerate(neighbour_idx_list):
+            # centering feature columns (for each voxel, demean the column corresponding to its activity)
+            patternmatrix = scale_feature(self.X[:,neighbour_idx],1,False)
+            neuralrdm = compute_rdm(patternmatrix,"correlation")
             # instantiate estimator for current voxel
-            neuralrdm = compute_rdm(self.X[:,neighbour_idx],"correlation")
             curr_estimator =  self.estimator(
                 neuralrdm,
                 model)
@@ -305,7 +305,8 @@ class RSASearchLight:
                     sys.stderr.write(
                         f"job # {thread_id}, processed {i}/{len(neighbour_idx_list)} voxels"
                         f"({pt:0.2f}%, {remaining} seconds remaining){crlf}"
-                    )        
+                    )
+        sys.stderr.write(f"job #{thread_id}, processed {len(neighbour_idx_list)} voxels in {time.time()-t0} seconds\r")
         return np.asarray(voxel_results)    
 
     def genPatches(self,use_parallel:bool = True,verbose:bool=False):
@@ -349,7 +350,7 @@ class RSASearchLight:
             return X,A
 
         if use_parallel: 
-            njobs = 20
+            njobs = self.njobs
             split_idx = np.array_split(np.arange(len(process_coords)), njobs)
             pc_chunks = [process_coords[idx] for idx in split_idx]           
             XA_list = Parallel(n_jobs = njobs)(delayed(get_patch_data)(coords) for coords in pc_chunks)

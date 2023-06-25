@@ -5,7 +5,7 @@ import glob
 import pandas as pd
 import joblib
 from multivariate.rsa_searchlight import RSASearchLight
-from multivariate.rsa_estimator import MultipleRDMRegression
+from multivariate.rsa_estimator import MultipleRDMRegression, PatternCorrelation
 from multivariate.helper import ModelRDM
 
 project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
@@ -17,7 +17,9 @@ with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
     voxel_size = pirate_defaults['fmri']['voxelsize']
 
 preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
+preprocess = ['unsmoothedLSA']
 outputregexp = 'beta_%04d.nii'
+outputcorrexp = 'rho_%04d.nii'
 sphere_vox_count = dict(zip(preprocess,[[]]*len(preprocess)))
 for p in preprocess: 
     LSA_GLM_dir = os.path.join(fmri_output_path,p,glm_name)
@@ -77,10 +79,10 @@ for p in preprocess:
         "sc_withins_feature1d":  ['within_feature1dx','within_feature1dy'],
         "sc_betweens_feature1d": ['between_feature1dx','between_feature1dy'],
         "sc_alls_feature1d":     ['feature1dx','feature1dy'],
-        # train-test
-        "tt_withins_stimuligroup":  ['within_stimuligroup'],
-        "tt_betweens_stimuligroup": ['between_stimuligroup'],
-        "tt_alls_stimuligroup":     ['stimuligroup'],
+        # # train-test
+        # "tt_withins_stimuligroup":  ['within_stimuligroup'],
+        # "tt_betweens_stimuligroup": ['between_stimuligroup'],
+        # "tt_alls_stimuligroup":     ['stimuligroup'],
         # map-based
         "betweens_loc2d":  ["between_loc2d"],
         "withins_loc2d":   ["within_loc2d"],
@@ -101,8 +103,9 @@ for p in preprocess:
                   "oddeven":beta_flistoe}
     n_sess = {"fourruns":4,
               "oddeven":2}
-    mask_flist = {"reliability_ths0":pmask_flist,
-                  "noselection":fmask_flist}
+    mask_flist = {"noselection":fmask_flist,
+                  "reliability_ths0":pmask_flist
+                  }
     
     radius = voxel_size*4
     sphere_vox_count[p] = dict(zip(list(beta_flist.keys()),[[]]*len(beta_flist.keys())))
@@ -134,12 +137,13 @@ for p in preprocess:
                 # run search light
                 for a_name,m_regs in analysis.items():
                     print(f'Analysis - {a_name}')
+                    output_dir = os.path.join(LSA_GLM_dir,'searchlight_wb_rsa_regspr',vselect,ds_name,a_name,'first')
                     regress_models = [model_rdm.models[m] for m in m_regs]
-                    output_dir = os.path.join(LSA_GLM_dir,'searchlight_wb_rsa',vselect,ds_name,a_name,'first')
                     subRSA.run(MultipleRDMRegression,regress_models,a_name,os.path.join(output_dir,subid), outputregexp, j == 0) # only show details at the first sub
+                    subRSA.run(PatternCorrelation,regress_models,a_name,os.path.join(output_dir,subid), outputcorrexp, j == 0)
 
                 print(f'{ds_name}: Completed searchlight in {subid}')
             joblib.dump(dict({'subid':subid_list,'count':sphere_vox_count[p][ds_name][vselect]}),
-                        os.path.join(LSA_GLM_dir,'searchlight_wb_rsa',f'searchlight_voxcount_r4_{vselect}_{ds_name}.pkl'))
+                        os.path.join(LSA_GLM_dir,'searchlight_wb_rsa_regspr',f'searchlight_voxcount_r4_{vselect}_{ds_name}.pkl'))
 
 joblib.dump(sphere_vox_count,os.path.join(fmri_output_path,'searchlight_voxcount_r4.pkl'))
