@@ -87,7 +87,12 @@ function pirate_defaults = setdefaults
     %%%%%TODO add valid participants list
     pirate_defaults.participants.validids  = pirate_defaults.participants.ids(1:30); % exclude sub 31 due to incomplete scans
     pirate_defaults.participants.nvalidsub = numel(pirate_defaults.participants.validids);% exclude sub 31 due to incomplete scans
-        
+    
+    pirate_defaults.participants.nonlearnerids     = {'sub010','sub012','sub013','sub027','sub017'}; 
+    pirate_defaults.participants.nongeneralizerids = {'sub010','sub012','sub013','sub027','sub004','sub023','sub002','sub014','sub021','sub017'};
+    pirate_defaults.participants.learnerids        = pirate_defaults.participants.validids(~ismember(pirate_defaults.participants.validids,pirate_defaults.participants.nonlearnerids));
+    pirate_defaults.participants.generalizerids    = pirate_defaults.participants.validids(~ismember(pirate_defaults.participants.validids,pirate_defaults.participants.nongeneralizerids));
+
     %% --------------  naming patterns ------------------
     pirate_defaults.filepattern.task1   = 'sub-.*_task-piratenavigation_run-[1-4]';
     pirate_defaults.filepattern.task2   = 'sub-.*_task-localizer_run-[1]';

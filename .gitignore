@@ -2,6 +2,7 @@ data
 otherscode
 plot
 probdf
+*.RData
 *.Rhistory
 *.Rproj
 *.Rproj.user
