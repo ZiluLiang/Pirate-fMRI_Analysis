@@ -1,0 +1,233 @@
+---
+title: "testROIRSA"
+output: html_document
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE)
+
+rm(list = ls())
+wk_dir = rstudioapi::getActiveProject();
+generic_dir = file.path(wk_dir, "scripts/generic", fsep="/")
+
+spec_dir = file.path(wk_dir, "scripts/behavior", fsep="/")
+data_dir = file.path(wk_dir, "data", fsep="/")
+save_dir = file.path(wk_dir, "plot", fsep="/")
+prob_df_dir =  file.path(wk_dir, "probdf", fsep="/")
+  
+
+source(file.path(generic_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(generic_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(generic_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+library(ggpubr)
+```
+
+## ROIRSA
+```{r}
+rsa_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation\\'
+res_path = file.path(rsa_dir,'roirsa.csv')
+roirsa_df = read.csv(res_path,header = TRUE)
+analysis = list(## stimuli based
+                sc_betweens_stimuli = c("between_stimuli"),
+                sc_alls_stimuli = c("stimuli"),
+                sc_withins_feature1d = c("within_feature1dx","within_feature1dy"),
+                sc_betweens_feature1d = c("between_feature1dx","between_feature1dy"),
+                sc_alls_feature1d = c("feature1dx","feature1dy"),
+                ## feature based
+                tt_withins_stimuligroup = c('within_stimuligroup'),
+                tt_betweens_stimuligroup = c('between_stimuligroup'),
+                tt_alls_stimuligroup = c('stimuligroup'),
+                ## map based
+                betweens_loc2d = c("between_loc2d"),
+                withins_loc2d = c("within_loc2d"),
+                alls_loc2d = c("loc2d"),
+                betweens_loc1d = c("between_loc1dx","between_loc1dy"),
+                withins_loc1d = c("within_loc1dx","within_loc1dy"),
+                alls_loc1d = c("loc1dx","loc1dy"),
+                # map-based plus control
+                betweens_loc2d_c =  c("between_stimuligroup","between_loc2d"),
+                withins_loc2d_c =   c("within_stimuligroup","within_loc2d"),
+                alls_loc2d_c =      c("stimuligroup","loc2d"),
+                betweens_loc1d_c =  c("between_stimuligroup","between_loc1dx","between_loc1dy"),
+                withins_loc1d_c =   c("within_stimuligroup","within_loc1dx","within_loc1dy"),
+                alls_loc1d_c =      c("stimuligroup","loc1dx","loc1dy")
+        )
+id_cols = c("subid","roi","laterality","voxselect","ds","preprocess")
+```
+
+```{r}
+pval_list = list()
+for (a_name in names(analysis)){
+  curr_df = roirsa_df%>%
+    filter(analysis == a_name)%>%
+    dplyr::select(all_of(c(id_cols,analysis[[a_name]])))
+  curr_df_long = curr_df%>%
+    pivot_longer(cols = analysis[[a_name]],names_to ="regressors",values_to = "estimates")%>%
+    mutate(roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")),
+           preprocess = factor(preprocess,levels = c("unsmoothedLSA","smoothed5mmLSA")))
+  g_cols = c("roi","laterality","voxselect","ds","preprocess","regressors")
+  sum_df = aggregate_data(curr_df_long,groupbyvars = g_cols,yvars = "estimates")
+  
+  pval_list[[a_name]] = curr_df_long %>%
+    group_by_at(g_cols) %>%
+    t_test(data =., estimates ~ 1, mu=0) %>%
+    adjust_pvalue(method = "bonferroni") %>%
+    add_significance("p.adj")%>%
+    ungroup()
+  
+  p = curr_df_long%>%
+    ggplot(aes(x=roi,color=preprocess))+
+    facet_nested(cols=vars(ds,laterality),rows = vars(voxselect,regressors))+
+    geom_point(aes(y=estimates),position = position_dodge(1),alpha=0.8,size=0.5)+
+    geom_col(data = sum_df,aes(y=mu_estimates),position = position_dodge(1),fill=NA)+
+    geom_errorbar(data = sum_df,
+                  aes(ymin=mu_estimates-se_estimates,ymax=mu_estimates+se_estimates),
+                  position = position_dodge(1),width = 0.5)+
+    theme(aspect.ratio = 1/2, axis.text.x = element_text(angle=15),legend.position = "top")
+
+  ggsave(
+  file.path(rsa_dir,str_c(a_name,'.png')),
+  plot = p,
+  device = "png",
+  scale = 1,
+  width = 16,
+  height = 9,
+  dpi = 300)
+}
+```
+
+## ROIMDS
+```{r}
+mds_path = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean\\roimds.csv'
+roimds_df = read.csv(mds_path,header = TRUE)
+id_cols = c("subid","roi","laterality","voxselect","ds","preprocess")
+```
+
+```{r}
+save_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean'
+sg_list = list("training"='white',"test"='grey')
+for (sid in unique(roimds_df[["subid"]])){
+  curr_df = roimds_df%>%
+    filter(subid == sid)%>%
+    mutate(stimgroup = factor(training,levels = c(0,1),labels=c("test","training")),
+           roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")))
+
+  for (sg in names(sg_list)){
+    (p = curr_df%>%
+       filter(stimgroup == sg)%>%
+       ggplot(aes(x=x,y=y,color=color,shape=shape))+
+        facet_nested(cols=vars(roi,laterality),rows = vars(preprocess,voxselect))+
+        geom_point(size=2,fill=sg_list[[sg]])+
+        # scale_fill_manual(values =c("training"='white',"test"='grey'))+
+        scale_shape_manual(values =c("circle filled","square filled","diamond filled","triangle filled","triangle down filled"))+
+        theme(legend.position = "top")
+    )
+    
+    ggsave(
+      file.path(save_dir,str_c(sid,'_',sg,'.png')),
+      plot = p,
+      device = "png",
+      scale = 1,
+      width = 16,
+      height = 9,
+      dpi = 300
+      )
+  }
+}
+```
+## group ROI MDS
+```{r}
+mds_path = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean\\groupWBmds.csv'
+roimds_df = read.csv(mds_path,header = TRUE)
+save_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean'
+sg_list = list("training"='white',"test"='grey')
+col_name_by_nc = list("2" = c("x","y"),
+                      "3" = c("x","y","z"),
+                      "4" = c("x","y","u","v"))
+
+```
+
+#### mds 2-4 COMPONENTS WB
+```{r}
+for (nc in unique(roimds_df$ncomponents)){
+  curr_df = roimds_df%>%
+    filter(ncomponents == nc)%>%
+    mutate(stimgroup = factor(training,levels = c(1,0),labels=c("training","test")),
+           roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")),
+           subgroup = factor(subgroup,levels = c("all","learner","generalizer")))
+  
+  axes_comb = combs(col_name_by_nc[[paste(nc)]],m=2)
+  if (is.null(dim(axes_comb))){
+    axes_comb = matrix(axes_comb,ncol=2)
+  }
+  
+  apply(axes_comb, 1, function(axes){
+    (p = curr_df%>%
+         filter(roi=="ofc" & laterality == "left")%>%
+       ggplot(aes(x=.data[[axes[1]]],y=.data[[axes[2]]],color=color,fill=color,shape=shape))+
+        facet_nested(cols=vars(stimgroup,subgroup),rows=vars(preprocess,voxselect))+
+        geom_point(size=2)+
+        scale_shape_manual(values =c("circle filled","square filled","diamond filled","triangle filled","triangle down filled"))+
+        theme(legend.position = "top",
+              panel.spacing = unit(0.2, "lines"),
+              panel.background = element_rect(fill=NULL,linewidth=1,linetype ="solid",color ="black"))+
+        labs(title=paste0(nc,"D ",axes[1],axes[2]))
+    )
+    ggsave(
+      file.path(save_dir,paste0("MDS",nc,'_',axes[1],axes[2],'_WB.png')),
+      plot = p, 
+      device = "png",
+      scale = 1,
+      width = 16,
+      height = 9,
+      dpi = 300
+      )
+  })
+}
+
+```
+
+#### mds 2-4 COMPONENTS ROI
+```{r}
+mds_path = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean\\grouproimds.csv'
+roimds_df = read.csv(mds_path,header = TRUE)
+for (ROI in unique(roimds_df$roi)){
+  for (nc in unique(roimds_df$ncomponents)){
+    curr_df = roimds_df%>%
+      filter(ncomponents == nc)%>%
+      mutate(stimgroup = factor(training,levels = c(1,0),labels=c("training","test")),
+             roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")),
+             subgroup = factor(subgroup,levels = c("all","learner","generalizer")))
+    
+    axes_comb = combs(col_name_by_nc[[paste(nc)]],m=2)
+    if (is.null(dim(axes_comb))){
+      axes_comb = matrix(axes_comb,ncol=2)
+    }
+    
+    apply(axes_comb, 1, function(axes){
+      (p = curr_df%>%
+           filter(roi==ROI)%>%
+         ggplot(aes(x=.data[[axes[1]]],y=.data[[axes[2]]],color=color,fill=color,shape=shape))+
+          facet_nested(rows=vars(stimgroup,subgroup),cols=vars(laterality,preprocess,voxselect))+
+          geom_point(size=2)+
+          scale_shape_manual(values =c("circle filled","square filled","diamond filled","triangle filled","triangle down filled"))+
+          theme(legend.position = "top",
+                panel.spacing = unit(0.2, "lines"),
+                panel.background = element_rect(fill=NULL,linewidth=1,linetype ="solid",color ="black"))+
+          labs(title=paste0(nc," D ",ROI,axes[1],axes[2]))
+      )
+      ggsave(
+        file.path(save_dir,paste0("MDS",nc,'_',ROI,'_',axes[1],axes[2],'.png')),
+        plot = p, 
+        device = "png",
+        scale = 1,
+        width = 16,
+        height = 9,
+        dpi = 300
+        )
+    })  
+}
+
+}
+
+```

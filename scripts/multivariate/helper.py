@@ -218,19 +218,27 @@ class ModelRDM:
     split_sess : bool, optional
         split the rdm into within-session and between-session or not, by default True
     """
-    def __init__(self,stimid:numpy.ndarray,stimloc:numpy.ndarray,stimfeature:numpy.ndarray,n_session:int=1):
+    
+    def __init__(self,
+                 stimid:numpy.ndarray,
+                 stimloc:numpy.ndarray,
+                 stimfeature:numpy.ndarray,
+                 stimgroup:numpy.ndarray,
+                 n_session:int=1):
         self.n_session   = n_session
         self.n_stim      = len(stimid)
         self.stimid      = numpy.tile(stimid,(n_session,1))
         self.stimloc     = numpy.tile(stimloc,(n_session,1))
         self.stimfeature = numpy.tile(stimfeature,(n_session,1))
+        self.stimgroup   = numpy.tile(stimgroup,(n_session,1))
         models = {"loc2d":self.euclidean2d(),
                   "loc1dx":self.euclidean1d(0),
                   "loc1dy":self.euclidean1d(1),
                   "feature2d":self.feature2d(),
                   "feature1dx":self.feature1d(0),
                   "feature1dy":self.feature1d(1),
-                  "stimuli":self.stimuli(),
+                  "stimuli":self.identity(),
+                  "stimuligroup":self.identity(self.stimgroup)
                 }
 
         # split into sessions
@@ -333,8 +341,9 @@ class ModelRDM:
         X,Y = numpy.meshgrid(self.stimfeature[:,dim],self.stimfeature[:,dim])
         modelrdm = 1. - abs(X==Y) # if same feature, distance=0
         return modelrdm
+    
 
-    def stimuli(self)->numpy.ndarray:
+    def identity(self,identity_arr=None)->numpy.ndarray:
         """calculate model rdm based on stimuli identity, if the pair is the same stimuli, distance will be zero, otherwise will be one.
 
         Returns
@@ -342,7 +351,10 @@ class ModelRDM:
         numpy.ndarray
             2D numpy array of model rdm
         """
-        X,Y = numpy.meshgrid(self.stimid,self.stimid)
+        if identity_arr is None:
+            X,Y = numpy.meshgrid(self.stimid,self.stimid)
+        else:
+            X,Y = numpy.meshgrid(identity_arr,identity_arr)
         modelrdm = 1. - abs(X==Y)# if same stimuli, distance=0
         return modelrdm
     
