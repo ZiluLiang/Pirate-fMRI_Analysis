@@ -9,8 +9,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
 
-def standardize(X:numpy.ndarray,s_dir:int=2) -> numpy.ndarray:
-    """ standardize a 1D or 2D numpy array by using ZX = (X - mean)/std
+def scale_feature(X:numpy.ndarray,s_dir:int=2,standardize:bool=True) -> numpy.ndarray:
+    """ standardize or center a 1D or 2D numpy array by using ZX = (X - mean)/std
 
     Parameters
     ----------
@@ -33,21 +33,24 @@ def standardize(X:numpy.ndarray,s_dir:int=2) -> numpy.ndarray:
 
     if X.ndim == 1:
         s_dir = 2
-    if s_dir == 1:
+
+    if s_dir == 0:
+        ZX = _rowwise_standardize(X,standardize)
+    elif s_dir == 1:
         X = X.T
-        ZX = _rowwise_standardize(X)
+        ZX = _rowwise_standardize(X,standardize)
         ZX = ZX.T
     elif s_dir == 2:
-        ZX = (X - numpy.mean(X)) / numpy.std(X)
-    else:
-        ZX = _rowwise_standardize(X)
+        denom = numpy.std(X) if standardize else 1
+        ZX = (X - numpy.mean(X)) / denom
     return ZX
 
 
-def _rowwise_standardize(X):
+def _rowwise_standardize(X,standardize:bool):
     row_means = X.mean(axis=1)
     row_stds  = X.std(axis=1)
-    return (X - row_means[:, numpy.newaxis]) / row_stds[:, numpy.newaxis]
+    denom = row_stds[:, numpy.newaxis] if standardize else 1
+    return (X - row_means[:, numpy.newaxis]) / denom
 
 
 def lower_tri(rdm:numpy.ndarray) -> tuple:
