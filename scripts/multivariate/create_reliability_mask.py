@@ -6,7 +6,8 @@ contrasts were built for any given stimuli in odd and in even runs separately, y
 Here in this script, we extracted the contrast weights as the activity pattern of whole brain voxels in odd and even runs.
 This creates two 25*nvoxel matrix, one for odd and one for even. For each voxel, we then correlate the activity pattern vectors(1,25) 
 from odd and even runs. The correlation coefficient was used to build a reliability_map.nii saved in the first level directory.
-We then use a threshold of r>0 to binarize it into a relaibility mask and save to first level directory.
+We then use a threshold of r>0 to binarize it into a reliability mask and save to first level directory.
+Meanwhile, a permuted version of reliability mask is created. This mask includes the same number of voxels as the reliability mask, but the masking location is randomly permuted from the reliability mask.
 """	
 import os
 import numpy as np
@@ -34,7 +35,7 @@ for p in preprocess:
     print(p)
     def getsubWB(subid):
         # retrieve pattern data from the contrast images
-        # do not drop na values so that the reliavility value can be transformed back to same nifti image dimension
+        # do not drop na values so that the reliability value can be transformed back to same nifti image dimension
         subWB_beta = ActivityPatternDataLoader(
             os.path.join(LSA_GLM_dir,'first',subid,'stimuli_oe.nii'),
             os.path.join(LSA_GLM_dir,'first',subid,'mask.nii'))
@@ -51,11 +52,14 @@ for p in preprocess:
         vox_reliability = [spearmanr(pattern_oddrun[:,j], pattern_evenrun[:,j]).correlation for j in np.arange(subAP.X.shape[1])]
         vox_reliability = np.array(vox_reliability)
         vox_rmaskdata = np.logical_and(vox_reliability>0, ~np.isnan(vox_reliability))
+        vox_permrmaskdata = np.random.permutation(vox_rmaskdata)
 
         _, voxr_img = subAP.create_img(vox_reliability)
         _, voxr_maskimg = subAP.create_img(vox_rmaskdata)
+        _, voxr_permmaskimg = subAP.create_img(vox_permrmaskdata)
         nib.save(voxr_img, os.path.join(outputdir, 'reliability_map.nii'))        
-        nib.save(voxr_maskimg, os.path.join(outputdir, 'reliability_mask.nii')) 
+        nib.save(voxr_maskimg, os.path.join(outputdir, 'reliability_mask.nii'))
+        nib.save(voxr_permmaskimg, os.path.join(outputdir, 'permuted_reliability_mask.nii'))
 
         vox_retention_rate = np.sum(vox_rmaskdata)/subAP.X.shape[1]
         print(f"{subid} whole brain voxel retention rate: {vox_retention_rate}")        
