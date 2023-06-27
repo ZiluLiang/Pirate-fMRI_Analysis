@@ -17,7 +17,6 @@ with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
     voxel_size = pirate_defaults['fmri']['voxelsize']
 
 preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
-preprocess = ['unsmoothedLSA']
 outputregexp = 'beta_%04d.nii'
 outputcorrexp = 'rho_%04d.nii'
 sphere_vox_count = dict(zip(preprocess,[[]]*len(preprocess)))
@@ -80,9 +79,9 @@ for p in preprocess:
         "sc_betweens_feature1d": ['between_feature1dx','between_feature1dy'],
         "sc_alls_feature1d":     ['feature1dx','feature1dy'],
         # # train-test
-        # "tt_withins_stimuligroup":  ['within_stimuligroup'],
-        # "tt_betweens_stimuligroup": ['between_stimuligroup'],
-        # "tt_alls_stimuligroup":     ['stimuligroup'],
+        "tt_withins_stimuligroup":  ['within_stimuligroup'],
+        "tt_betweens_stimuligroup": ['between_stimuligroup'],
+        "tt_alls_stimuligroup":     ['stimuligroup'],
         # map-based
         "betweens_loc2d":  ["between_loc2d"],
         "withins_loc2d":   ["within_loc2d"],
@@ -122,7 +121,7 @@ for p in preprocess:
                     mask_img_path=m_path,
                     process_mask_img_path=mask_flist["noselection"][j],
                     radius=radius,
-                    njobs=20
+                    njobs=15
                     )
                 sphere_vox_count[p][ds_name][vselect].append(
                     np.array(subRSA.A.sum(axis=1)).squeeze()

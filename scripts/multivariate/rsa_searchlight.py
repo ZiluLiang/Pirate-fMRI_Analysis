@@ -157,7 +157,7 @@ def _apply_mask_and_get_affinity(seeds,
     sphere_sizes = np.asarray(A.tocsr().sum(axis=1)).ravel()
     redo_spheres = np.nonzero(sphere_sizes < n_vox)[0]
     
-    #==================================================== customised redo neibourghood searching scripts ==================================================
+    #==================================================== customized redo neighborhood searching scripts ==================================================
     #expand radius if doesn't meet voxel count criteria
     j = 0
     while len(redo_spheres)>0:
@@ -183,7 +183,7 @@ def _apply_mask_and_get_affinity(seeds,
     
     dt = time.time()-t0
     print(f'neibourhood specification elapse time: {dt}, redo iterations = {j},  max radius = {radius}')
-    return X, A, radius
+    return X, A
 
 class RSASearchLight:
     def __init__(self,
@@ -236,6 +236,7 @@ class RSASearchLight:
         return voxel_neighbours
 
     def run(self,estimator,models,modelnames,outputpath,outputregexp,verbose):
+        t0 = time.time()
         self.estimator = estimator
         # split patches for parallelization
         group_iter = GroupIterator(len(self.neighbour_idx_lists), self.njobs)
@@ -253,6 +254,7 @@ class RSASearchLight:
 
         result = np.vstack(results)
         self.write(result,models,modelnames,outputpath,outputregexp)
+        print((f" searchlight on {len(self.neighbour_idx_lists)} voxels in {time.time()-t0} seconds"))
         return self
     
     def write(self,result,models,modelnames,outputpath,outputregexp,ensure_finite:bool=False):
@@ -266,7 +268,6 @@ class RSASearchLight:
             result_3D[maskdata] = result[:,k]
             if not ensure_finite:
                 result_3D = result_3D.astype('float64') # make sure nan is saved as nan
-            print(f"len_result = {len(result[:,k])}")
             curr_img = nilearn.image.new_img_like(mean_img, result_3D)
             curr_fn = os.path.join(outputpath,outputregexp % (k))
             nib.save(curr_img, curr_fn)
@@ -303,14 +304,16 @@ class RSASearchLight:
                     dt = time.time()-t0
                     remaining = (100-pt)/max(0.01,pt)*dt
                     sys.stderr.write(
-                        f"job # {thread_id}, processed {i}/{len(neighbour_idx_list)} voxels"
+                        f"job {thread_id}, processed {i}/{len(neighbour_idx_list)} voxels"
                         f"({pt:0.2f}%, {remaining} seconds remaining){crlf}"
                     )
-        sys.stderr.write(f"job #{thread_id}, processed {len(neighbour_idx_list)} voxels in {time.time()-t0} seconds\r")
+        if verbose:
+            sys.stderr.write(f"job {thread_id}, processed {len(neighbour_idx_list)} voxels in {time.time()-t0} seconds\r")
         return np.asarray(voxel_results)    
 
     def genPatches(self,use_parallel:bool = True,verbose:bool=False):
         print("generating searchlight patches")
+        t0 = time.time()
         ## voxels to perform searchlight on
         process_mask_data = self.process_mask_img.get_fdata()
         process_coords = np.where(process_mask_data!=0)
@@ -322,44 +325,32 @@ class RSASearchLight:
                 self.process_mask_img.affine
                 )
             ).T
-        
-        def get_patch_data(coords):
-            """retrieve data and neibourgh for a list of searchlight patch(sphere).
-            see `_apply_mask_and_get_affinity` in `nilearn` package for more details
-
-            Parameters
-            ----------
-            coords : list or numpy.ndarray
-                coordinate of the centre of the sphere in 3D
-
-            Returns
-            -------
-            X : 2D numpy.ndarray
-                activity pattern matrix from within mask voxels. shape: (number of scans, number of voxels within mask)
-            A : scipy.sparse.lil_matrix
-                neibourghs that should be included in each searchlight patch(sphere). shape: (number of seeds, number of voxels)
-            """
-            X,A,_ = _apply_mask_and_get_affinity(
-            seeds  = coords,
-            niimg  = self.pattern_img,
-            radius = self.radius,
-            allow_overlap = True,
-            mask_img      = self.mask_img,# only include voxel in the mask
-            n_vox = 50 # enforce a minimum of 50 voxels
-            )        
-            return X,A
 
         if use_parallel: 
-            njobs = self.njobs
+            njobs = 10
             split_idx = np.array_split(np.arange(len(process_coords)), njobs)
-            pc_chunks = [process_coords[idx] for idx in split_idx]           
-            XA_list = Parallel(n_jobs = njobs)(delayed(get_patch_data)(coords) for coords in pc_chunks)
+            pc_chunks = [process_coords[idx] for idx in split_idx]
+            with Parallel(n_jobs=self.njobs) as parallel:
+                XA_list = parallel(
+                    delayed(_apply_mask_and_get_affinity)(seeds  = coords,
+                                            niimg  = self.pattern_img,
+                                            radius = self.radius,
+                                            allow_overlap = True,
+                                            mask_img      = self.mask_img,# only include voxel in the mask
+                                            n_vox = 50
+                                            ) for coords in pc_chunks)
             X = XA_list[0][0] # X is the same for each chunk
             A = vstack([l[1] for l in XA_list])
         else:
-            X,A = get_patch_data(process_coords)
+            X,A = _apply_mask_and_get_affinity(
+                seeds  = process_coords,
+                niimg  = self.pattern_img,
+                radius = self.radius,
+                allow_overlap = True,
+                mask_img      = self.mask_img,# only include voxel in the mask
+                n_vox = 50)
         A = A.tocsr()
         if verbose:
-                print(f'number of voxels per sphere:{np.unique(A.sum(axis=1))}')
-        print("finished generating searchlight patches") 
+            print(f'number of voxels per sphere:{np.unique(A.sum(axis=1))}')
+        print(f"finished generating searchlight patches in {time.time()-t0}") 
         return X, A 
