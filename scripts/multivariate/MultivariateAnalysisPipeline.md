@@ -35,8 +35,14 @@ Details on what parcellation is included in each anatomical mask are in [`anatom
 For each voxel, a spherical ROI is defined with a radius of 10mm (4 times the voxel size). An additional constraint is added: each searchlight sphere should include at least 50 usable voxels. 
 
 ### Neural RDM
-activity pattern within each mask/sphere is extracted to compute the neural RDM. If voxel selection is performed, then the spherical region will only include the selected voxels to compute neural RDM. Before computing neural RDM, centering is performed for each voxel separately.
-
+activity pattern within each mask/sphere is extracted to compute the neural RDM. If voxel selection is performed, then the spherical region will only include the selected voxels to compute neural RDM. 
+(1) Centering
+Before computing neural RDM, centering is performed for each voxel separately.
+(2) Distance metrics
+- Euclidean
+- Correlation: this is the one we are currently using
+- Mahalanobis distance 
+ 
 ### Quantifying similarity between neural RDM and model RDM
 Only the lower triangular part of the model RDMs and neural RDMs (excluding diagonals) are extracted for the analysis
 (1) regression
