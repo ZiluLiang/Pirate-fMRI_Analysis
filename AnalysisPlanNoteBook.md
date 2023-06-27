@@ -24,17 +24,25 @@ Another issue is, with voxel selection, almost all the effect becomes stronger (
 RSA is conducted both within [ROI](/scripts/multivariate/MultivariateAnalysisPipeline.md#1-brain-parcellation-based-rsa-obtaining-roi-masks-from-aal-parcellation) and at [whole-brain level](/scripts/multivariate/MultivariateAnalysisPipeline.md#2-whole-brain-searchlight-rsa-obtaining-spherical-searchlight-regions) to check the robustness of the result and compare different pipelines.
 
 #### 3. computing neural RDMs
-Neural RDM is calculated based on the activity pattern we obtained in [step 1](/AnalysisPlanNoteBook.md#1-preparing-the-activity-pattern-matrix). However some 'preprocessing' on this neural RDM is necessary to remove noise or control for confounds.
-Several decisions to make when computing neural RDM:
-(1) whether or not to do centering
-(2) which distance metric to use
-Some papers have discussed what would be the optimal way to do this, for instance:
-[Walther et al.,](https://doi.org/10.1016/j.neuroimage.2015.12.012)[<sup>1</sup>](/AnalysisPlanNoteBook.md#references) showed that cross-validated Mahalanobis distance is preferable .
+Neural RDM is calculated based on the activity pattern we obtained in [step 1](/AnalysisPlanNoteBook.md#1-preparing-the-activity-pattern-matrix). However some 'preprocessing' on this neural RDM is necessary to remove noise or control for confounds.  
+Several decisions to make when computing neural RDM:  
+(1) whether or not to do centering  
+(2) which distance metric to use  
+Three common metrics of similarity metric:  
+- Correlation  
+- Euclidean distance
+- Mahalanobis distance - this requires estimation of a covariance matrix. should do more reading and decide if it is a more suitable alternative. list of literatures:
+   - Bobadilla-Suarez et al. [Measures of Neural Similarity](https://doi.org/10.1007/s42113-019-00068-5)[<sup>2</sup>](/AnalysisPlanNoteBook.md#references) and [open codes](https://osf.io/5a6bd/?view_only=)
+   - Kriegeskorte's [blog post] on the above paper (https://nikokriegeskorte.org/category/representational-similarity-analysis/)
+   - [Walther et al.,](https://doi.org/10.1016/j.neuroimage.2015.12.012)[<sup>1</sup>](/AnalysisPlanNoteBook.md#references) showed that cross-validated Mahalanobis distance is more suitable.
+   - [rsatoolbox's documentation and implementation of Mahalanobis distance](https://rsatoolbox.readthedocs.io/en/latest/distances.html)
+   - Maybe [this unpublished tutorial by Walther et al](https://www.mrc-cbu.cam.ac.uk/wp-content/uploads/www/sites/3/2014/10/Walther_etAl_representationalfMRIanalysis_unpublishedDraft.pdf)?
+   - [An overview by Diedrichsen, J., & Kriegeskorte](https://doi.org/10.1371/journal.pcbi.1005508)[<sup>3</sup>](/AnalysisPlanNoteBook.md#references) that seems helpful
 
 #### 6. computing model RDMs
-(1) sanity check model RDMs
-(2) feature-based model RDMs
-(3) map-based model RDMs
+(1) sanity check model RDMs  
+(2) feature-based model RDMs  
+(3) map-based model RDMs  
 ## Hypothesis 2: color or shape will be represented by two orthogonal neural axis - Decoding analysis
 ### Literature
 tbc
@@ -44,4 +52,6 @@ split train/evaluation set by: actual train/test, random row/col, cross-task gen
 
 
 # References
-[Walther, A., Nili, H., Ejaz, N., Alink, A., Kriegeskorte, N., & Diedrichsen, J. (2016). Reliability of dissimilarity measures for multi-voxel pattern analysis. Neuroimage, 137, 188-200.](https://doi.org/10.1016/j.neuroimage.2015.12.012)
+1. [Walther, A., Nili, H., Ejaz, N., Alink, A., Kriegeskorte, N., & Diedrichsen, J. (2016). Reliability of dissimilarity measures for multi-voxel pattern analysis. Neuroimage, 137, 188-200.](https://doi.org/10.1016/j.neuroimage.2015.12.012)  
+2. [Bobadilla-Suarez, S., Ahlheim, C., Mehrotra, A., Panos, A., & Love, B. C. (2020). Measures of neural similarity. Computational brain & behavior, 3, 369-383.](https://doi.org/10.1007/s42113-019-00068-5)  
+3. [Diedrichsen, J., & Kriegeskorte, N. (2017). Representational models: A common framework for understanding encoding, pattern-component, and representational-similarity analysis. PLoS computational biology, 13(4), e1005508.](https://doi.org/10.1371/journal.pcbi.1005508)
