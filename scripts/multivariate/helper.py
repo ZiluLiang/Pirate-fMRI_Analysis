@@ -241,7 +241,8 @@ class ModelRDM:
                   "feature1dx":self.feature1d(0),
                   "feature1dy":self.feature1d(1),
                   "stimuli":self.identity(),
-                  "stimuligroup":self.identity(self.stimgroup)
+                  "stimuligroup":self.identity(self.stimgroup),
+                  "random":self.random()
                 }
 
         # split into sessions
@@ -264,6 +265,18 @@ class ModelRDM:
         return 'The following model rdms are created:\n' + ',\n'.join(
             self.models.keys()
         )
+    
+    def random(self)->numpy.ndarray:
+        """generate random model RDM based on sample size
+
+        Returns
+        -------
+        numpy.ndarray
+            2D numpy array of a random model rdm
+        """
+        prng = numpy.random.RandomState(1234567890)
+        rand_features = prng.random(size=self.stimfeature.shape)
+        return compute_rdm(rand_features,"euclidean")
 
     def session(self)->numpy.ndarray:
         """calculate model rdm based on session, if the pair is in the same session, distance will be 0, otherwise will be 1

@@ -83,8 +83,12 @@ class PatternCorrelation:
                 _,idx = lower_tri(v)
                 fillidx = (idx[0][self.na_filters[k]],idx[1][self.na_filters[k]])
                 v[fillidx] = m[self.na_filters[k]]
-                sns.heatmap(v,ax=axes[k][j],square=True,cbar_kws={"shrink":0.85})
-                axes[k][j].set_title(t)
+                if self.nY==1:
+                    sns.heatmap(v,ax=axes[j],square=True,cbar_kws={"shrink":0.85})
+                    axes[j].set_title(t)
+                else:
+                    sns.heatmap(v,ax=axes[k][j],square=True,cbar_kws={"shrink":0.85})
+                    axes[k][j].set_title(t)
         fig.suptitle(f'{self.type} correlation: {self.result}')
         return fig
 

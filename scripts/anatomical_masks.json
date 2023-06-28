@@ -18,6 +18,12 @@
     ],
     "parahippocampus":[
         "ParaHippocampal"
+    ],
+    "parietal":[
+        "Parietal_Sup","Parietal_Inf"
+    ],
+    "sma":[
+        "Supp_Motor_Area"
     ]
 
 }
