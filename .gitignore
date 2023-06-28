@@ -20,3 +20,4 @@ scripts/behavior
 scripts/generic
 scripts/tidydata
 scripts/behavior.Rmd
+.Rproj.user

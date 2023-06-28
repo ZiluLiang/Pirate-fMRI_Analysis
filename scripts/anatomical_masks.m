@@ -1,9 +1,9 @@
 get_pirate_defaults();
 mask_dir  = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks';    
-
-%% generate marsbar compatible aal3 rois
 AAL3_path = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\AAL3';
 marsbar_aal3 = fullfile(mask_dir,'marsbarAAL3');
+
+%% generate marsbar compatible aal3 rois
 checkdir(marsbar_aal3)
 gen_marsbar_AAL(AAL3_path,marsbar_aal3,'ROI_MNI_V7_1mm')
 
