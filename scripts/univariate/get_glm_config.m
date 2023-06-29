@@ -2,6 +2,9 @@ function glm_cofig = get_glm_config(glm_name)
 % get the configurations of the glm models
     glms      = glm_gallery;
     glm_names = {glms.name};
+    if ~ismember(glm_name,glm_names)
+        error("Cannot find glm name in glm gallery, available glms: %s\n", strjoin(glm_names,', '))
+    end
     glm_cofig = glms(cellfun(@(x) strcmp(glm_name,x),glm_names));
 end
 
