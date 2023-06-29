@@ -1,4 +1,4 @@
-function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cfg)
+function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cfg,flag_concatenate)
 % create the mat file for multiple condtions
 % INPUT
 % - glm_name: name of the glm, this will be used to find glm
@@ -9,24 +9,50 @@ function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cf
 %                  use box car or stick function, whether to orthogonalize 
 %                  parametric modulators etc. See documentation in
 %                  gen_multi
-    directory  = get_pirate_defaults(false,'directory');
-    glm_config = get_glm_config(glm_name);
+% - flag_concatenate: whether or not to concatenate sessions together
+
+    [directory,fmri]  = get_pirate_defaults(false,'directory','fmri');
+    glm_config = glm_configure(glm_name);
     glm_dir    = fullfile(directory.fmri_data,glm_config.name);
     
     if nargin<3, output_dir = fullfile(glm_dir,'beh',subid); end
     if nargin<4, gen_multi_cfg = struct();end
+    if nargin<5, flag_concatenate = false;end
     checkdir(output_dir)
     
+    preproc_img_dir = directory.smoothed;
+    nii_files  = cellstr(spm_select('FPList',fullfile(preproc_img_dir,subid),[glm_config.filepattern,'.*.nii'])); 
     data_mat   = cellstr(spm_select('FPList',fullfile(directory.fmribehavior,subid),[glm_config.filepattern,'.*mat']));
-    M          = cell(size(data_mat));
-    M_fn       = cell(size(data_mat));
-    for j = 1:numel(data_mat)
-        load(data_mat{j},'data');
-        multi   = gen_multi(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
-        M_fn{j} = fullfile(output_dir,sprintf('multi_%d.mat',j));
-        M{j}    = multi;
-        save(M_fn{j},'-struct','multi')
-        clearvars data multi
+    if ~flag_concatenate
+        M          = cell(size(data_mat));
+        M_fn       = cell(size(data_mat));
+        for j = 1:numel(data_mat)
+            load(data_mat{j},'data');
+            multi   = gen_multi(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
+            M_fn{j} = fullfile(output_dir,sprintf('multi_%d.mat',j));
+            M{j}    = multi;
+            save(M_fn{j},'-struct','multi')
+            clearvars data multi
+        end
+    else
+        scans  = cellfun(@(x) numel(spm_vol(x)),nii_files);
+        data_list = cellfun(@(x) load(x,'data').data,data_mat,'UniformOutput',0);
+        for j = 1:numel(data_list)
+            if ~istable(data_list{j})
+                error('data must be in table format')
+            end
+            variable_names = data_list{j}.Properties.VariableNames;
+            onset_variables = variable_names(contains(variable_names,'onset_'));
+            for k = 1:numel(onset_variables)
+                data_list{j}.(onset_variables{k}) = data_list{j}.(onset_variables{k}) + sum(scans(1:j-1),'all')* fmri.tr;
+            end
+        end
+        data = cat(1,data_list{:});
+        M = {};
+        multi = gen_multi(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
+        M{1} = multi;
+        M_fn = {fullfile(output_dir,'multi_concat.mat')};
+        save(M_fn{1},'-struct','multi')
     end
 end
 
@@ -85,7 +111,7 @@ function multi = gen_multi(data,cond_names,pmod_names,custom_cfg)
     
     % if input specifies cfg, combine cfg with default cfg
     if nargin<4, custom_cfg = struct('use_stick',{},'tmod',{},'orth',{}); end
-    cfg = repmat(def_cfg,n_conditions,1);
+    cfg = repmat(def_cfg,size(cond_names));
     for k = 1:numel(custom_cfg)
         cfg(k) = fill_struct(custom_cfg(k),def_cfg);
     end

@@ -1,5 +1,5 @@
-function specify_estimate_grouplevel(outputdir,scans,factor_names,cov)
-% specify_estimate_grouplevel(outputdir,scans)
+function glm_grouplevel(outputdir,scans,factor_names,cov)
+% glm_grouplevel(outputdir,scans,factor_names,cov)
 % INPUT:
 %  - otputdir: output directory of second level analysis
 %  - scans: a N1*N2*...*Nf...*NnF cell array, it specifies a design with nF

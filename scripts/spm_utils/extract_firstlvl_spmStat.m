@@ -16,10 +16,10 @@ function [rangeCon,meanCon,meanResMS,rangeStat,meanStat] = extract_firstlvl_spmS
     catch
         contrast_names = {};
     end
-    if nargin<2
+    if nargin<2 || isempty(glm_dir)
         glm_dir    = fullfile(directory.fmri_data,glm_name);
     end
-    if nargin<3
+    if nargin<3 || isempty(masks)
         masks = repmat({'all'},numel(contrast_names),1);
     end
     unique_masks = unique(masks);
