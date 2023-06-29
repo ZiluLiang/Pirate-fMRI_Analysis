@@ -19,6 +19,7 @@ plot the distribution of correlation in each participants. Currently ~50% of vox
 Another issue is, with voxel selection, almost all the effect becomes stronger (in ROI-based analysis and whole-brain searchlight), we need to check if voxel selection biased our results and lead to false positive. To check if voxel selection biased our analysis, two type of permutation are conducted:
 (1) permute a random voxel selection mask with the same number of voxels as the main mask
 (2) permute a random rdm and compare the result of voxel selection
+In addition, control regions are setup to check if the voxel selection create positive bias or spurious correlation
 
 #### 2. where to conduct RSA analysis
 RSA is conducted both within [ROI](/scripts/multivariate/MultivariateAnalysisPipeline.md#1-brain-parcellation-based-rsa-obtaining-roi-masks-from-aal-parcellation) and at [whole-brain level](/scripts/multivariate/MultivariateAnalysisPipeline.md#2-whole-brain-searchlight-rsa-obtaining-spherical-searchlight-regions) to check the robustness of the result and compare different pipelines.
