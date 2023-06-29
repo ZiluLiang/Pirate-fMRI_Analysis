@@ -10,8 +10,6 @@ gen_marsbar_AAL(AAL3_path,marsbar_aal3,'ROI_MNI_V7_1mm')
 %% combine anatomical rois and output to  the same space as participants first level mask
 ref_img = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\LSA_stimuli_localizer\first\sub001\mask.nii';
 anat_masks = loadjson('anatomical_masks.json');
-
-%rois = 'OFC*';
 outputdir = fullfile(mask_dir,'anat');
 checkdir(outputdir);
 cellfun(@(x) generate_anatomical_masks(marsbar_aal3,anat_masks.(x),x,outputdir,ref_img),fieldnames(anat_masks))

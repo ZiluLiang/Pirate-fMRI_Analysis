@@ -1,4 +1,4 @@
-function report_results(SPMmat_dir,ths_cfg,output_fmt,masks)
+function glm_results(SPMmat_dir,ths_cfg,output_fmt,masks)
     spm('defaults','FMRI')
     
     default_threshold = struct('type','none',...

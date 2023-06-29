@@ -1,11 +1,15 @@
-function glm_cofig = get_glm_config(glm_name)
+function glm_config = glm_configure(glm_name)
 % get the configurations of the glm models
+% INPUTS:
+% - glm_name: name of the glm as specified in the glm_gallery
+%
+% Author: Zilu Liang
     glms      = glm_gallery;
     glm_names = {glms.name};
     if ~ismember(glm_name,glm_names)
         error("Cannot find glm name in glm gallery, available glms: %s\n", strjoin(glm_names,', '))
     end
-    glm_cofig = glms(cellfun(@(x) strcmp(glm_name,x),glm_names));
+    glm_config = glms(cellfun(@(x) strcmp(glm_name,x),glm_names));
 end
 
 %% glms designs
@@ -34,6 +38,9 @@ end
 function glms = glm_gallery
     glms = struct('name',{},'filepattern',{},'conditions',{},'modelopt',{},'contrasts',{});
     
+    % ==============================================================================================
+    % SANITY CHECK MODELS
+    % ==============================================================================================
     glms(1).name = 'sc_navigation';
     glms(1).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(1).conditions  = {'stimuli','response'};
@@ -49,11 +56,14 @@ function glms = glm_gallery
     glms(2).conditions  = {'stimuli','response'};
     glms(2).modelopt    = struct('use_stick', {false,true});
     glms(2).contrasts   = struct('name',{},'type',{},'wvec',{});
-    glms(2).contrasts(1).name = 'visual';
-    glms(2).contrasts(1).wvec = [1,0];
+    glms(2).contrasts(1).name = 'visual';   
+    glms(2).contrasts(1).wvec = struct('stimuli',{1},'response',{0});% this is equivalant to: glms(2).contrasts(1).wvec = [1,0]; 
     glms(2).contrasts(2).name = 'response';
-    glms(2).contrasts(2).wvec = [0,1];
+    glms(2).contrasts(2).wvec = struct('stimuli',{0},'response',{1});% this is equivalant to: glms(2).contrasts(2).wvec = [0,1]; 
 
+    % ==============================================================================================
+    % Repetition Suppression MODELS
+    % ==============================================================================================
     glms(3).name        = 'rs_loc2d_navigation';
     glms(3).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(3).conditions  = {'rstrials','response','excluders'};
@@ -77,7 +87,10 @@ function glms = glm_gallery
     glms(5).pmods       = {{'dist2d'}};
     glms(5).contrasts(1).name = 'euclidean distance';
     glms(5).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors: 3 conditions + 1 pmod
-    
+
+    % ==============================================================================================
+    % Difference between train/test
+    % ==============================================================================================    
     glms(6).name = 'traintest_navigation';
     glms(6).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(6).conditions  = {'training','test','response'};
@@ -88,18 +101,45 @@ function glms = glm_gallery
     glms(6).contrasts(2).name = 'test_minus_train';
     glms(6).contrasts(2).wvec = [-1,1,0];
     
+    % ==============================================================================================
+    % LSA glm for extracting beta series - not concatenated
+    % ==============================================================================================  
     allstimid = 0:24;
     glms(7).name = 'LSA_stimuli_navigation';
     glms(7).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(7).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
     glms(7).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
+    % F contrast for the overall effect of stimuli
+    glms(7).contrasts(1).name = 'stimuli';
+    glms(7).contrasts(1).wvec = cell2struct(num2cell(ones(size(allstimid))'), ...
+                                            arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0));% it is equivalent to:[eye(25) zeros(25,1)]
+    % separate t contrast for each stimulus
+    curr_ccount = numel(glms(7).contrasts);
+    for j = 1:numel(allstimid)
+        glms(7).contrasts(j+curr_ccount).name = sprintf('stim%02d',j);
+        glms(7).contrasts(j+curr_ccount).wvec = struct(sprintf('stim%02d',j),{1});
+    end
+    % contrast for each stimulus in odd and even runs
+    curr_ccount = numel(glms(7).contrasts);
+    for j = 1:numel(allstimid)
+        idx_odd  = j+curr_ccount;
+        idx_even = j+curr_ccount+numel(allstimid);
+        glms(7).contrasts(idx_odd).name = sprintf('stim%02d_odd',j);
+        glms(7).contrasts(idx_odd).wvec = struct(sprintf('Sn_1_stim%02d',j),{1},sprintf('Sn_3_stim%02d',j),{1});
+        glms(7).contrasts(idx_even).name = sprintf('stim%02d_even',j);
+        glms(7).contrasts(idx_even).wvec = struct(sprintf('Sn_2_stim%02d',j),{1},sprintf('Sn_4_stim%02d',j),{1});
+    end
    
+
     trainingstimid = [2,7,10,11,12,13,14,17,22];
     glms(8).name = 'LSA_stimuli_localizer';
     glms(8).filepattern = 'sub-.*_task-localizer_run-[1]';
     glms(8).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),trainingstimid,'uni',0),{'response'}];
     glms(8).modelopt    = struct('use_stick', [repmat({false},size(trainingstimid)),{true}]);
 
+% ==============================================================================================
+% Neural axis for x/y
+% ==============================================================================================  
     glms(9).name = 'axis_loc_navigation'; % location based on ground truth
     glms(9).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(9).conditions  = {'stimuli','response'};
@@ -133,23 +173,31 @@ function glms = glm_gallery
     glms(11).contrasts(2).name = 'stim_y';
     glms(11).contrasts(2).wvec = [0,0,1,0];% weight vector for task regressors
 
-    glms(12).name = 'axis_attrloc_navigation'; % location based on ground truth
+    % ==============================================================================================
+    % LSA glm for extracting beta series - concatenated
+    % ==============================================================================================  
+    allstimid = 0:24;
+    glms(12).name = 'LSA_stimuli_navigation_concatall';
     glms(12).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
-    glms(12).conditions  = {'stimuli','response'};
-    glms(12).modelopt    = struct('use_stick', {true,false});
-    glms(12).pmods       = {{'stim_attrx','stim_attry'}};
-    glms(12).contrasts   = struct('name',{},'type',{},'wvec',{});
-    glms(12).contrasts(1).name = 'stim_attrx';
-    glms(12).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
-    glms(12).contrasts(2).name = 'stim_attry';
-    glms(12).contrasts(2).wvec = [0,0,1,0];% weight vector for task regressors
+    glms(12).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
+    glms(12).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
+    % contrast for the overall effect of stimuli
+    glms(12).contrasts(1).name = 'stimuli';
+    glms(12).contrasts(1).wvec = [eye(numel(allstimid)),zeros(numel(allstimid),1)];
 
-    glms(13).name = 'axis_attryloc_navigation'; % location based on ground truth
-    glms(13).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
-    glms(13).conditions  = {'stimuli','response'};
-    glms(13).modelopt    = struct('use_stick', {true,false});
-    glms(13).pmods       = {{'stim_attry'}};
-    glms(13).contrasts   = struct('name',{},'type',{},'wvec',{});
-    glms(13).contrasts(1).name = 'stim_attry';
-    glms(13).contrasts(1).wvec = [0,1,0];% weight vector for task regressors
+    glms(13).name = 'LSA_stimuli_navigation_concatodd';
+    glms(13).filepattern = 'sub-.*_task-piratenavigation_run-[1,3]';
+    glms(13).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
+    glms(13).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
+    % contrast for the overall effect of stimuli
+    glms(13).contrasts(1).name = 'stimuli';
+    glms(13).contrasts(1).wvec = [eye(numel(allstimid)),zeros(numel(allstimid),1)];
+
+    glms(14).name = 'LSA_stimuli_navigation_concateven';
+    glms(14).filepattern = 'sub-.*_task-piratenavigation_run-[2,4]';
+    glms(14).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
+    glms(14).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
+    % contrast for the overall effect of stimuli
+    glms(14).contrasts(1).name = 'stimuli';
+    glms(14).contrasts(1).wvec = [eye(numel(allstimid)),zeros(numel(allstimid),1)];
 end

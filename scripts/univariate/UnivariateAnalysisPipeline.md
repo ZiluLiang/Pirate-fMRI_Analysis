@@ -5,7 +5,7 @@ For our univariate analysis, first-level usually model the stimuli stage and the
 Different univariate analysis models different conditions. The following classes of univariate analyses have been performed.
 ### I. Sanity check models
 1. sanity check for navigation task  
-   - **First-level**: each participants 4D fmri series are modeled with two regressors: stimuli and response. box car functions are used with duration corresponding to acutual stimuli presentation time and actual response time (time participants spent moving the pirate)
+   - **First-level**: each participants 4D fmri series are modeled with two regressors: stimuli and response. box car functions are used with duration corresponding to actual stimuli presentation time and actual response time (time participants spent moving the pirate)
    two T-contrasts are built:  
     (1) to test for visual effect: a weight vector of `[1,1]` is used  
     (2) to test for motor effect: a weight vector of `[0,1]` is used  
@@ -19,14 +19,14 @@ Different univariate analysis models different conditions. The following classes
 
 ### II. Repetition Suppression models
 1. repetition suppression for navigation task  
-   Repetition supression models for the navigation task modeled three events:  
-   (1) the stimuli event for trials not preceeded by a response trial   
+   Repetition suppression models for the navigation task modeled three events:  
+   (1) the stimuli event for trials not preceded by a response trial   
    (2) the motor event in response trial  
-   (3) the stimuli event for trials preceeded by a response trial  
+   (3) the stimuli event for trials preceded by a response trial  
 In the first regressor, the euclidean distance between current trial stimuli and previous trial stimuli is included as a parametric modulator for the stimuli event.  
 Two variants of this model is constructed, one with groundtruth euclidean distance, the other with euclidean distance computed from participants' response map.
 
-2. Repetition supression model for the localizer task
+2. Repetition suppression model for the localizer task
    This is similar to the one above for navigation task, except that button presses are not modeled with boxcar function, a stick function is used instead. Only one model with euclidean distance between pirate locations in successive trials are included.
 
 ### III. Models for extracting beta series
@@ -36,13 +36,17 @@ To extract activity related to stimuli, we adopted the LSA approach. We build fi
 All univariate analysis are conducted with canonical HRF without temporal and dispersion derivatives. We use spm's intracranial volume mask as explicit mask (mask_ICV.nii in the `spm/tpm` directory) combined with a lowered implicit masking threshold of 0.2. 
 
 ## Scripts Overview
-Two main scripts runs univariate analysis: the [`sanity_check.m`](/scripts/sanity_check.m) main script runs sanity check on the data, while the [`univariate_analysis.m`](/scripts/univariate_analysis.m) main script performs the repetition supression analysis and build the model for extracting beta series.
+Three main scripts runs univariate analysis: 
+- [`sanity_check.m`](/scripts/sanity_check.m) runs sanity check on the data, while the
+- [`univariate_analysis.m`](/scripts/univariate_analysis.m) performs the repetition suppression analysis.
+- [`prepare_MVPA`](/scripts/prepare_MVPA.m) builds the models for extracting beta series.
 
-The following functions specify the batch job for running glm analysis in SPM:  
-- [`specify_estimate_glm`](/scripts/univariate/specify_estimate_glm.m) specify and/or runs estimation on the first level glm models. 
-- [`specify_estimate_grouplevel`](/scripts/univariate/specify_estimate_grouplevel.m) specify and/or runs estimation on the second level glm models.  
-- [`specify_estimate_contrast`](/scripts/univariate/specify_estimate_contrast.m) specify and estimate contrast of first or second level glm models. 
-- [`report_results`](/scripts/univariate/report_results.m) shows results reports on all the contrasts in corresponding SPM.mat file, can be first/second level. 
+The functions in [`univariate`](/scripts/univariate/) subfolder specify the batch jobs for running glm analysis in SPM:  
+- [`glm_firstlevel`](/scripts/univariate/glm_firstlevel.m) specifies the first level glm models. 
+- [`glm_concatenate`](/scripts/univariate/glm_concatenate.m) concatenates separate runs into one long run before estimation. 
+- [`glm_grouplevel`](/scripts/univariate/glm_grouplevel.m) specifies the group level glm models. 
+- [`glm_estimate`](/scripts/univariate/glm_estimate.m) estimates specified glm models.  
+- [`glm_contrast`](/scripts/univariate/glm_contrast.m) specifies contrasts for estimated glm models. 
+- [`glm_results`](/scripts/univariate/glm_results.m) shows results reports on all the contrasts in corresponding SPM.mat file, can be first/second level.   
 
-
-Models are configured in [`get_glm_config`](/scripts/univariate/get_glm_config.m) and configurations are identified by the name of glms. the [`run_glm`](/scripts/univariate/run_glm.m) runs different steps in glm analysis. It first reads in the configurations, prepare relevant diretories and then calls the above batch-job scripts to set up batch job for analysis. 
+Models are configured in [`glm_configure`](/scripts/univariate/glm_configure.m) and configurations are identified by the name of glms. Three main scripts all calls [`glm_runner`](/scripts/univariate/glm_runner.m) to run different steps in glm analysis. It first reads in the configurations, prepare relevant directories and then calls the above batch-job scripts to set up batch job for analysis. 

@@ -8,6 +8,9 @@ function [regressor_idx,regressor_img] = find_regressor_idx(subSPM,regname_patte
 % OUTPUT:
 %    - regressor_idx: the index/indices of the regressor(s) in SPM.xX.name;
 %    - regressor_img: the name of the corresponding beta image;
+%
+% Author: Zilu Liang
+
     if ischar(subSPM)
         if exist(subSPM,'file')
             subSPM = load(subSPM).SPM;
@@ -17,8 +20,8 @@ function [regressor_idx,regressor_img] = find_regressor_idx(subSPM,regname_patte
     elseif ~isstruct(subSPM)
         error('first input must be full path to SPM.mat file or the loaded SPM struct')
     end
-    if ischar(regname_patterns)
-        regname_patterns = cellstr(regname_patterns);
+    if ischar(regname_patterns) || isa(regname_patterns,'pattern')
+        regname_patterns = {regname_patterns};
     elseif ~iscell(regname_patterns)
         error('second input must be a regressor name/pattern or a cell array of regressor names/patterns')
     end

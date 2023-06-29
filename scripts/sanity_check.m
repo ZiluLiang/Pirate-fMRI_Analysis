@@ -18,7 +18,7 @@ if flag_runGLM
     err_tracker   = struct(); %#ok<*UNRCH>
     for j = 1:numel(glm_names)
         glm_name = glm_names{j};
-        err_tracker.(glm_name) = run_glm(glm_name);
+        err_tracker.(glm_name) = glm_runner(glm_name);
     end
 end
 
