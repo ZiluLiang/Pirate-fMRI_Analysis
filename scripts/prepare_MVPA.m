@@ -3,7 +3,6 @@
 % -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
-% TODO need to rerun the first and third section to test if new code is bug-free
 clear;clc
 
 [directory,participants,filepattern,exp]  = get_pirate_defaults(false,'directory','participants','filepattern','exp');
@@ -37,9 +36,13 @@ for j = 1:numel(LSAglm_names)
 end
 
 %% concatenate regressor/contrast estimates into 4D series - unconcatenated glms navigation task
-% 1 - 25 contrasts one for each stimuli
-% 2 - 50 contrasts one for each stimuli in odd/even run
-% 3 - 100 regressors one for each stimuli in each run
+% contrast img group 1 - 25 contrasts one for each stimuli
+%    concatenated into-> stimuli_all.nii (each stimulus's average effect across all runs)
+% contrast img group 2 - two 25 contrasts one for each stimuli in odd/even run 
+%    concatenated into-> stimuli_odd.nii and stimuli_even.nii (each stimulus's average effect across odd/even runs)
+% reg img - 100 regressors one for each stimuli in each run
+%    concatenated into-> stimuli_4r.nii (no averaging)
+
 glm_name = 'LSA_stimuli_navigation';
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 for jdir = 1:numel(lsa_dir)
@@ -51,10 +54,10 @@ for jdir = 1:numel(lsa_dir)
         [contrast_img1,contrast_imgo,contrast_imge] = deal(cell(numel(exp.allstim),1));
         reg_img = cell(numel(exp.allstim),4);
         for k = 1:numel(exp.allstim)
-            % find contrast image 1
+            % find contrast image group 1
             [~,contrast_img1{k},~] = find_contrast_idx(subSPM,regexpPattern(sprintf('^stim%02d$',exp.allstim(k))));
             
-            % find contrast image 2
+            % find contrast image group 2
             [~,contrast_imgo{k},~] = find_contrast_idx(subSPM,sprintf('stim%02d_odd',exp.allstim(k)));
             [~,contrast_imge{k},~] = find_contrast_idx(subSPM,sprintf('stim%02d_even',exp.allstim(k)));
             
@@ -62,25 +65,26 @@ for jdir = 1:numel(lsa_dir)
             [~,reg_img(k,:)] = arrayfun(@(runid) find_regressor_idx(subSPM,sprintf('Sn(%d) stim%02d',runid,exp.allstim(k))),1:numel(subSPM.Sess));
         end
         
-        fprintf('%s - contrast_img1: %d/25, contrast_img2: %d/50, reg_img: %d/100\n',...
-            participants.validids{isub},...
-            numel(contrast_img1),...
-            numel([contrast_imgo;contrast_imge]),...
-            numel(reg_img))
+        
         if ~any(cellfun(@isempty,[contrast_img1;contrast_imgo;contrast_imge;reshape(reg_img,[],1)]))
             % ordered by stim00 -- stim24
-            spm_file_merge(char(fullfile(firstlvl_dir,contrast_img1)),fullfile(firstlvl_dir,'stimuli_mu.nii'));
+            spm_file_merge(char(fullfile(firstlvl_dir,contrast_img1)),fullfile(firstlvl_dir,'stimuli_all.nii'));
             
-            % ordered by stim00odd -- stim24odd -- stim00even -- stim24even
-            spm_file_merge(char(fullfile(firstlvl_dir,[contrast_imgo;contrast_imge])),fullfile(firstlvl_dir,'stimuli_oe.nii'));
+            % ordered by stim00odd -- stim24odd/stim00even -- stim24even
+            spm_file_merge(char(fullfile(firstlvl_dir,contrast_imgo)),fullfile(firstlvl_dir,'stimuli_odd.nii'));
+            spm_file_merge(char(fullfile(firstlvl_dir,contrast_imge)),fullfile(firstlvl_dir,'stimuli_even.nii'));
 
             % ordered by stim00r1 -- stim24r1 -- stim00r2 -- stim24r2 ...        
             tmp = permute(reg_img,[1,2]);
             reg_img = vertcat(tmp(:));
             spm_file_merge(char(fullfile(firstlvl_dir,reg_img)),fullfile(firstlvl_dir,'stimuli_4r.nii'));
             fprintf('Completed concatenating 4D activity pattern images for %s\n',participants.validids{isub})
-        else
-            error('failed to find enough file to concatenate')            
+        else            
+            error('failed to find enough file to concatenate:\n %s - contrast_img1: %d/25, contrast_img2: %d/50, reg_img: %d/100\n',...
+                    participants.validids{isub},...
+                    numel(contrast_img1),...
+                    numel([contrast_imgo;contrast_imge]),...
+                    numel(reg_img))
         end
         clear firstlvl_dir subSPM contrast_img1 contrast_imgo contrast_imge reg_img tmp
     end
@@ -133,13 +137,15 @@ end
 % extract residuals to double check if models are running okay
 for j = 1:numel(LSAglm_names)
     glm_name = LSAglm_names{j};
-    [~,~,meanResMS3.(glm_name),rangeStat3.(glm_name),meanStat3.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{1},glm_name),masks);
-    [~,~,meanResMS4.(glm_name),rangeStat4.(glm_name),meanStat4.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{2},glm_name),masks);
+    [~,~,meanResMS1.(glm_name),rangeStat1.(glm_name),meanStat1.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{1},glm_name),masks);
+    [~,~,meanResMS2.(glm_name),rangeStat2.(glm_name),meanStat2.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{2},glm_name),masks);
 end
 
 %% concatenate regressor estimates into 4D series - concatenated glms navigation task
-% 1 - 25 regressors one for each stimuli in the concatall glm
-% 2 - 50 regressors one for each stimuli in concatodd/concateven glm
+% contrast img group 1 - 25 regressors one for each stimuli in the concatall glm
+%    concatenated into-> stimuli_all.nii (each stimulus's average effect across all runs)
+% contrast img group 2 - two 25 regressors one for each stimuli in concatodd/concateven glm
+%    concatenated into-> stimuli_odd.nii and stimuli_even.nii (each stimulus's average effect across odd/even runs)
 
 lsa_dir = {'unsmoothedLSA','smoothed5mmLSA'};
 for jdir = 1:numel(lsa_dir)
