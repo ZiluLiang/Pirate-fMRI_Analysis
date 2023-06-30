@@ -15,6 +15,9 @@ function w_mat = gen_contrast_matrix(subSPM,weights,flag_rescale)
 % -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
+%TODO: build contrast with regressor names. 
+% current script is a SUPER BAD solution to deal with constraints in struct field naming, need to come up with cleaner solution
+
     if ischar(subSPM)
         if exist(subSPM,'file')
             subSPM = load(subSPM).SPM;
@@ -46,7 +49,7 @@ function w_mat = gen_contrast_matrix(subSPM,weights,flag_rescale)
         end        
         w_mat = zeros(numel(weights),numel(subSPM.xX.name));
         for j = 1:numel(weighted_regressors)
-            reg_idx          = find_regressor_idx(subSPM,weighted_regressors{j});
+            reg_idx          = find_regressor_idx(subSPM,reg_pattern{j});
             w_mat(:,reg_idx) = [weights.(weighted_regressors{j})] ./ (numel(reg_idx)^flag_rescale); 
         end
     end    

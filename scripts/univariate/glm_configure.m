@@ -105,38 +105,37 @@ function glms = glm_gallery
     % ==============================================================================================
     % LSA glm for extracting beta series - not concatenated
     % ==============================================================================================  
-    allstimid = 0:24;
+    exp = get_pirate_defaults(false,'exp');
     glms(7).name = 'LSA_stimuli_navigation';
     glms(7).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
-    glms(7).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
-    glms(7).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
+    glms(7).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0),{'response'}];
+    glms(7).modelopt    = struct('use_stick', [repmat({false},size(exp.allstim)),{false}]);
     % F contrast for the overall effect of stimuli
     glms(7).contrasts(1).name = 'stimuli';
-    glms(7).contrasts(1).wvec = cell2struct(num2cell(ones(size(allstimid))'), ...
-                                            arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0));% it is equivalent to:[eye(25) zeros(25,1)]
+    glms(7).contrasts(1).wvec = [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)];
     % separate t contrast for each stimulus
     curr_ccount = numel(glms(7).contrasts);
-    for j = 1:numel(allstimid)
-        glms(7).contrasts(j+curr_ccount).name = sprintf('stim%02d',j);
-        glms(7).contrasts(j+curr_ccount).wvec = struct(sprintf('stim%02d',j),{1});
+    for j = 1:numel(exp.allstim)
+        glms(7).contrasts(j+curr_ccount).name = sprintf('stim%02d',exp.allstim(j));
+        glms(7).contrasts(j+curr_ccount).wvec = struct(sprintf('stim%02d',exp.allstim(j)),{1});
     end
     % contrast for each stimulus in odd and even runs
     curr_ccount = numel(glms(7).contrasts);
-    for j = 1:numel(allstimid)
+    for j = 1:numel(exp.allstim)
         idx_odd  = j+curr_ccount;
-        idx_even = j+curr_ccount+numel(allstimid);
-        glms(7).contrasts(idx_odd).name = sprintf('stim%02d_odd',j);
-        glms(7).contrasts(idx_odd).wvec = struct(sprintf('Sn_1_stim%02d',j),{1},sprintf('Sn_3_stim%02d',j),{1});
-        glms(7).contrasts(idx_even).name = sprintf('stim%02d_even',j);
-        glms(7).contrasts(idx_even).wvec = struct(sprintf('Sn_2_stim%02d',j),{1},sprintf('Sn_4_stim%02d',j),{1});
+        idx_even = j+curr_ccount+numel(exp.allstim);
+        glms(7).contrasts(idx_odd).name = sprintf('stim%02d_odd',exp.allstim(j));
+        glms(7).contrasts(idx_odd).wvec = struct(sprintf('Sn_1_stim%02d',exp.allstim(j)),{1}, ...
+                                                 sprintf('Sn_3_stim%02d',exp.allstim(j)),{1});
+        glms(7).contrasts(idx_even).name = sprintf('stim%02d_even',exp.allstim(j));
+        glms(7).contrasts(idx_even).wvec = struct(sprintf('Sn_2_stim%02d',exp.allstim(j)),{1}, ...
+                                                  sprintf('Sn_4_stim%02d',exp.allstim(j)),{1});
     end
    
-
-    trainingstimid = [2,7,10,11,12,13,14,17,22];
     glms(8).name = 'LSA_stimuli_localizer';
     glms(8).filepattern = 'sub-.*_task-localizer_run-[1]';
-    glms(8).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),trainingstimid,'uni',0),{'response'}];
-    glms(8).modelopt    = struct('use_stick', [repmat({false},size(trainingstimid)),{true}]);
+    glms(8).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),exp.trainingstim,'uni',0),{'response'}];
+    glms(8).modelopt    = struct('use_stick', [repmat({false},size(exp.trainingstim)),{true}]);
 
 % ==============================================================================================
 % Neural axis for x/y
@@ -177,28 +176,28 @@ function glms = glm_gallery
     % ==============================================================================================
     % LSA glm for extracting beta series - concatenated
     % ==============================================================================================  
-    allstimid = 0:24;
+    exp = get_pirate_defaults(false,'exp');
     glms(12).name = 'LSA_stimuli_navigation_concatall';
     glms(12).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
-    glms(12).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
-    glms(12).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
+    glms(12).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0),{'response'}];
+    glms(12).modelopt    = struct('use_stick', [repmat({false},size(exp.allstim)),{false}]);
     % contrast for the overall effect of stimuli
     glms(12).contrasts(1).name = 'stimuli';
-    glms(12).contrasts(1).wvec = [eye(numel(allstimid)),zeros(numel(allstimid),1)];
+    glms(12).contrasts(1).wvec = [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)];
 
     glms(13).name = 'LSA_stimuli_navigation_concatodd';
     glms(13).filepattern = 'sub-.*_task-piratenavigation_run-[1,3]';
-    glms(13).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
-    glms(13).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
+    glms(13).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0),{'response'}];
+    glms(13).modelopt    = struct('use_stick', [repmat({false},size(exp.allstim)),{false}]);
     % contrast for the overall effect of stimuli
     glms(13).contrasts(1).name = 'stimuli';
-    glms(13).contrasts(1).wvec = [eye(numel(allstimid)),zeros(numel(allstimid),1)];
+    glms(13).contrasts(1).wvec = [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)];
 
     glms(14).name = 'LSA_stimuli_navigation_concateven';
     glms(14).filepattern = 'sub-.*_task-piratenavigation_run-[2,4]';
-    glms(14).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),allstimid,'uni',0),{'response'}];
-    glms(14).modelopt    = struct('use_stick', [repmat({false},size(allstimid)),{false}]);
+    glms(14).conditions  = [arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0),{'response'}];
+    glms(14).modelopt    = struct('use_stick', [repmat({false},size(exp.allstim)),{false}]);
     % contrast for the overall effect of stimuli
     glms(14).contrasts(1).name = 'stimuli';
-    glms(14).contrasts(1).wvec = [eye(numel(allstimid)),zeros(numel(allstimid),1)];
+    glms(14).contrasts(1).wvec = [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)];
 end
