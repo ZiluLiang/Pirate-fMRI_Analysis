@@ -10,6 +10,10 @@ We then use a threshold of r>0 to binarize it into a reliability mask and save t
 Meanwhile, a permuted version of reliability mask is created. This mask includes the same number of voxels as the reliability mask, but the masking location is randomly permuted from the reliability mask.
 """	
 import os
+import sys
+project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
+sys.path.append(os.path.join(project_path,'scripts'))
+
 import numpy as np
 import joblib
 from joblib import Parallel, delayed
@@ -20,34 +24,48 @@ import json
 from dataloader import ActivityPatternDataLoader
 import pandas as pd
 import seaborn as sns
+from multivariate.helper import checkdir
 
-project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
 fmri_output_path = os.path.join(project_path,'data','fmri')
-glm_name = 'LSA_stimuli_navigation'
+glm_name = {'odd':'LSA_stimuli_navigation_concatodd', # 'LSA_stimuli_navigation_concatodd' #'LSA_stimuli_navigation'
+            'even':'LSA_stimuli_navigation_concateven'} # 'LSA_stimuli_navigation_concateven' #'LSA_stimuli_navigation'
+beta_img = {'odd':'stimuli_odd.nii',
+            'even':'stimuli_even.nii'}
+reliability_dirname = 'reliability_concat' # 'reliability_concat'  # 'reliability_noconcat'
 
 with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
+    allstimid = pirate_defaults['exp']['allstim']
+    n_stim = len(allstimid)
 
 preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
 for p in preprocess: 
-    LSA_GLM_dir = os.path.join(fmri_output_path,p,glm_name)
     print(p)
+    output_dir_par = os.path.join(fmri_output_path,p,reliability_dirname)
+    checkdir(output_dir_par)
     def getsubWB(subid):
         # retrieve pattern data from the contrast images
         # do not drop na values so that the reliability value can be transformed back to same nifti image dimension
+        beta_oddruns  = os.path.join(fmri_output_path,p,glm_name['odd'],'first',subid,beta_img['odd'])
+        beta_evenruns = os.path.join(fmri_output_path,p,glm_name['even'],'first',subid,beta_img['even'])
+        mask_oddruns  = os.path.join(fmri_output_path,p,glm_name['odd'],'first',subid,'mask.nii')
+        mask_evenruns = os.path.join(fmri_output_path,p,glm_name['even'],'first',subid,'mask.nii')
+
         subWB_beta = ActivityPatternDataLoader(
-            os.path.join(LSA_GLM_dir,'first',subid,'stimuli_oe.nii'),
-            os.path.join(LSA_GLM_dir,'first',subid,'mask.nii'))
+            [beta_oddruns,beta_evenruns],
+            [mask_oddruns,mask_evenruns])
         print(f"{subid} activity pattern matrix shape: {subWB_beta.X.shape}")
         return subWB_beta
+    
     WB_beta = Parallel(n_jobs = 10)(
         delayed(getsubWB)(subid) for (subid) in subid_list
         )
     
     # voxel selection based on correlation between odd and even runs
     def compute_voxel_reliability(subAP,outputdir,subid):
-        groups = np.concatenate((np.ones((25,)),np.ones((25,))*2))
+        checkdir(outputdir)
+        groups = np.concatenate((np.ones((n_stim,)),np.ones((n_stim,))*2)) # split into odd and even
         [pattern_oddrun,pattern_evenrun] = subAP.split_data(groups)
         vox_reliability = [spearmanr(pattern_oddrun[:,j], pattern_evenrun[:,j]).correlation for j in np.arange(subAP.X.shape[1])]
         vox_reliability = np.array(vox_reliability)
@@ -65,10 +83,11 @@ for p in preprocess:
         print(f"{subid} whole brain voxel retention rate: {vox_retention_rate}")        
         return {"reliability":vox_reliability,"retentionrate":vox_retention_rate}
     
-    firstlvl_dirs = [os.path.join(LSA_GLM_dir,'first',subid) for subid in subid_list]
+    firstlvl_dirs = [os.path.join(output_dir_par,'first',subid) for subid in subid_list]
     WB_reliability = Parallel(n_jobs = 10)(delayed(compute_voxel_reliability)(sAP,opdir,subid) for (sAP,opdir,subid) in zip(WB_beta,firstlvl_dirs,subid_list))
-    joblib.dump(WB_reliability,os.path.join(LSA_GLM_dir,'wholebrain_reliability.pkl'))
+    joblib.dump(WB_reliability,os.path.join(output_dir_par,'wholebrain_reliability.pkl'))
 
+    # create a distribution plot for each participant
     M = [t["reliability"] for t in WB_reliability]
     R = [t["retentionrate"] for t in WB_reliability]
     df = pd.DataFrame({"r":np.concatenate(M),
@@ -80,4 +99,4 @@ for p in preprocess:
     for ax, sub, rsub in zip(r_displot.axes.flat, subid_list, R):
         txt = "%s - approx. %0.2f%% voxels' r> 0" % (sub,rsub*100)
         ax.set_title(txt)
-    r_displot.savefig(os.path.join(LSA_GLM_dir,'WB_reliability_distribution.png'))
+    r_displot.savefig(os.path.join(output_dir_par,'WB_reliability_distribution.png'))
