@@ -12,7 +12,7 @@ function w_mat = gen_contrast_matrix(subSPM,weights,flag_rescale)
 %  - flag_rescale: whether or not to rescale the weights depending on the number of regressors
 %      if flag_rescale is true, the weights will be divided by the number of regressors found
 %      if flag_rescale is false, the weights will stay as specified in weights
-%
+% -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
     if ischar(subSPM)

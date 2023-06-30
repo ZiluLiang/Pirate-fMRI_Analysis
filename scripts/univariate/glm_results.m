@@ -1,4 +1,13 @@
 function glm_results(SPMmat_dir,ths_cfg,output_fmt,masks)
+% report of results of contrasts specified in spm.mat file
+% INPUT:
+% - SPMmat_dir: directory to spmMAT file
+% - ths_cfg: threshold settings for computing results
+% - output_fmt: output format. default is {'jpg','xls'}
+% - masks: mask to be applied when computing results
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
     spm('defaults','FMRI')
     
     default_threshold = struct('type','none',...

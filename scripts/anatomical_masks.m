@@ -1,20 +1,45 @@
-get_pirate_defaults();
-mask_dir  = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks';    
-AAL3_path = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\AAL3';
+% This script generates anatomical masks in AAL3v1 parcellation using
+% marsbar.
+% For definition of anatomical masks see anatomical_masks.json
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
+directory = get_pirate_defaults(false,'directory');
+mask_dir  = fullfile(directory.projectdir,'data','fmri','masks');   
 marsbar_aal3 = fullfile(mask_dir,'marsbarAAL3');
 
 %% generate marsbar compatible aal3 rois
-checkdir(marsbar_aal3)
+checkdir(marsbar_aal3) 
+AAL3_path = fullfile(mask_dir,'AAL3'); % the downloaded and unzipped AAL3v1 parcellations
 gen_marsbar_AAL(AAL3_path,marsbar_aal3,'ROI_MNI_V7_1mm')
 
 %% combine anatomical rois and output to  the same space as participants first level mask
 ref_img = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\LSA_stimuli_localizer\first\sub001\mask.nii';
-anat_masks = loadjson('anatomical_masks.json');
-outputdir = fullfile(mask_dir,'anat');
+anat_masks = loadjson(fullfile(directory.projectdir,'scripts','anatomical_masks.json'));
+outputdir  = fullfile(mask_dir,'anat');
 checkdir(outputdir);
 cellfun(@(x) generate_anatomical_masks(marsbar_aal3,anat_masks.(x),x,outputdir,ref_img),fieldnames(anat_masks))
 
-%% =================== embedded functions =============================
+%% ========================================================================
+%          function: generate_anatomical_masks
+%  ========================================================================
+%  generate anatomical mask in the same space as reference image
+%  INPUT:
+%    - marsbar_aal3: directory to marsbar generated anatomical ROI
+%    definitions in .mat format. Each .mat file corresponds to one anatomical
+%    label in the aal3v1 parcellation.
+%    - structures: which anatomical region is used to generate the mask.
+%    the name must be from the AAL3v1 label list
+%    - maskname: the name of the output mask images.
+%    - outputdir: where to save the output mask images.
+%    - ref_img:  the reference image. output mask images will be generated
+%    in the same space as this image
+%
+% This function will create:
+%    three masks (.nii) and definitions(.mat) of one anatomical region:
+%      two unilateral masks (maskname_left.nii/.mat, maskname_right.nii/.mat),
+%      one bilateral mask (maskname_bilateral.nii/.mat)
+
 function generate_anatomical_masks(marsbar_aal3,structures,maskname,outputdir,ref_img)
     marsbar('on')% Start marsbar to make sure spm_get works
     spm('defaults', 'fmri');
@@ -55,15 +80,19 @@ function generate_anatomical_masks(marsbar_aal3,structures,maskname,outputdir,re
     end
 end
 
-
+%% ========================================================================
+%          function: gen_marsbar_AAL
+%  ========================================================================
 % This script is a slight adaptation from MarsBaR repo
 % (https://github.com/marsbar-toolbox/marsbar-aal-rois/releases)
 % to generate MarsBaR-compatiblev anatomical mask based on AAL3v1 parcellations
-% adapted by Zilu
-% ====================== Original Documentation =================== %
+% 
+% ------------------------------------------------------------------
+% Original Documentation:
 % Script to make AAL ROIs for MarsBaR
 % You will need SPM(99 or 2), and MarsBaR, on the matlab path
-% ================================================================= %
+% ------------------------------------------------------------------
+% adapted by Zilu Liang
 function gen_marsbar_AAL(aal_path,roi_path,aal_root)
     if nargin<1, aal_path = spm_get(-1, '', 'Select path containing AAL files'); end
     if nargin<2, roi_path = spm_get(-1, '', 'Select path for MarsBaR ROI files'); end    

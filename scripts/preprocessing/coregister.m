@@ -1,14 +1,17 @@
-function coregister(subimg_dir,varargin)
+function coregister(subimg_dir,use_reorient)
 % coregister the T1(source) to the mean epi image(reference)
-%
-% created files r*(a coregistered T1 image)
-% ------ written by Zilu Liang(2023.4,Oxford)------
+% INPUT:
+%  - subimg_dir: directory to participant's preprocessing fmri images
+%  - use_reorient: use reoriented or raw image for preprocessing
+% 
+% This will create the following files:
+%  r*(a coregistered T1 image)
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
 
     % get flags
-    use_reorient = true;
-    if numel(varargin) == 1 && islogical(use_reorient)
-        use_reorient = varargin{1};
-    end
+    if nargin<2 || ~islogical(use_reorient), use_reorient = true; end
 
     % get regular expression for different image files 
     filepattern = get_pirate_defaults(false,'filepattern');

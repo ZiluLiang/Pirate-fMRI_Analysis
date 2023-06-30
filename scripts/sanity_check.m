@@ -3,7 +3,9 @@
 % check visual and motor effect at group level
 % check visual and motor effect at first level by extracting statistics
 % from visual and motor ROI
-% ------ written by Zilu Liang(2023.5,Oxford)------
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
 
 clear;clc
 

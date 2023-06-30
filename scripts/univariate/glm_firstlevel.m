@@ -12,7 +12,7 @@ function glm_firstlevel(nii_files,multicond_files,nuisance_files,output_dir)
 %                    each column in a txt file is the value of one nuisance
 %                    regressor.
 % - output_dir:      the directory in which result images and SPM.mat is saved 
-%
+% -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
     if numel(nii_files)==numel(multicond_files) && numel(nii_files)==numel(nuisance_files)

@@ -1,6 +1,9 @@
 function T = subtract_table(A,B)
 % subtract all numeric fields of the table and return the result as a table
 % INPUT: A,B must be tables of with same variables
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
 error_flag = true;
 if istable(A)&&istable(B)
     var_A = A.Properties.VariableNames;

@@ -26,6 +26,7 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
 %                      'contrast',          @glm_contrast, ...
 %                      'result',            @glm_results,...
 %                      'second_level_spec', @glm_grouplevel);
+% -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
 % TODO: make second level accommodate different types of first level

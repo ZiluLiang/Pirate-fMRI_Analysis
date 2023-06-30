@@ -1,5 +1,19 @@
 function meanepi_filename = create_mean_epi(subimg_dir,filepattern,varargin)
-%create_mean_epi(subimg_dir,filepattern,outputname,outdir)
+%  usage create_mean_epi(subimg_dir,filepattern,outputname,outdir)
+% INPUT: 
+%  - subimg_dir: the directory to the epi images
+%  - filepattern: regular expression to search for epi images to calculate
+%  mean from
+%  - outputname: output name of the mean epi image, if not specified, will
+%  be named as meanepi_filepattern.nii
+%  - outdir: directory where output mean epi image will be saved. If not
+%  specifyed, output mean epi image will be saved to subimg_dir
+%
+% This function will create:
+%   outputname.nii
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
     
     if numel(varargin) >= 1
         outputname = varargin{1};

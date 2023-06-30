@@ -8,7 +8,7 @@ function glm_contrast(SPMmat_dir,contrast_names,contrast_weights,flag_replace)
 % - contrast_weights: weight vector (for T contrast) or  
 %                     weight matrix (for F contrast) for the contrasts
 % - flag_replace: whether or not to delete the existing contrasts.
-%
+% -----------------------------------------------------------------------    
 % Author: Zilu Liang
     
     if nargin<4, flag_replace = true; end

@@ -1,8 +1,13 @@
 function normalise(subimg_dir)
 % normlise functional images
-%
-% output: w*.nii(smoothed images)
-% ------ written by Zilu Liang(2023.4,Oxford)------
+% INPUT:
+%  - subimg_dir: directory to participant's preprocessing fmri images
+% 
+% This will create the following files:
+%  w*.nii(smoothed images)
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
     % find files
     [fmri,filepattern] = get_pirate_defaults(false,'fmri','filepattern');    
     def_field = cellstr(spm_select('FPList',subimg_dir,filepattern.preprocess.deformation));

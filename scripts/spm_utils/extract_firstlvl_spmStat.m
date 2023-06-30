@@ -3,16 +3,19 @@ function [rangeCon,meanCon,meanResMS,rangeStat,meanStat] = extract_firstlvl_spmS
 % results of first level glm analysis for sanity check of model fitting
 % results.
 % INPUT: 
-%      glm_name: string, to get glm configuration using get_glm_config
+%      glm_name: string, to get glm configuration using glm_configure
 %      glm_dir:  string, directory to search from
 %      masks:    cell array with number of elements equal to the number of
 %      contrast in the glm configuration. Each element specify a Region of 
 %      Interest(ROI) mask from which the stat values of the corresponding contrast are extracted. 
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
 % TODO: calculate measure of model fitting quality?
 
     [directory,participants]  = get_pirate_defaults(false,'directory','participants');
     try
-        contrast_names = {get_glm_config(glm_name).contrasts.name};
+        contrast_names = {glm_configure(glm_name).contrasts.name};
     catch
         contrast_names = {};
     end
@@ -28,18 +31,25 @@ function [rangeCon,meanCon,meanResMS,rangeStat,meanStat] = extract_firstlvl_spmS
     rangeStat  = cell(numel(participants.validids),numel(contrast_names));
     meanStat  = cell(numel(participants.validids),numel(contrast_names));    
     rangeCon   = cell(numel(participants.validids),numel(contrast_names));
+    meanCon   = cell(numel(participants.validids),numel(contrast_names));
     meanResMS  = nan(numel(participants.validids), numel(unique_masks));
+    
     for isub = 1:numel(participants.validids)
         firstlevel_dir = fullfile(glm_dir,'first',participants.validids{isub});
         for j = 1:numel(contrast_names)
             try
                 [~,con_img,stat_img] = find_contrast_idx(fullfile(firstlevel_dir,'SPM.mat'),contrast_names{j});
                 voxelwise_Stat  = spm_summarise(fullfile(firstlevel_dir,stat_img),masks{j});
-                voxelwise_Con   = spm_summarise(fullfile(firstlevel_dir,con_img),masks{j});
                 rangeStat{isub,j} = [min(voxelwise_Stat),max(voxelwise_Stat)];
                 meanStat{isub,j} = mean(voxelwise_Stat);
-                rangeCon{isub,j} = [min(voxelwise_Con),max(voxelwise_Con)];
-                meanCon{isub,j} = mean(voxelwise_Con);
+                if ~isempty(con_img)
+                    voxelwise_Con   = spm_summarise(fullfile(firstlevel_dir,con_img),masks{j});
+                    rangeCon{isub,j} = [min(voxelwise_Con),max(voxelwise_Con)];
+                    meanCon{isub,j} = mean(voxelwise_Con);
+                else
+                    rangeCon{isub,j} = [nan,nan];
+                    meanCon{isub,j} = [nan,nan];
+                end                
             catch
                 rangeStat{isub,j} = [nan,nan];
                 meanStat{isub,j} = [nan,nan];

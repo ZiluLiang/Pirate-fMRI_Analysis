@@ -4,7 +4,7 @@ function glm_estimate(SPMmat_dir,write_residuals)
 % INPUT:
 % - SPMmat_dir: directory to spmMAT file
 % - write_residuals: whether or not to save residual files
-%
+% -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
     if ~contains(SPMmat_dir,"SPM.mat")
