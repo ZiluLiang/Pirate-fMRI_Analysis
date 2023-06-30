@@ -2,6 +2,15 @@ function check_distortion_correction(subimg_dir,varargin)
 % show the unwarped epi, original epi and t1 image side by side to check
 % the quality of distortion correction using fieldmap. 
 % example usage: checkDistortionCorrection(subimg_dir,task,run,volume)
+% INPUTS:
+%     - subimg_dir: directory that contains the rp file and preprocessed
+%     image of participants
+%     - task:   which task to check
+%     - run:    which run to check
+%     - volume: which run to check
+%     the first volume of the first session(1st run of 1st task) is selected to check by default
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
 
     if numel(varargin)>3
         error('Too many input arguments')

@@ -2,8 +2,9 @@ function glm_config = glm_configure(glm_name)
 % get the configurations of the glm models
 % INPUTS:
 % - glm_name: name of the glm as specified in the glm_gallery
-%
+% -----------------------------------------------------------------------    
 % Author: Zilu Liang
+
     glms      = glm_gallery;
     glm_names = {glms.name};
     if ~ismember(glm_name,glm_names)

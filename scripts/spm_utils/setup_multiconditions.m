@@ -2,7 +2,7 @@ function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cf
 % create the mat file for multiple condtions
 % INPUT
 % - glm_name: name of the glm, this will be used to find glm
-%             configurations in the get_glm_config functions
+%             configurations in the glm_configure functions
 % - subid: the participant whose mat file is to be generated
 % - output_dir: the directory where the mat file is saved
 % - gen_multi_cfg: configurations for design matrix, including whether to
@@ -10,6 +10,8 @@ function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cf
 %                  parametric modulators etc. See documentation in
 %                  gen_multi
 % - flag_concatenate: whether or not to concatenate sessions together
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
 
     [directory,fmri]  = get_pirate_defaults(false,'directory','fmri');
     glm_config = glm_configure(glm_name);

@@ -10,7 +10,8 @@ function mean_tsnr = calculate_snr(source,outputname,masks)
 %    -outputname: the full path of the output tsnr image
 %    -masks: a cell array of mask image files or a struct with fieldnames as
 %    mask names and field values as mask image files.
-% ------ written by Zilu Liang(2023.5,Oxford)------
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
 
 
     if nargin<2

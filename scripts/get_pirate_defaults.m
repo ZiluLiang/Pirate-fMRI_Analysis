@@ -9,7 +9,7 @@ function varargout = get_pirate_defaults(varargin)
 %    if return_struct_flag is true, then a struct is returned,
 %    if return_struct_flag is false, then multiple configurations are returned 
 % -----------------------------------------------------------------------    
-% written by Zilu Liang(2023.5,Oxford)
+% Author: Zilu Liang
 
     % set defaults for pirate fMRI analysis
     pirate_defaults = setdefaults();
@@ -68,7 +68,8 @@ function pirate_defaults = setdefaults
     % add path to packages
     structfun(@(pkg_path) addpath(pkg_path),rmfield(pirate_defaults.packages,'MRIcroGL'))
     
-    %% --------------  Specify directory  --------------      
+    %% --------------  Specify directory  -------------- 
+    pirate_defaults.directory.projectdir   = wk_dir;
     pirate_defaults.directory.pm_default   = fullfile(wk_dir,'scripts','preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
     pirate_defaults.directory.mni_template = fullfile(spm('dir'),'canonical','avg152T1.nii'); % mni template used for visualization and estimate parameters for auto-reorientation
     pirate_defaults.directory.fmri_data    = fullfile(wk_dir,'data','fmri');
@@ -133,7 +134,12 @@ function pirate_defaults = setdefaults
     pirate_defaults.fmri.voxelsize = 2.5; % voxel size in mm
     pirate_defaults.fmri.tr        = 1.73;% TR in seconds
     pirate_defaults.fmri.nuisance_terms = {'raw','fw'}; 
-    
+
+    %% --------------  experiment design ------------------
+    pirate_defaults.exp.allstim      = 0:24;
+    pirate_defaults.exp.trainingstim = [2,7,10,11,12,13,14,17,22];
+    pirate_defaults.exp.teststim     = pirate_defaults.exp.allstim(arrayfun(@(x) ~ismember(x,pirate_defaults.exp.trainingstim),pirate_defaults.exp.allstim));
+
     %% --------------  saving to json file for python reading  ------------------
     %pirate_defaults.participants = rmfield(pirate_defaults.participants,{'ids','nsub'});
     savejson('',pirate_defaults,'FileName',fullfile(wk_dir,'scripts','pirate_defaults.json'),'SingletCell',0,'ForceRootName',0);

@@ -1,3 +1,7 @@
+% This script runs the univariate analysis on repetition suppression and
+% neural axis and train/test difference
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
 
 % TODO need to rerun to test if new code is bug-free
 clear;clc

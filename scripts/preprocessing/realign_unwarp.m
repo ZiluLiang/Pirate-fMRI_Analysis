@@ -1,16 +1,20 @@
-function realign_unwarp(subimg_dir,varargin)
+function realign_unwarp(subimg_dir,use_reorient)
 % realign the first scan of each session to the first scan of the first session, 
 % realign the other scans to the first scan within each session,
 % and unwarp using the vdm calculated from fieldmap images
 %
-% output: u*(realigned and unwarped epi images), mean*(mean epi image)
-% ------ written by Zilu Liang(2023.4,Oxford)------
-    
+% INPUT:
+%  - subimg_dir: directory to participant's preprocessing fmri images
+%  - use_reorient: use reoriented or raw image for preprocessings
+% 
+% This will create the following files:
+%  u*(realigned and unwarped epi images),
+%  mean*(mean epi image)
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
     % get flags
-    use_reorient = true;
-    if numel(varargin) == 1 && islogical(use_reorient)
-        use_reorient = varargin{1};
-    end
+    if nargin<2 || ~islogical(use_reorient), use_reorient = true; end
 
     % get regular expression for different image files 
     filepattern = get_pirate_defaults(false,'filepattern');

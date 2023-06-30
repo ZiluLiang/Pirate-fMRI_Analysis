@@ -1,19 +1,32 @@
 function reorient(subimg_dir)
 % VERY VERY ROUGHLY automatically reorient T1, fieldmap and functional 
 % images according to the AC-PC axis and setting the origin to AC. 
+%
+% INPUT:
+%  - subimg_dir: directory to participant's preprocessing fmri images
+% 
+% This will create the following files:
+%  o*.nii(reoriented images)
+%
 % Notes:
-% 1. for this script, this is done by performing rigid body 
-% transformation on T1 according to a specified template. The transformation
-% parameter estimated for T1 is applied to all functional time series as
-% well as the fieldmap images to make sure everyting moves together. The
+% 1. for the current preprocessing pipeline, this is done in order to
+% provide better prior for normalization, so the template is in line with
+% the one used for normalization.
+%
+% 2. for this script, this is done by performing rigid body 
+% transformation on T1,functional, and fieldmap images according to a 
+% specified template. The same set of transformation parameter is applied 
+% to all the above modalities to make sure everyting moves together. The
 % function used for deriving such parameter is adapted from the github repo
 % spm_auto_reorient_coregister RRID: SCR_017281. https://github.com/lrq3000/spm_auto_reorient_coregister
 %
-% 2. for the current preprocessing pipeline, this is done in order to
-% provide better prior for normalization, so the template is in line with
-% the one used for normalization
-% --------------------------------------------------------------------------
-% written by Zilu Liang, 2023
+% 3. for this script, the transformation parameter is estimated based on T1 
+% and a specified template. Note that this may not yield satisfactory result
+% if T1 and the functional and/or fieldmap scans are not acquired on the
+% same day. If this is the case, using the first scan of the functional
+% image to estimate the transformation parameter may be a better choice.
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
 
     [filepattern,directory] = get_pirate_defaults(false,'filepattern','directory');    
 

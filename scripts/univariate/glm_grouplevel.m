@@ -12,7 +12,13 @@ function glm_grouplevel(outputdir,scans,factor_names,cov)
 %           scans{1,2,3,4} specifies the first level contrasts images 
 %           corresponding to condition A1B2C3D4.
 %  - factor_names: cell array of names of each factor. 
-    
+%  - cov: covariates
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
+% TODO: need to support multiple covariates
+
+
     % reshape input so that each factor at least has two levels
     nLs0 = size(scans); 
     nLs  = nLs0(nLs0>1); % number of levels for each factor

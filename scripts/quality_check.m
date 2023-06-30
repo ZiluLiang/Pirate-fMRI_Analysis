@@ -1,11 +1,13 @@
 % quality checks of fmri data preprocessing
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
 % TODO: checkout
 % https://github.com/jsheunis/fMRwhy/tree/master/fmrwhy/qcand see if more
 % quality control measures should be calculated
-% ------ written by Zilu Liang(2023.5,Oxford)------
 
-clear;clc
 %% Configurations
+clear;clc
 [directory,participants,filepattern] = get_pirate_defaults(false,'directory','participants','filepattern');                                                         
 qc_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\qualitycheck';
 

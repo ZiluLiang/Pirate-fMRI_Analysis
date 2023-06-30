@@ -1,9 +1,11 @@
 function o = ext_spm_coregcost(source_img,template_img,varargin)
 % o = ext_spm_coregcost(source_img,template_img,costfun) 
-% -- adapted from spm_coreg.m according to https://www.jiscmail.ac.uk/cgi-bin/wa-jisc.exe?A2=ind1812&L=SPM&P=R16843
+% ---------------------------- Copyright Info ---------------------------- 
+% this script is adapted from spm_coreg.m according to https://www.jiscmail.ac.uk/cgi-bin/wa-jisc.exe?A2=ind1812&L=SPM&P=R16843
 % this function is a simplified version of part of the code from spm_coreg.m
 % it returns the match between source image and template imgage based on 
 % the cost function specified. 
+% ------------------------------------------------------------------------
 % INPUT:
 %    - source_img:cell array containing one/multiple images to be compared
 %    - template_image: one template image
@@ -12,7 +14,10 @@ function o = ext_spm_coregcost(source_img,template_img,varargin)
 %    should be used
 % OUTPUT:
 %    - 1*N array of matching measures, N being the number of source images.
-% TODO: mi measures are greater than one, is that normal?
+% -----------------------------------------------------------------------    
+% Adapted by Zilu Liang
+
+% TODO: MI measures are greater than one, is that normal?
 
     if numel(varargin) >= 1 && ischar(varargin{1})
         costfun = varargin{1};

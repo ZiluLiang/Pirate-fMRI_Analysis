@@ -1,5 +1,6 @@
 % fmri data preprocessing
-% The script contains six steps controlled by six flags in the preprocess_flags struct:
+% The script contains seven steps controlled by seven flags in the preprocess_flags struct:
+%       reorient:       auto-reorient T1/fmri/fieldmap according to a template
 %       calVDM:         calculated voxel displacement map
 %       realign_unwarp: realign and unwarp using vdm
 %       coregistration: coregister t1 to mean epi
@@ -12,7 +13,8 @@
 % level glm analysis, preprocessed images are copied to new folders for
 % subsequent analysis
 %
-% ------ written by Zilu Liang(2023.4,Oxford)------
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
 
 clear;clc
 %% Configurations

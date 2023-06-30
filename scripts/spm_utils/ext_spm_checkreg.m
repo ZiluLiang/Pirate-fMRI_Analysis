@@ -7,7 +7,9 @@ function ext_spm_checkreg(varargin)
 % or 
 %    ext_spm_checkreg(view_cfg) where view_cfg is a struct with the
 %    following fields:'images','captions','overlays'
-   
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
     % initialize empty configurations the same size as the 
     init_cfg = struct('images',[],'captions',[],'overlays',[]);
     cfg_fields = {'images','captions','overlays'};

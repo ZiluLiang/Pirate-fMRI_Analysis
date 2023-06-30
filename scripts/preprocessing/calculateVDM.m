@@ -1,16 +1,18 @@
-function calculateVDM(subimg_dir,varargin)
+function calculateVDM(subimg_dir,use_reorient)
 % calculate voxel distortion map
-%
-% output:
+% INPUT:
+%  - subimg_dir: directory to participant's preprocessing fmri images
+%  - use_reorient: use reoriented or raw image for preprocessing
+% 
+% This will create the following files:
 %  vdm5_sc*:
 %  wfmag_*: forward warpped magnitude image
-% ------ written by Zilu Liang(2023.4,Oxford)------
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
     
     % get flags
-    use_reorient = true;
-    if numel(varargin) == 1 && islogical(use_reorient)
-        use_reorient = varargin{1};
-    end
+    if nargin<2 || ~islogical(use_reorient), use_reorient = true; end
 
     % get regular expression for different image files 
     [filepattern,directory] = get_pirate_defaults(false,'filepattern','directory');

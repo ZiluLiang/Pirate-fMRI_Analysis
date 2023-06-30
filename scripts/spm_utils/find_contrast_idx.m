@@ -8,6 +8,9 @@ function [contrast_idx,contrast_img,stat_img] = find_contrast_idx(subSPM,contras
 %    - contrast_img: the name of the corresponding con***.nii file(s);
 %    - stat_img: the name of the corresponding spmT***.nii or spmF***.nii
 %    file(s);
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
     if ischar(subSPM)
         if exist(subSPM,'file')
             subSPM = load(subSPM).SPM;
@@ -29,8 +32,12 @@ function [contrast_idx,contrast_img,stat_img] = find_contrast_idx(subSPM,contras
     [contrast_img,stat_img] = deal(cell(size(contrast_idx)));
     for j = 1:numel(contrast_idx)
         if ~isnan(contrast_idx(j))
-            contrast_img{j} = sprintf('con_%04d.nii',contrast_idx(j));
             stat_img{j} = sprintf('spm%s_%04d.nii',subSPM.xCon(contrast_idx(j)).STAT,contrast_idx(j));
+            if subSPM.xCon(contrast_idx(j)).STAT == 'T'
+                contrast_img{j} = sprintf('con_%04d.nii',contrast_idx(j));
+            else
+                contrast_img{j} = '';
+            end
         end
     end
     if numel(numel(contrast_idx)) == 1

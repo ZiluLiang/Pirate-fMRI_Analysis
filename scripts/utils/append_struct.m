@@ -1,8 +1,11 @@
 function s = append_struct(varargin)
 %Usage: append_struct(s,addon_s1,addon_s2,...,addon_sn,append_option)
-%   s, addon_sj must all be structs
-%   append_option can be one of : 'concatenate','add_field','expand'
-%check inputs
+%       s, addon_sj must all be structs
+%       append_option can be one of : 'concatenate','add_field','expand'
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
+    %check inputs
     if nargin<3
         error(['Number of arguments is not enough. ',...
                'At least two structs should be entered as input argument']);

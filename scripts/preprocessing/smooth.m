@@ -1,8 +1,13 @@
 function smooth(subimg_dir)
 % smooth the normlised images using a kernel that equals to twice the voxel size,
-%
-% output: s*.nii(smoothed images)
-% ------ written by Zilu Liang(2023.4,Oxford)------
+% INPUT:
+%  - subimg_dir: directory to participant's preprocessing fmri images
+% 
+% This will create the following files:
+%  s*.nii(smoothed images)
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
+
 
     [fmri,filepattern] = get_pirate_defaults(false,'fmri','filepattern'); 
     func_imgs = cellstr(spm_select('FPList', subimg_dir, [filepattern.preprocess.normalise,'.*\.nii']));

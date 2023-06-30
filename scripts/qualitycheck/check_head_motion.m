@@ -15,6 +15,8 @@ function [T,f] = check_head_motion(subimg_dir,rp_range,rp_thres,flag_animate,fla
 %     - T: table of head motion metrics
 %     - f: the figure handle of the head motion plots if flag_plotmotion is
 %     true, else return nan
+% -----------------------------------------------------------------------    
+% Author: Zilu Liang
 
     % get the filepattern from default setting 
     filepattern = get_pirate_defaults(false,'filepattern');
