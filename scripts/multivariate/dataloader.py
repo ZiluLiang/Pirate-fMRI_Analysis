@@ -109,6 +109,8 @@ class ActivityPatternDataLoader:
             data_3D[maskdata] = data1d
             if not ensure_finite:
                 data_3D = data_3D.astype('float64') # make sure nan is saved as nan
+            else:
+                data_3D[numpy.isnan(data_3D)] = 0 # replace nan with 0
             data_img = new_img_like(self.mask_img, data_3D)
             data_3D_list.append(data_3D)
             data_img_list.append(data_img)
