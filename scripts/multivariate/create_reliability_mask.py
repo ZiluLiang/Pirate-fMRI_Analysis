@@ -72,15 +72,15 @@ for p in preprocess:
         vox_rmaskdata = np.logical_and(vox_reliability>0, ~np.isnan(vox_reliability))
         vox_permrmaskdata = np.random.permutation(vox_rmaskdata)
 
-        _, voxr_img = subAP.create_img(vox_reliability)
-        _, voxr_maskimg = subAP.create_img(vox_rmaskdata)
-        _, voxr_permmaskimg = subAP.create_img(vox_permrmaskdata)
+        _, voxr_img = subAP.create_img(vox_reliability,ensure_finite=True)
+        _, voxr_maskimg = subAP.create_img(vox_rmaskdata,ensure_finite=True)
+        _, voxr_permmaskimg = subAP.create_img(vox_permrmaskdata,ensure_finite=True)
         nib.save(voxr_img, os.path.join(outputdir, 'reliability_map.nii'))        
         nib.save(voxr_maskimg, os.path.join(outputdir, 'reliability_mask.nii'))
         nib.save(voxr_permmaskimg, os.path.join(outputdir, 'permuted_reliability_mask.nii'))
 
         vox_retention_rate = np.sum(vox_rmaskdata)/subAP.X.shape[1]
-        print(f"{subid} whole brain voxel retention rate: {vox_retention_rate}")        
+        print(f"{p} - {subid} whole brain voxel retention rate: {vox_retention_rate}")        
         return {"reliability":vox_reliability,"retentionrate":vox_retention_rate}
     
     firstlvl_dirs = [os.path.join(output_dir_par,'first',subid) for subid in subid_list]
