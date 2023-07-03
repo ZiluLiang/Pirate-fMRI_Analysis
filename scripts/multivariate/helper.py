@@ -8,6 +8,7 @@ import os
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
+import pandas
 
 def scale_feature(X:numpy.ndarray,s_dir:int=2,standardize:bool=True) -> numpy.ndarray:
     """ standardize or center a 1D or 2D numpy array by using ZX = (X - mean)/std
@@ -227,13 +228,16 @@ class ModelRDM:
                  stimloc:numpy.ndarray,
                  stimfeature:numpy.ndarray,
                  stimgroup:numpy.ndarray,
-                 n_session:int=1):
+                 n_session:int=1,
+                 randomseed:int=1):
         self.n_session   = n_session
-        self.n_stim      = len(stimid)
-        self.stimid      = numpy.tile(stimid,(n_session,1))
-        self.stimloc     = numpy.tile(stimloc,(n_session,1))
-        self.stimfeature = numpy.tile(stimfeature,(n_session,1))
-        self.stimgroup   = numpy.tile(stimgroup,(n_session,1))
+        self.n_stim      = len(stimid)       
+        self.stimid      = numpy.tile(stimid,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
+        self.stimloc     = numpy.tile(stimloc,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
+        self.stimfeature = numpy.tile(stimfeature,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
+        self.stimgroup   = numpy.tile(stimgroup,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
+        self.stimsession = numpy.concatenate([numpy.repeat(j,len(stimid)) for j in range(self.n_session)])
+
         models = {"loc2d":self.euclidean2d(),
                   "loc1dx":self.euclidean1d(0),
                   "loc1dy":self.euclidean1d(1),
@@ -242,7 +246,9 @@ class ModelRDM:
                   "feature1dy":self.feature1d(1),
                   "stimuli":self.identity(),
                   "stimuligroup":self.identity(self.stimgroup),
-                  "random":self.random()
+                  "shuffledloc2d":self.random(randomseed=randomseed,rdm=self.euclidean2d(),mode="permuterdm"),
+                  "randfeature2d":self.random(randomseed=randomseed,mode="randomfeature"),
+                  "randmatrix":self.random(randomseed=randomseed,mode="randommatrix")
                 }
 
         # split into sessions
@@ -266,17 +272,39 @@ class ModelRDM:
             self.models.keys()
         )
     
-    def random(self)->numpy.ndarray:
+    def random(self,randomseed:int=1,rdm:numpy.ndarray=None,mode:str="randommatrix") -> numpy.ndarray:
         """generate random model RDM based on sample size
+
+        Parameters
+        ----------
+        randomseed: int
+            a random seed used for the random state instance that are used for generating random matrix/feature/permutation
+        rdm : numpy.ndarray
+            a 2D numpy array of a model rdm that is used for shuffling to generate random RDM
+        mode : str
+            a string specifying the kind of random rdm to be generated. Must be one of: randomfeature, permuterdm,randommatrix
 
         Returns
         -------
         numpy.ndarray
             2D numpy array of a random model rdm
         """
-        prng = numpy.random.RandomState(1234567890)
-        rand_features = prng.random(size=self.stimfeature.shape)
-        return compute_rdm(rand_features,"euclidean")
+        
+        prng = numpy.random.RandomState(randomseed)
+        if rdm is not None:
+            assert isinstance(rdm,numpy.ndarray), "rdm must be 2D square array of size = (nsample,nsample)"
+            assert rdm.shape == (self.n_stim*self.n_session,self.n_stim*self.n_session), "rdm must be 2D square array of size = (nsample,nsample)"
+            mode = "permuterdm"
+
+        if mode == "permuterdm":
+            return prng.permutation(rdm.flatten()).reshape(rdm.shape)
+        elif mode == "randomfeature":
+            rand_features = prng.random(size=self.stimfeature.shape)
+            return compute_rdm(rand_features,"euclidean")
+        elif mode == "randommatrix":
+            return prng.random((self.n_stim*self.n_session,self.n_stim*self.n_session))
+        else:
+            raise ValueError("invalid random mode, must be one of: randomfeature, permuterdm, randommatrix")
 
     def session(self)->numpy.ndarray:
         """calculate model rdm based on session, if the pair is in the same session, distance will be 0, otherwise will be 1
@@ -429,4 +457,49 @@ class ModelRDM:
             for k in numpy.arange(numpy.size(axes.flatten())-1-j)+1:
                 fig.delaxes(axes.flatten()[j+k])
         return fig
+    
+    def rdm_to_df(self,modelnames:list or str,rdms:list or numpy.ndarray=None) -> pandas.DataFrame:
+        """put the lower triangular part (excluding the diagonal) fo a square rdm matrix into pandas dataframe indexed by stimuli id, run(session), and group
+
+        Parameters
+        ----------
+        modelnames : list or str
+            a model name or a list of model names. If rdms is not specified, the model names must be one of the keys of `self.models`
+        rdms : listornumpy.ndarray, optional
+            the external rdms (that are generated for the same stimuli pairs as in `self.models` but based on different feature vectors) to be transformed, by default None
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
+        if not isinstance(modelnames,list):
+            if isinstance(modelnames,str):
+                modelnames = [modelnames]
+            else:
+                raise ValueError("modelnames must be a model name or a list of model names")
+        
+        if rdms is None:
+            assert numpy.all([x in self.models.keys() for x in modelnames]), "Invalid model names!"
+            rdms = [self.models[m] for m in modelnames]
+        else:
+            if not isinstance(rdms,list):
+                if isinstance(rdms,numpy.ndarray):
+                    rdms = [rdms]
+                else:
+                    raise ValueError("rdms must be a 2d numpy array of rdm or a list of 2d numpy array rdms")            
+            assert len(rdms)==len(modelnames), "number of rdms do not match number of names"
+
+        modeldf = []
+        for m,rdm in zip(modelnames,rdms):
+            lt,idx = lower_tri(rdm)
+            c = numpy.repeat(numpy.arange(0, rdm.shape[0]), rdm.shape[0]).reshape(rdm.shape)[idx]
+            i = numpy.tile(numpy.arange(0, rdm.shape[0]),  rdm.shape[0]).reshape(rdm.shape)[idx]
+            df = pandas.DataFrame({'stimidA':numpy.squeeze(self.stimid[c]), 'stimidB': numpy.squeeze(self.stimid[i]), 
+                                   'groupA': numpy.squeeze(self.stimgroup[c]),  'groupB': numpy.squeeze(self.stimgroup[i]), 
+                                   'runA': numpy.squeeze(self.stimsession[c]),  'runB': numpy.squeeze(self.stimsession[i]), 
+                                    m: lt}
+                                 ).set_index(['stimidA', 'stimidB', 'groupA', 'groupB', 'runA', 'runB'])
+            modeldf.append(df)
+        modeldf = modeldf[0].join(modeldf[1:])
+        return modeldf
         
