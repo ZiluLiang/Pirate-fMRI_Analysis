@@ -112,7 +112,8 @@ function glms = glm_gallery
     glms(7).modelopt    = struct('use_stick', [repmat({false},size(exp.allstim)),{false}]);
     % F contrast for the overall effect of stimuli
     glms(7).contrasts(1).name = 'stimuli';
-    glms(7).contrasts(1).wvec = [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)];
+    glms(7).contrasts(1).wvec = cell2struct(num2cell(eye(numel(exp.allstim))),... % same as [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)] 
+                                            arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0));
     % separate t contrast for each stimulus
     curr_ccount = numel(glms(7).contrasts);
     for j = 1:numel(exp.allstim)
@@ -183,7 +184,8 @@ function glms = glm_gallery
     glms(12).modelopt    = struct('use_stick', [repmat({false},size(exp.allstim)),{false}]);
     % contrast for the overall effect of stimuli
     glms(12).contrasts(1).name = 'stimuli';
-    glms(12).contrasts(1).wvec = [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)];
+    glms(12).contrasts(1).wvec = cell2struct(num2cell(eye(numel(exp.allstim))),...
+                                             arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0));
 
     glms(13).name = 'LSA_stimuli_navigation_concatodd';
     glms(13).filepattern = 'sub-.*_task-piratenavigation_run-[1,3]';
@@ -191,7 +193,8 @@ function glms = glm_gallery
     glms(13).modelopt    = struct('use_stick', [repmat({false},size(exp.allstim)),{false}]);
     % contrast for the overall effect of stimuli
     glms(13).contrasts(1).name = 'stimuli';
-    glms(13).contrasts(1).wvec = [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)];
+    glms(13).contrasts(1).wvec = cell2struct(num2cell(ones(numel(exp.allstim),1)),...
+                                             arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0));
 
     glms(14).name = 'LSA_stimuli_navigation_concateven';
     glms(14).filepattern = 'sub-.*_task-piratenavigation_run-[2,4]';
@@ -199,5 +202,6 @@ function glms = glm_gallery
     glms(14).modelopt    = struct('use_stick', [repmat({false},size(exp.allstim)),{false}]);
     % contrast for the overall effect of stimuli
     glms(14).contrasts(1).name = 'stimuli';
-    glms(14).contrasts(1).wvec = [eye(numel(exp.allstim)),zeros(numel(exp.allstim),1)];
+    glms(14).contrasts(1).wvec = cell2struct(num2cell(ones(numel(exp.allstim),1)),...
+                                             arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0));
 end
