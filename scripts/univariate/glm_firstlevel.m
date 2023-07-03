@@ -1,4 +1,4 @@
-function glm_firstlevel(nii_files,multicond_files,nuisance_files,output_dir)
+function glm_firstlevel(nii_files,multicond_files,multireg_files,output_dir)
 % Specify first-level glm in spm
 % usage: glm_firstlevel(nii_files,multicond_files,nuisance_files,output_dir,flag_estimate)
 % INPUT:
@@ -7,15 +7,17 @@ function glm_firstlevel(nii_files,multicond_files,nuisance_files,output_dir)
 % - multicond_files: cell array of .mat file that contains the specification of
 %                    conditions in spm, each element is the file for one session.  
 %                    see spm batch GUI for detailed formatting instructions
-% - nuisance_files:  cell array of .txt files that contains the nuisance regressors,
+% - multireg_files:  cell array of .txt/.mat files that contains the 
+%                    multiple regressors not convolved with hrf, e.g.
+%                    nuisance regressors, head motion regressors etc
 %                    each element is the file for one session.  
-%                    each column in a txt file is the value of one nuisance
-%                    regressor.
+%                    each column in a txt file or in the R matrix of the .mat
+%                    file is the value of one nuisance regressor. 
 % - output_dir:      the directory in which result images and SPM.mat is saved 
 % -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
-    if numel(nii_files)==numel(multicond_files) && numel(nii_files)==numel(nuisance_files)
+    if numel(nii_files)==numel(multicond_files) && numel(nii_files)==numel(multireg_files)
         nsess = numel(nii_files);
     else
         error('number of 4D nii files, multiple conditions files, and number of nuisance regressor files do not match!')
@@ -40,10 +42,10 @@ function glm_firstlevel(nii_files,multicond_files,nuisance_files,output_dir)
         specification.sess(iSess).scans = nii_files{iSess};%#ok<*AGROW> %scans for each run
         %Data&Design - conditions and pmods
         specification.sess(iSess).cond = struct('name', {}, 'onset', {}, 'duration', {}, 'tmod', {}, 'pmod', {}, 'orth', {});
-        specification.sess(iSess).multi = multicond_files(iSess);
+        specification.sess(iSess).multi = multicond_files{iSess};
         %Data&Design - nuisance regressors
         specification.sess(iSess).regress = struct('name',{},'val',{});
-        specification.sess(iSess).multi_reg = nuisance_files(iSess);
+        specification.sess(iSess).multi_reg = multireg_files{iSess};
         % high-pass filter
         specification.sess(iSess).hpf = 128;
     end
