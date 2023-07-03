@@ -75,21 +75,14 @@ function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,s
             fprintf('%s: Specifying first-level GLM for %s \n', glm_name, subid)
             flag_concatenate = ismember('concatenate',steps);
 
-            [~,m_files]    = setup_multiconditions(glm_name,subid,fullfile(glm_dir,'beh',subid),glm_config.modelopt,flag_concatenate);
-            nuisance_files = cellstr(spm_select('FPList',subimg_dir,[filepattern.preprocess.nuisance,glm_config.filepattern,'.*.txt']));
+            [~,c_files,r_files] = setup_multi(glm_name,subid,fullfile(glm_dir,'beh',subid),glm_config.modelopt,flag_concatenate,preproc_img_dir);
             if flag_concatenate
                 nii_files = {cellstr(spm_select('ExtFPList',subimg_dir,[glm_config.filepattern,'.*.nii']))};
-                nuisance_list  =  cellfun(@(x) readtable(x),nuisance_files,'UniformOutput',0); %#ok<*UNRCH>
-                nuisance_table = cat(1,nuisance_list{:});
-                [savedir,~,~]  = fileparts(m_files);
-                nuisance_files = {fullfile(savedir,'nuisance_concat.txt')};
-                writetable(nuisance_table,nuisance_files{1},'Delimiter',' ','WriteVariableNames',false)
             else
                 nii_files      = cellstr(spm_select('List',subimg_dir,[glm_config.filepattern,'.*.nii']));
                 nii_files      = cellfun(@(x) cellstr(spm_select('ExtFPList',subimg_dir,x)),nii_files,'UniformOutput',false);
-            end
-            
-            glm_firstlevel(nii_files,m_files,nuisance_files,output_dir);
+            end            
+            glm_firstlevel(nii_files,c_files,r_files,output_dir);
             
             if flag_concatenate
                 glm_concatenate(output_dir,cellfun(@(x) numel(spm_vol(x)),nii_files));

@@ -1,5 +1,5 @@
-function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cfg,flag_concatenate)
-% create the mat file for multiple condtions
+function [multicond,multicond_fn,multireg_fn] = setup_multi(glm_name,subid,output_dir,gen_multi_cfg,flag_concatenate,preproc_img_dir)
+% create the mat file for multiple condtions and multiple regressors
 % INPUT
 % - glm_name: name of the glm, this will be used to find glm
 %             configurations in the glm_configure functions
@@ -13,31 +13,35 @@ function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cf
 % -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
-    [directory,fmri]  = get_pirate_defaults(false,'directory','fmri');
+    [directory,fmri,filepattern]  = get_pirate_defaults(false,'directory','fmri','filepattern');
     glm_config = glm_configure(glm_name);
     glm_dir    = fullfile(directory.fmri_data,glm_config.name);
     
     if nargin<3, output_dir = fullfile(glm_dir,'beh',subid); end
     if nargin<4, gen_multi_cfg = struct();end
     if nargin<5, flag_concatenate = false;end
+    if nargin<6, preproc_img_dir = directory.smoothed;end
     checkdir(output_dir)
     
-    preproc_img_dir = directory.smoothed;
     nii_files  = cellstr(spm_select('FPList',fullfile(preproc_img_dir,subid),[glm_config.filepattern,'.*.nii'])); 
+    nuisance_files = cellstr(spm_select('FPList',fullfile(preproc_img_dir,subid),[filepattern.preprocess.nuisance,glm_config.filepattern,'.*.txt']));    
     data_mat   = cellstr(spm_select('FPList',fullfile(directory.fmribehavior,subid),[glm_config.filepattern,'.*mat']));
     if ~flag_concatenate
-        M          = cell(size(data_mat));
-        M_fn       = cell(size(data_mat));
+        multicond          = cell(size(data_mat));
+        multicond_fn       = cell(size(data_mat));
         for j = 1:numel(data_mat)
             load(data_mat{j},'data');
-            multi   = gen_multi(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
-            M_fn{j} = fullfile(output_dir,sprintf('multi_%d.mat',j));
-            M{j}    = multi;
-            save(M_fn{j},'-struct','multi')
+            multi   = gen_multiconditions(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
+            multicond_fn{j} = cellstr(fullfile(output_dir,sprintf('multi_%d.mat',j)));
+            multicond{j}    = multi;
+            save(string(multicond_fn{j}),'-struct','multi')
             clearvars data multi
         end
-    else
-        scans  = cellfun(@(x) numel(spm_vol(x)),nii_files);
+        multireg_fn = cellfun(@(x) {x},nuisance_files,'UniformOutput',false);
+    else        
+        scans = cellfun(@(x) numel(spm_vol(x)),nii_files);
+        nsess = numel(scans);
+        %multiple conditions
         data_list = cellfun(@(x) load(x,'data').data,data_mat,'UniformOutput',0);
         for j = 1:numel(data_list)
             if ~istable(data_list{j})
@@ -50,15 +54,34 @@ function [M,M_fn] = setup_multiconditions(glm_name,subid,output_dir,gen_multi_cf
             end
         end
         data = cat(1,data_list{:});
-        M = {};
-        multi = gen_multi(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
-        M{1} = multi;
-        M_fn = {fullfile(output_dir,'multi_concat.mat')};
-        save(M_fn{1},'-struct','multi')
+        multicond = {};
+        multicond_fn = {};
+        multi = gen_multiconditions(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
+        multicond{1} = multi;
+        multicond_fn{1} = cellstr(fullfile(output_dir,'multi_concat.mat'));
+        save(string(multicond_fn{1}),'-struct','multi')
+        %nuisance regressors
+        nuisance_list  =  cellfun(@(x) readtable(x),nuisance_files,'UniformOutput',0); %#ok<*UNRCH>
+        nuisance_table = cat(1,nuisance_list{:});
+        nuisance_file  = fullfile(output_dir,'nuisance_concat.txt');
+        writetable(nuisance_table,nuisance_file,'Delimiter',' ','WriteVariableNames',false)
+        %session-specific regressors  - here we generate nsess-1
+        %regressors, accounting for session-specific effect. we do not
+        %generate nsess regressors because spm inherently has a column for
+        %all sessions in the design matrix, having nsess number of
+        %regressors will be redundant.
+        session_regressors = arrayfun(@(j) ...
+            [zeros(sum(scans(1:j-1)),1);ones(scans(j),1);zeros(sum(scans(j+1:nsess)),1)],...
+            1:nsess-1,'UniformOutput',false);
+        session_regressors = struct('names',{arrayfun(@(x) sprintf('Sn%d',x),1:nsess-1,'UniformOutput',false)},...
+                                    'R',cat(2,session_regressors{:}));
+        session_reg_fn = fullfile(output_dir,'sessionreg_concat.mat');
+        save(session_reg_fn,'-struct','session_regressors')
+        multireg_fn = {{nuisance_file;session_reg_fn}};
     end
 end
 
-function multi = gen_multi(data,cond_names,pmod_names,custom_cfg)
+function multi = gen_multiconditions(data,cond_names,pmod_names,custom_cfg)
 % generate the variables saved to the multi-cond.mat file which can be used
 % directly when specifying first level models in SPM.
 % example usage: gen_multi(data,names,pmod,cfg) cfg and pmod are optional
