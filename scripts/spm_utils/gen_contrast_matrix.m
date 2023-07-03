@@ -49,8 +49,9 @@ function w_mat = gen_contrast_matrix(subSPM,weights,flag_rescale)
         end        
         w_mat = zeros(numel(weights),numel(subSPM.xX.name));
         for j = 1:numel(weighted_regressors)
-            reg_idx          = find_regressor_idx(subSPM,reg_pattern{j});
-            w_mat(:,reg_idx) = [weights.(weighted_regressors{j})] ./ (numel(reg_idx)^flag_rescale); 
+            reg_idx = find_regressor_idx(subSPM,reg_pattern{j});
+            w_col   = reshape([weights.(weighted_regressors{j})],numel(weights),1) ./ (numel(reg_idx)^flag_rescale);
+            w_mat(:,reg_idx) = repmat(w_col,1,numel(reg_idx));
         end
     end    
 end
