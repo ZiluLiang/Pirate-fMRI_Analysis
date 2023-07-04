@@ -11,19 +11,18 @@ Meanwhile, a permuted version of reliability mask is created. This mask includes
 """	
 import os
 import sys
-project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
-sys.path.append(os.path.join(project_path,'scripts'))
-
 import numpy as np
-import joblib
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, dump
 import nibabel as nib
 import nibabel.processing
 from scipy.stats import spearmanr
 import json
-from dataloader import ActivityPatternDataLoader
 import pandas as pd
 import seaborn as sns
+
+project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
+sys.path.append(os.path.join(project_path,'scripts'))
+from multivariate.dataloader import ActivityPatternDataLoader
 from multivariate.helper import checkdir
 
 fmri_output_path = os.path.join(project_path,'data','fmri')
@@ -85,7 +84,7 @@ for p in preprocess:
     
     firstlvl_dirs = [os.path.join(output_dir_par,'first',subid) for subid in subid_list]
     WB_reliability = Parallel(n_jobs = 10)(delayed(compute_voxel_reliability)(sAP,opdir,subid) for (sAP,opdir,subid) in zip(WB_beta,firstlvl_dirs,subid_list))
-    joblib.dump(WB_reliability,os.path.join(output_dir_par,'wholebrain_reliability.pkl'))
+    dump(WB_reliability,os.path.join(output_dir_par,'wholebrain_reliability.pkl'))
 
     # create a distribution plot for each participant
     M = [t["reliability"] for t in WB_reliability]
