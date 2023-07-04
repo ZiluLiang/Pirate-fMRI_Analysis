@@ -102,7 +102,7 @@ for jdir = 1:numel(lsa_dir)
         subSPM = load(fullfile(firstlvl_dir,'SPM.mat'),'SPM').SPM;
         [~,reg_img] = arrayfun(@(stimid) find_regressor_idx(subSPM,sprintf('stim%02d',stimid)),exp.trainingstim);
         
-        fprintf('%s - reg_img: %d/9\n', numel(reg_img))
+        fprintf('%s - reg_img: %d/9\n', participants.validids{isub},numel(reg_img))
         if all(~isempty(reg_img))
             % ordered by stim[2,7,10,11,12,13,14,17,22]
             spm_file_merge(char(fullfile(firstlvl_dir,reg_img)),fullfile(firstlvl_dir,'stimuli_1r.nii'));

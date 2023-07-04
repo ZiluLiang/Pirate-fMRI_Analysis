@@ -74,18 +74,19 @@ function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,s
         if ismember('specify',steps)
             fprintf('%s: Specifying first-level GLM for %s \n', glm_name, subid)
             flag_concatenate = ismember('concatenate',steps);
-
+            scans     = cellfun(@(x) numel(spm_vol(x)), ... % count how many volumes each 4D nii file has
+                                cellstr(spm_select('FPList',subimg_dir,[glm_config.filepattern,'.*.nii'])))'; % get the 4D nii files
             [~,c_files,r_files] = setup_multi(glm_name,subid,fullfile(glm_dir,'beh',subid),glm_config.modelopt,flag_concatenate,preproc_img_dir);
             if flag_concatenate
                 nii_files = {cellstr(spm_select('ExtFPList',subimg_dir,[glm_config.filepattern,'.*.nii']))};
             else
-                nii_files      = cellstr(spm_select('List',subimg_dir,[glm_config.filepattern,'.*.nii']));
-                nii_files      = cellfun(@(x) cellstr(spm_select('ExtFPList',subimg_dir,x)),nii_files,'UniformOutput',false);
+                nii_files = cellstr(spm_select('List',subimg_dir,[glm_config.filepattern,'.*.nii']));
+                nii_files = cellfun(@(x) cellstr(spm_select('ExtFPList',subimg_dir,x)),nii_files,'UniformOutput',false);
             end            
             glm_firstlevel(nii_files,c_files,r_files,output_dir);
             
             if flag_concatenate
-                glm_concatenate(output_dir,cellfun(@(x) numel(spm_vol(x)),nii_files));
+                glm_concatenate(output_dir,scans);
             end
         end
 
