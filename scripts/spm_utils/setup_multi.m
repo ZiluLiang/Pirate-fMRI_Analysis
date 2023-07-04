@@ -27,20 +27,26 @@ function [multicond,multicond_fn,multireg_fn] = setup_multi(glm_name,subid,outpu
     nuisance_files = cellstr(spm_select('FPList',fullfile(preproc_img_dir,subid),[filepattern.preprocess.nuisance,glm_config.filepattern,'.*.txt']));    
     data_mat   = cellstr(spm_select('FPList',fullfile(directory.fmribehavior,subid),[glm_config.filepattern,'.*mat']));
     if ~flag_concatenate
+        % no concatenation, specify mutli-conditions and multi-regressors separately
         multicond          = cell(size(data_mat));
         multicond_fn       = cell(size(data_mat));
         for j = 1:numel(data_mat)
             load(data_mat{j},'data');
             multi   = gen_multiconditions(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
-            multicond_fn{j} = cellstr(fullfile(output_dir,sprintf('multi_%d.mat',j)));
+            multicond_fn{j} = fullfile(output_dir,sprintf('multi_%d.mat',j));
             multicond{j}    = multi;
-            save(string(multicond_fn{j}),'-struct','multi')
+            save(multicond_fn{j},'-struct','multi')
             clearvars data multi
-        end
-        multireg_fn = cellfun(@(x) {x},nuisance_files,'UniformOutput',false);
+        end        
+        % multi-regressors: only nuisance regressors are used（headmotion）
+        multireg_fn = nuisance_files;
+        
+        % put reg/cond for different sessions(runs) into different cells
+        multireg_fn = cellfun(@(x) cellstr(x),multireg_fn,'UniformOutput',false);
+        multicond_fn = cellfun(@(x) cellstr(x),multicond_fn,'UniformOutput',false);
     else        
+        % concatenation, concatenate data from all runs together before specifying multi-conditions and multi-regressosrs
         scans = cellfun(@(x) numel(spm_vol(x)),nii_files);
-        nsess = numel(scans);
         %multiple conditions
         data_list = cellfun(@(x) load(x,'data').data,data_mat,'UniformOutput',0);
         for j = 1:numel(data_list)
@@ -54,30 +60,17 @@ function [multicond,multicond_fn,multireg_fn] = setup_multi(glm_name,subid,outpu
             end
         end
         data = cat(1,data_list{:});
-        multicond = {};
-        multicond_fn = {};
         multi = gen_multiconditions(data,glm_config.conditions,glm_config.pmods,gen_multi_cfg);
-        multicond{1} = multi;
-        multicond_fn{1} = cellstr(fullfile(output_dir,'multi_concat.mat'));
-        save(string(multicond_fn{1}),'-struct','multi')
-        %nuisance regressors
-        nuisance_list  =  cellfun(@(x) readtable(x),nuisance_files,'UniformOutput',0); %#ok<*UNRCH>
+        multicond = {multi};
+        multicond_fn = fullfile(output_dir,'multi_concat.mat');
+        save(string(multicond_fn),'-struct','multi')
+        multicond_fn = {cellstr(multicond_fn)};
+        % multi-regressors: currently only nuisance regressors are used（headmotion）
+        nuisance_list  = cellfun(@(x) readtable(x),nuisance_files,'UniformOutput',0); %#ok<*UNRCH>
         nuisance_table = cat(1,nuisance_list{:});
         nuisance_file  = fullfile(output_dir,'nuisance_concat.txt');
         writetable(nuisance_table,nuisance_file,'Delimiter',' ','WriteVariableNames',false)
-        %session-specific regressors  - here we generate nsess-1
-        %regressors, accounting for session-specific effect. we do not
-        %generate nsess regressors because spm inherently has a column for
-        %all sessions in the design matrix, having nsess number of
-        %regressors will be redundant.
-        session_regressors = arrayfun(@(j) ...
-            [zeros(sum(scans(1:j-1)),1);ones(scans(j),1);zeros(sum(scans(j+1:nsess)),1)],...
-            1:nsess-1,'UniformOutput',false);
-        session_regressors = struct('names',{arrayfun(@(x) sprintf('Sn%dconstant',x),1:nsess-1,'UniformOutput',false)},...
-                                    'R',cat(2,session_regressors{:}));
-        session_reg_fn = fullfile(output_dir,'sessionreg_concat.mat');
-        save(session_reg_fn,'-struct','session_regressors')
-        multireg_fn = {{nuisance_file;session_reg_fn}};
+        multireg_fn    = {cellstr(nuisance_file)};
     end
 end
 
