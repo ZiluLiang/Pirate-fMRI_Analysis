@@ -5,6 +5,36 @@ import nibabel.processing
 from nilearn.masking import apply_mask,intersect_masks,_load_mask_img
 import sklearn
 from nilearn.image import new_img_like
+
+def _check_single_image(image):
+        if isinstance(image,str):
+            if not os.path.exists(image):
+                raise LookupError("The following nii files are not found:\n" + image)
+            else:
+                return nib.load(image)
+        elif isinstance(image,nibabel.spatialimages.SpatialImage):
+            return image
+        else:
+            raise ValueError("input must be a loaded nibabel image or path to image")
+        
+
+def _check_and_load_images(imgs,mode:str="pass",intersect_threshold=1):
+        if not isinstance(imgs,list):
+            imgs = [imgs]
+        image_list = [_check_single_image(img) for img in imgs]
+
+        if len(image_list)>1:
+                if mode == "concatenate":
+                        loaded_image = nib.funcs.concat_images(image_list,axis=3) # concatenate into 4D image
+                elif mode == "intersect":
+                        loaded_image = intersect_masks(image_list,threshold=intersect_threshold) # compute intersection of the masks
+                elif mode == "pass":
+                        loaded_image = image_list
+        else:
+                loaded_image = image_list[0]
+
+        return loaded_image
+
 class ActivityPatternDataLoader:
     def __init__(self,data_nii_paths: list, mask_imgs=None):
         """_summary_
@@ -25,30 +55,12 @@ class ActivityPatternDataLoader:
             if any of the nii image files are not found, will throw error
         """
         
-        # validate input
-        if isinstance(data_nii_paths,list):
-            if not numpy.all([os.path.exists(x) for x in data_nii_paths]): 
-                non_existing_paths = numpy.array(data_nii_paths)[[not os.path.exists(x) for x in data_nii_paths]]
-                file_err_msg = "The following nii files are not found:\n" + ',\n'.join(non_existing_paths)
-                raise LookupError(file_err_msg)
-            else:
-                data_img = nib.funcs.concat_images(data_nii_paths,axis=3)
-        else:
-            data_img = nib.load(data_nii_paths)
+        # load data image
+        data_img = _check_and_load_images(imgs=data_nii_paths, mode="concatenate")        
 
         # obtain masks
         if mask_imgs is not None:
-            if isinstance(mask_imgs,list):
-                if not numpy.all([os.path.exists(x) for x in mask_imgs]): 
-                    non_existing_paths = numpy.array(mask_imgs)[[not os.path.exists(x) for x in mask_imgs]]
-                    file_err_msg = "The following nii files are not found:\n" + ',\n'.join(non_existing_paths)
-                    raise LookupError(file_err_msg)
-                else:
-                    loaded_maskimgs = [nib.load(mask_img) if isinstance(mask_img, str) else mask_img for mask_img in mask_imgs]
-                self.mask_img = intersect_masks(loaded_maskimgs,threshold=1)
-            else:
-                self.mask_img = nib.load(mask_imgs) if isinstance(mask_imgs, str) else mask_imgs     
-            
+            self.mask_img = _check_and_load_images(imgs=mask_imgs, mode="intersect")            
             X = apply_mask(data_img, self.mask_img,ensure_finite = False)
         else:
             self.maskdata = None
