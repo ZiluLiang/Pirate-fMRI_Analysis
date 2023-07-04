@@ -229,7 +229,8 @@ class ModelRDM:
                  stimfeature:numpy.ndarray,
                  stimgroup:numpy.ndarray,
                  n_session:int=1,
-                 randomseed:int=1):
+                 randomseed:int=1,
+                 nan_identity:bool=False):
         self.n_session   = n_session
         self.n_stim      = len(stimid)       
         self.stimid      = numpy.tile(stimid,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
@@ -257,7 +258,7 @@ class ModelRDM:
             WS = 1 - BS         # 0 - between session; 1 - between session
             BS[BS==0]=numpy.nan
             WS[WS==0]=numpy.nan
-            tmp = list(models.items())
+            tmp = list(models.items()) ## this is so that we don't change models
             for k,v in tmp:
                 ws_n  = 'within_'+k
                 rdmws = numpy.multiply(v,WS)
@@ -265,7 +266,14 @@ class ModelRDM:
                 rdmbs = numpy.multiply(v,BS)
                 models |= {ws_n:rdmws,bs_n:rdmbs}
             models["session"] = self.session()
+        for k,v in models.items():
+            if nan_identity:
+                from copy import deepcopy
+                nan_matrix = deepcopy(models["stimuli"])
+                nan_matrix[numpy.where(nan_matrix==0)] = numpy.nan
+                models[k] = numpy.multiply(v,nan_matrix)
         self.models = models
+
 
     def __str__(self):
         return 'The following model rdms are created:\n' + ',\n'.join(
