@@ -16,6 +16,7 @@ import nibabel.processing
 from joblib import Parallel, delayed, cpu_count
 from scipy.sparse import vstack, find
 from multivariate.helper import compute_rdm,checkdir,scale_feature
+from multivariate.dataloader import _check_and_load_images
 
 import nilearn
 from nilearn import image, masking
@@ -24,29 +25,38 @@ from nilearn._utils.niimg_conversions import (
     check_niimg_3d,
 )
 from nilearn.decoding.searchlight import GroupIterator
-
 from sklearn import neighbors
-
-
 
 
 def _apply_mask_and_get_affinity(seeds,
                                  niimg,
                                  radius:float=5,
-                                 allow_overlap:bool=True,
                                  mask_img=None,
-                                 n_vox:int=1):
+                                 empty_policy:str="ignore",
+                                 n_vox:int=1,
+                                 allow_overlap:bool=True,
+                                 n_jobs:int=cpu_count()):
     """
     This function is adapted from `_apply_mask_and_get_affinity` from the `nilearn.maskers.nifti_spheres_masker` module
     (https://github.com/nilearn/nilearn/blob/0d379462d8f84344056308d4d096caf78954ca6d/nilearn/input_data/nifti_spheres_masker.py)
-    Custom script was added in the end to avoid throwing warnings when an empty sphere is detected. \
-    Instead of throwing error for empty sphere, new search will be conducted with the same algorithm but incrementing searchlight sphere radius
     
-    Get only the rows which are occupied by sphere \
-    at given seed locations and the provided radius.
-
+    Original Documentation: 
+    ----------
+    Get only the rows which are occupied by sphere at given seed locations and the provided radius.
     Rows are in target_affine and target_shape space.
+    
+    Adaptation 
+    ----------
+    This function is adapted to:
+    1. impose minimum voxel number contraints and avoid throwing warnings when an empty sphere/insufficient voxel number is detected.
+    The current script handle empty sphere or sphere with insufficient voxel number using one of the three approaches by specifying `empty_policy` argument:  
+        - ``'fill'``: conduct new search with the same algorithm but incrementing searchlight sphere radius for empty spheres  
+        - ``'ignore'``: return empty  
+        - ``'raise'``: throw an error       
 
+    2. add parallelization to speed up the process
+
+    
     Parameters
     ----------
     seeds : List of triplets of coordinates in native space
@@ -60,18 +70,21 @@ def _apply_mask_and_get_affinity(seeds,
         the output to represent the single scan in the niimg.
 
     radius : float
-        Indicates, in millimeters, the radius for the sphere around the seed.
-
-    allow_overlap : boolean
-        If False, a ValueError is raised if VOIs overlap
+        Indicates, in millimeters, the radius for the sphere around the seed.  By default `5`.
 
     mask_img : Niimg-like object, optional
         Mask to apply to regions before extracting signals. If niimg is None,
         mask_img is used as a reference space in which the spheres 'indices are
-        placed.
+        placed. By default `None`.
+
+    empty_policy: str, optional
+        how to deal with empty spheres
 
     n_vox : int, optional
-        minimum number of voxel in each searchlight sphere
+        minimum number of voxel in each searchlight sphere. By default `1`.
+
+    allow_overlap : boolean
+        If False, a ValueError is raised if VOIs overlap. By default `True`.
 
     Returns
     -------
@@ -122,18 +135,28 @@ def _apply_mask_and_get_affinity(seeds,
             X = _safe_get_data(niimg).reshape([-1, niimg.shape[3]]).T
 
         mask_coords = list(np.ndindex(niimg.shape[:3]))
-
+    
     # For each seed, get coordinates of nearest voxel
-    tmp_nearests = np.round(image.resampling.coord_transform(
-            np.array(seeds)[:,0], np.array(seeds)[:,1], np.array(seeds)[:,2], np.linalg.inv(affine)
-        )).T.astype(int)
-    def find_ind(mask_coords, nearest):
+    def find_ind(m_coords, nearest):
         try:
-            return mask_coords.index(nearest)
+            return m_coords.index(nearest)
         except ValueError:
             return None
-    nearests = [find_ind(mask_coords,tuple(nearest)) for nearest in tmp_nearests]
 
+    def search_nearest_for_seedschunk(m_coords,seedschunk,aff):
+        tmp_nearests = np.round(image.resampling.coord_transform(
+            np.array(seedschunk)[:,0], np.array(seedschunk)[:,1], np.array(seedschunk)[:,2], np.linalg.inv(aff)
+        )).T.astype(int)
+        nearest_ = [find_ind(m_coords,tuple(nearest)) for nearest in tmp_nearests]
+        return nearest_
+    
+    with Parallel(n_jobs=n_jobs) as parallel:
+        n_splits = n_jobs
+        split_idx = np.array_split(np.arange(len(seeds)), n_splits)
+        seed_chunks = [np.array(seeds)[idx] for idx in split_idx]
+        nearests = parallel(delayed(search_nearest_for_seedschunk)(mask_coords,sc,affine) for sc in seed_chunks)
+    nearests = sum(nearests,[])
+    
     mask_coords = np.asarray(list(zip(*mask_coords)))
     mask_coords = image.resampling.coord_transform(
         mask_coords[0], mask_coords[1], mask_coords[2], affine
@@ -142,11 +165,10 @@ def _apply_mask_and_get_affinity(seeds,
 
     clf = neighbors.NearestNeighbors(radius=radius)
     A = clf.fit(mask_coords).radius_neighbors_graph(seeds)
-    A = A.tolil()
+    A = A.tolil()        
     for i, nearest in enumerate(nearests):
         if nearest is None:
             continue
-
         A[i, nearest] = True
 
     # Include the voxel containing the seed itself if not masked
@@ -154,35 +176,40 @@ def _apply_mask_and_get_affinity(seeds,
     for i, seed in enumerate(seeds):
         with contextlib.suppress(ValueError):
             A[i, mask_coords.index(list(map(int, seed)))] = True
+
+    # Check for empty/insufficient voxel number spheres    
     sphere_sizes = np.asarray(A.tocsr().sum(axis=1)).ravel()
     redo_spheres = np.nonzero(sphere_sizes < n_vox)[0]
     
-    #==================================================== customized redo neighborhood searching scripts ==================================================
-    #expand radius if doesn't meet voxel count criteria
     j = 0
-    while len(redo_spheres)>0:
-        j+=1
-        redo_seeds = list(np.array(seeds)[redo_spheres])
-        redo_nearests = list(np.array(nearests)[redo_spheres])
-        radius += 0.5
-        redo_A = neighbors.NearestNeighbors(radius=radius).fit(mask_coords).radius_neighbors_graph(redo_seeds)
-        redo_A = redo_A.tolil()
-        for i, nearest in enumerate(redo_nearests):
-            if nearest is None:
-                continue
-            redo_A[i, nearest] = True
-        for i, seed in enumerate(redo_seeds):
-            with contextlib.suppress(ValueError):
-                redo_A[i, mask_coords.index(list(map(int, seed)))] = True
-        A[redo_spheres, :] = redo_A
-        sphere_sizes = np.asarray(A.tocsr().sum(axis=1)).ravel()
-        redo_spheres = np.nonzero(sphere_sizes < n_vox)[0]
+    if empty_policy == "raise":
+        raise ValueError(f'The following spheres have less than {n_vox} voxels: {redo_spheres}')
+    elif empty_policy == "ignore":
+        pass
+    elif empty_policy == "fill":
+        #expand radius if doesn't meet voxel count criteria
+        while len(redo_spheres)>0:
+            j+=1
+            redo_seeds = list(np.array(seeds)[redo_spheres])
+            redo_nearests = list(np.array(nearests)[redo_spheres])
+            radius += 0.5
+            redo_A = neighbors.NearestNeighbors(radius=radius).fit(mask_coords).radius_neighbors_graph(redo_seeds)
+            redo_A = redo_A.tolil()
+            for i, nearest in enumerate(redo_nearests):
+                if nearest is None:
+                    continue
+                redo_A[i, nearest] = True
+            for i, seed in enumerate(redo_seeds):
+                with contextlib.suppress(ValueError):
+                    redo_A[i, mask_coords.index(list(map(int, seed)))] = True
+            A[redo_spheres, :] = redo_A
+            sphere_sizes = np.asarray(A.tocsr().sum(axis=1)).ravel()
+            redo_spheres = np.nonzero(sphere_sizes < n_vox)[0]
         
     if (not allow_overlap) and np.any(A.sum(axis=0) >= 2):
         raise ValueError('Overlap detected between spheres')
     
-    dt = time.time()-t0
-    print(f'neibourhood specification elapse time: {dt}, redo iterations = {j},  max radius = {radius}')
+    print(f'neibourhood specification took: {time.time()-t0} seconds, redo iterations = {j},  max radius = {radius}')
     return X, A
 
 class RSASearchLight:
@@ -207,17 +234,12 @@ class RSASearchLight:
         njobs : int, optional
             number of parallel jobs, by default 1
         """
-        self.mask_img         = nib.load(mask_img_path)
-        process_mask_img_path = mask_img_path if process_mask_img_path is None else process_mask_img_path
-        self.process_mask_img = nib.load(process_mask_img_path)
+        self.pattern_img      = _check_and_load_images(patternimg_paths,mode="concatenate")
+        self.mask_img         = _check_and_load_images(mask_img_path,mode="intersect")
+        self.process_mask_img = self.mask_img if process_mask_img_path is None else _check_and_load_images(process_mask_img_path,mode="intersect")
         self.radius           = radius
         self.njobs            = njobs
-        if isinstance(patternimg_paths,list):
-            print("concatenating images")
-            self.pattern_img = nib.funcs.concat_images(patternimg_paths)
-            print("finished concatenating images")
-        else:
-            self.pattern_img = nib.load(patternimg_paths)
+        # get search light spheres
         self.X, self.A = self.genPatches()
         self.neighbour_idx_lists = self.find_neighbour_idx()
         print(f"total number of voxels to perform searchlight: {len(self.neighbour_idx_lists)}")
@@ -231,7 +253,7 @@ class RSASearchLight:
     def find_neighbour_idx(self):
         voxel_neighbours = []
         for _,row in enumerate(self.A):
-            _,vidx,_ = find(row)
+            _, vidx, _ = find(row)
             voxel_neighbours.append(vidx) 
         return voxel_neighbours
 
@@ -253,8 +275,8 @@ class RSASearchLight:
             )
 
         result = np.vstack(results)
+        sys.stderr.write((f" completed searchlight on {len(self.neighbour_idx_lists)} voxels in {time.time()-t0} seconds. \n"))
         self.write(result,models,modelnames,outputpath,outputregexp)
-        print((f" searchlight on {len(self.neighbour_idx_lists)} voxels in {time.time()-t0} seconds"))
         return self
     
     def write(self,result,models,modelnames,outputpath,outputregexp,ensure_finite:bool=False):
@@ -287,15 +309,18 @@ class RSASearchLight:
         voxel_results = []
         t0 = time.time()
         for i,neighbour_idx in enumerate(neighbour_idx_list):
-            # centering feature columns (for each voxel, demean the column corresponding to its activity)
-            patternmatrix = scale_feature(self.X[:,neighbour_idx],1,False)
-            neuralrdm = compute_rdm(patternmatrix,"correlation")
-            # instantiate estimator for current voxel
-            curr_estimator =  self.estimator(
-                neuralrdm,
-                model)
-            # perform estimation
-            voxel_results.append(curr_estimator.fit().result)
+            if neighbour_idx.size==0:
+                voxel_results.append(np.full((1,len(model)),fill_value=np.nan))
+            else:
+                # centering feature columns (for each voxel, demean the column corresponding to its activity)
+                patternmatrix = self.X[:,neighbour_idx]
+                neuralrdm = compute_rdm(patternmatrix,"correlation")
+                # instantiate estimator for current voxel
+                curr_estimator =  self.estimator(
+                    neuralrdm,
+                    model)
+                # perform estimation
+                voxel_results.append(curr_estimator.fit().result)
             if verbose:
                 step = 10000 # print every 10000 voxels
                 if  i % step == 0:
@@ -307,11 +332,10 @@ class RSASearchLight:
                         f"job {thread_id}, processed {i}/{len(neighbour_idx_list)} voxels"
                         f"({pt:0.2f}%, {remaining} seconds remaining){crlf}"
                     )
-        if verbose:
-            sys.stderr.write(f"job {thread_id}, processed {len(neighbour_idx_list)} voxels in {time.time()-t0} seconds\r")
+        sys.stderr.write(f"job {thread_id}, processed {len(neighbour_idx_list)} voxels in {time.time()-t0} seconds\n")
         return np.asarray(voxel_results)    
 
-    def genPatches(self,use_parallel:bool = True,verbose:bool=False):
+    def genPatches(self):
         print("generating searchlight patches")
         t0 = time.time()
         ## voxels to perform searchlight on
@@ -326,31 +350,15 @@ class RSASearchLight:
                 )
             ).T
 
-        if use_parallel: 
-            njobs = 10
-            split_idx = np.array_split(np.arange(len(process_coords)), njobs)
-            pc_chunks = [process_coords[idx] for idx in split_idx]
-            with Parallel(n_jobs=self.njobs) as parallel:
-                XA_list = parallel(
-                    delayed(_apply_mask_and_get_affinity)(seeds  = coords,
-                                            niimg  = self.pattern_img,
-                                            radius = self.radius,
-                                            allow_overlap = True,
-                                            mask_img      = self.mask_img,# only include voxel in the mask
-                                            n_vox = 50
-                                            ) for coords in pc_chunks)
-            X = XA_list[0][0] # X is the same for each chunk
-            A = vstack([l[1] for l in XA_list])
-        else:
-            X,A = _apply_mask_and_get_affinity(
-                seeds  = process_coords,
-                niimg  = self.pattern_img,
-                radius = self.radius,
-                allow_overlap = True,
-                mask_img      = self.mask_img,# only include voxel in the mask
-                n_vox = 50)
+        X,A = _apply_mask_and_get_affinity(
+                seeds    = process_coords,
+                niimg    = self.pattern_img,
+                radius   = self.radius,
+                mask_img = self.mask_img,# only include voxel in the mask
+                empty_policy = "ignore",
+                n_vox = 1,
+                allow_overlap = True
+                )        
         A = A.tocsr()
-        if verbose:
-            print(f'number of voxels per sphere:{np.unique(A.sum(axis=1))}')
         print(f"finished generating searchlight patches in {time.time()-t0}") 
         return X, A 

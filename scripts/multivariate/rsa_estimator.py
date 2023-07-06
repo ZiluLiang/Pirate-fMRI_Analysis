@@ -18,24 +18,32 @@ class PatternCorrelation:
         type of correlation measure, by default "spearman".
         must be one of: "spearman", "pearson", "kendall", "linreg"
     """
-    def __init__(self,neuralrdm:numpy.ndarray,modelrdm:numpy.ndarray or list,type:str="spearman",ztransform:bool=False) -> None:
-        self.rdm_shape = neuralrdm.shape
-        
-        self.X,_ = lower_tri(neuralrdm)
-        if isinstance(modelrdm,list):
-            modelrdm = modelrdm
-        elif isinstance(modelrdm,numpy.ndarrray):
-            modelrdm = [modelrdm]
-            Y,_ = lower_tri(modelrdm)
+    def __init__(self,neuralrdm:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,type:str="spearman",ztransform:bool=False) -> None:        
+
+        #neural rdm
+        self.rdm_shape = neuralrdm.shape        
+        self.Y,_ = lower_tri(neuralrdm)
+
+        #model rdm and names        
+        if isinstance(modelrdms,list):
+            modelrdms = modelrdms
+        elif isinstance(modelrdms,numpy.ndarrray):
+            modelrdms = [modelrdms]
         else:
             raise TypeError('model rdm must be numpy ndarray or a list of numpy ndarray')
         
-        self.Ys = []
-        for m in modelrdm:
-            Y,_ = lower_tri(m)
-            self.Ys.append(Y)
-        self.nY = len(modelrdm)
-        
+        if modelnames is None:
+            modelnames = [f'm{str(j)}' for j in range(len(modelrdms))]            
+        assert len(modelnames) == len(modelrdms), 'number of model names must be equal to number of model rdms'   
+
+        self.Xs = []
+        for m in modelrdms:
+            X,_ = lower_tri(m)
+            self.Xs.append(X)
+        self.modelnames = modelnames  
+        self.nX = len(modelrdms)
+
+        #correlation type        
         valid_corr_types = ["spearman", "pearson", "kendall", "linreg"]
         if type not in valid_corr_types:
             raise ValueError('unsupported type of correlation, must be one of: ' + ', '.join(valid_corr_types))
@@ -50,12 +58,11 @@ class PatternCorrelation:
     def fit(self):
         self.na_filters = []
         result = []
-        for Y in self.Ys:
-            na_filters = numpy.logical_and(~numpy.isnan(self.X),~numpy.isnan(Y))
+        for X in self.Xs:
+            na_filters = numpy.logical_and(~numpy.isnan(self.Y),~numpy.isnan(X))
             self.na_filters.append(na_filters)
-            X = self.X[na_filters]
-            Y = Y[na_filters]
-
+            Y = self.Y[na_filters]
+            X = X[na_filters]
             if self.type == "spearman":
                 r = self.outputtransform(scipy.stats.spearmanr(X,Y).correlation)
             elif self.type == "pearson":
@@ -74,16 +81,16 @@ class PatternCorrelation:
         except Exception:
             self.fit()        
 
-        fig,axes = plt.subplots(self.nY,2,figsize = (10,5*self.nY))
-        for k,Y in enumerate(self.Ys):
-            plot_models = [self.X,Y]
-            plot_titles = ["neural rdm", f"model rdm {k}"]
+        fig,axes = plt.subplots(self.nX,2,figsize = (10,5*self.nX))
+        for k,X in enumerate(self.Xs):
+            plot_models = [self.Y,X]
+            plot_titles = ["neural rdm", f"{self.modelnames[k]}"]
             for j,(t,m) in enumerate(zip(plot_titles,plot_models)):
                 v = numpy.full(self.rdm_shape,numpy.nan)
                 _,idx = lower_tri(v)
                 fillidx = (idx[0][self.na_filters[k]],idx[1][self.na_filters[k]])
                 v[fillidx] = m[self.na_filters[k]]
-                if self.nY==1:
+                if self.nX==1:
                     sns.heatmap(v,ax=axes[j],square=True,cbar_kws={"shrink":0.85})
                     axes[j].set_title(t)
                 else:
@@ -94,6 +101,14 @@ class PatternCorrelation:
 
 class MultipleRDMRegression:
     def __init__(self,neuralrdm,modelrdms,modelnames:list=None) -> None:
+
+        #model rdm and names        
+        if isinstance(modelrdms,list):
+            modelrdms = modelrdms
+        elif isinstance(modelrdms,numpy.ndarrray):
+            modelrdms = [modelrdms]
+        else:
+            raise TypeError('model rdm must be numpy ndarray or a list of numpy ndarray')
 
         if modelnames is None:
             modelnames = [f'm{str(j)}' for j in range(len(modelrdms))]
@@ -108,15 +123,13 @@ class MultipleRDMRegression:
         for j,m in enumerate(modelrdms):
             X[:,j],_ = lower_tri(m)
 
-        xna_filters = numpy.all([~numpy.isnan(X[:,j]) for j in range(numpy.shape(X)[1])],0)
-        na_filters = numpy.logical_and(~numpy.isnan(Y),xna_filters)
-        self.na_filters = na_filters
+        xna_filters = numpy.all(~numpy.isnan(X),1) # find out rows that are not nans in all columns
+        self.na_filters = numpy.logical_and(~numpy.isnan(Y),xna_filters)
 
         #standardize design matrix independently within each column
-        X_dropNA = X[na_filters,:]
-        self.X = scale_feature(X_dropNA,1)
+        self.X = scale_feature(X[self.na_filters,:],1)
         # standardize Y
-        self.Y = scale_feature(Y[na_filters])
+        self.Y = scale_feature(Y[self.na_filters])
     
     def __str__(self) -> str:
         return "MultipleRDMRegression"
@@ -126,8 +139,6 @@ class MultipleRDMRegression:
         self.reg = reg
         self.result = reg.coef_
         self.score  = reg.score(self.X,self.Y)
-        #print(f'sklearn score: {reg.score(self.X,self.Y)}')
-        #print(f'compute_R2: {compute_R2(reg.predict(self.X),self.Y,2)}')
         return self
     
     def visualize(self):

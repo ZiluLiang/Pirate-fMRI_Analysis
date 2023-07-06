@@ -240,6 +240,7 @@ class ModelRDM:
         self.stimsession = numpy.concatenate([numpy.repeat(j,len(stimid)) for j in range(self.n_session)])
 
         models = {"loc2d":self.euclidean2d(),
+                  "cityblock2d":self.cityblock2d(),
                   "loc1dx":self.euclidean1d(0),
                   "loc1dy":self.euclidean1d(1),
                   "feature2d":self.feature2d(),
@@ -343,6 +344,18 @@ class ModelRDM:
         """
         modelrdm = compute_rdm(self.stimloc,metric="euclidean")
         return modelrdm
+    
+    def cityblock2d(self)->numpy.ndarray:
+        """calculate model rdm based on 2d euclidean distance.
+        
+        Returns
+        -------
+        numpy.ndarray
+            2D numpy array of model rdm
+        """
+        modelrdm = compute_rdm(self.stimloc,metric="cityblock")
+        return modelrdm
+    
 
     def euclidean1d(self,dim)->numpy.ndarray:
         """calculate model rdm based on 1d euclidean distance.
