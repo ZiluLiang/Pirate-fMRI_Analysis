@@ -100,7 +100,7 @@ for p in preprocess:
                 rdm_df_list.append(rdm_df)
                 corr_df_list.append(corr_df)
         pd.concat(mds_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roimds_nocentering_{p}_{ds_name}_{vselect}.csv'))
-        pd.concat(rdm_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roimds_nocentering_{p}_{ds_name}_{vselect}.csv'))
+        pd.concat(rdm_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roirdm_nocentering_{p}_{ds_name}_{vselect}.csv'))
 pd.concat(corr_df_list, axis=0).to_csv(
     os.path.join(ROIRSA_output_path, 'roicorr_nocentering.csv')
 )
