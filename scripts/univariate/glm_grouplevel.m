@@ -78,15 +78,9 @@ function glm_grouplevel(outputdir,scans,factor_names,cov)
     design.globalm.gmsca.gmsca_no = 1;
     design.globalm.glonorm = 1;
 
-    %% Estimation
-    estimation.spmmat(1) = cfg_dep('Factorial design specification: SPM.mat File', substruct('.','val', '{}',{1}, '.','val', '{}',{1}, '.','val', '{}',{1}), substruct('.','spmmat'));
-    estimation.write_residuals = 0;
-    estimation.method.Classical = 1;
-
     %% Save second level batch job
     matlabbatch{1}.spm.stats.factorial_design = design;
-    matlabbatch{2}.spm.stats.fmri_est = estimation;
-    save(fullfile(outputdir,'spec2est2ndlvl.mat'),'matlabbatch')
+    save(fullfile(outputdir,'specification2ndlvl.mat'),'matlabbatch')
 
     spm_jobman('run', matlabbatch);
 end
