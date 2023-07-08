@@ -8,6 +8,20 @@
         "Frontal_Inf_Orb_2",
         "Rectus"
     ],
+    "frontal":[
+        "OFCant",
+        "OFClat",
+        "OFCmed",
+        "OFCpost",
+        "Frontal_Med_Orb",
+        "Frontal_Inf_Orb_2",
+        "Rectus",
+        "Frontal_Med_Orb",
+        "Frontal_Inf_Orb_2",
+        "Frontal_Sup_Medial",
+        "Frontal_Sup_2",
+        "Frontal_Mid_2"
+    ],
     "occipital":[
         "Occipital_Mid"
     ],
