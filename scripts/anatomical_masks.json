@@ -22,6 +22,18 @@
         "Frontal_Sup_2",
         "Frontal_Mid_2"
     ],
+    "cerebelum":[
+        "Cerebelum_10",
+        "Cerebelum_9",
+        "Cerebelum_8",
+        "Cerebelum_7b",
+        "Cerebelum_6",
+        "Cerebelum_4_5",
+        "Cerebelum_3",
+        "Cerebelum_Crus2",
+        "Cerebelum_Crus1"
+    ],
+
     "occipital":[
         "Occipital_Mid"
     ],
