@@ -6,7 +6,7 @@
 		"marsbar":"C:\\Program Files\\MATLAB\\matlab toolbox\\jsonlab-master",
 		"SPM12OldNorm":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\toolbox\\OldNorm",
 		"SPM12batch":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\matlabbatch",
-		"scripts":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\behavior;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\generic;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\generic\\png;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\multivariate;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\multivariate\\__pycache__;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\preprocessing;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\qualitycheck;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\spm_utils;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\tidydata;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\univariate;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\utils;"
+		"scripts":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\__pycache__;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\behavior;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\generic;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\generic\\png;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\multivariate;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\multivariate\\__pycache__;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\preprocessing;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\qualitycheck;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\spm_utils;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\tidydata;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\univariate;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\utils;"
 	},
 	"directory":{
 		"projectdir":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\",
@@ -102,8 +102,7 @@
 			"sub023",
 			"sub002",
 			"sub014",
-			"sub021",
-			"sub017"
+			"sub021"
 		],
 		"learnerids":[
 				"sub001",
@@ -143,6 +142,7 @@
 				"sub011",
 				"sub015",
 				"sub016",
+				"sub017",
 				"sub018",
 				"sub019",
 				"sub020",

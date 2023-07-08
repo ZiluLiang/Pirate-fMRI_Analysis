@@ -90,7 +90,7 @@ function pirate_defaults = setdefaults
     pirate_defaults.participants.nvalidsub = numel(pirate_defaults.participants.validids);% exclude sub 31 due to incomplete scans
     
     pirate_defaults.participants.nonlearnerids     = {'sub010','sub012','sub013','sub027','sub017'}; 
-    pirate_defaults.participants.nongeneralizerids = {'sub010','sub012','sub013','sub027','sub004','sub023','sub002','sub014','sub021','sub017'};
+    pirate_defaults.participants.nongeneralizerids = {'sub010','sub012','sub013','sub027','sub004','sub023','sub002','sub014','sub021'};
     pirate_defaults.participants.learnerids        = pirate_defaults.participants.validids(~ismember(pirate_defaults.participants.validids,pirate_defaults.participants.nonlearnerids));
     pirate_defaults.participants.generalizerids    = pirate_defaults.participants.validids(~ismember(pirate_defaults.participants.validids,pirate_defaults.participants.nongeneralizerids));
 
