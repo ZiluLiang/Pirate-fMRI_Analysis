@@ -7,6 +7,7 @@ import json
 import time
 import pandas as pd
 import glob
+from copy import deepcopy
 import os
 import sys
 from joblib import Parallel, delayed, cpu_count, dump
@@ -70,7 +71,9 @@ class RSARunner:
         stim_locy = np.array(stim_list['stim_y'])
         # get visual features
         stim_color = np.array([x.replace('.png','').split('_')[0] for x in stim_list["stim_img"]])
-        stim_shape = np.array([x.replace('.png','').split('_')[1] for x in stim_list["stim_img"]])        
+        stim_shape = np.array([x.replace('.png','').split('_')[1] for x in stim_list["stim_img"]])
+        _, stim_color = np.unique(stim_color, return_inverse=True)
+        _, stim_shape = np.unique(stim_shape, return_inverse=True)
 
         stimid = stim_id
         stimloc = np.vstack([stim_locx,stim_locy]).T
@@ -94,8 +97,7 @@ class RSARunner:
                         nan_identity = nan_identity)
 
     def get_neuralRDM(self,subid,
-                      preproc:str=None,
-                      PCA:bool=False):
+                      preproc:str=None):
         ## model rdm
         modelrdm = self.get_modelRDM(subid)
 
@@ -105,6 +107,7 @@ class RSARunner:
         APD = ActivityPatternDataLoader(beta_imgs,mask_imgs)
         
         ## preprocessing
+        ev = 1
         if preproc is None:
             activitypattern = APD.X
         elif preproc == "cocktail_blank_removal":
@@ -113,10 +116,11 @@ class RSARunner:
         elif preproc=="subtract_mean":
             activitypattern = scale_feature(activitypattern,1,False)
         elif preproc=="PCA":
-            neuralPCA = PCA(n_components=0.9)        
+            neuralPCA = PCA(n_components=0.9)
             activitypattern = neuralPCA.fit_transform(APD.X)
+            ev = np.sum(neuralPCA.fit(APD.X).explained_variance_ratio_)
             
-        return activitypattern,compute_rdm(activitypattern,'correlation')
+        return activitypattern,compute_rdm(activitypattern,'correlation'),ev
         
 ############################################### SINGLE PARTICIPANT LEVEL ANALSYSIS METHODS ###################################################
     def _singleparticipant_ROIRSA(self, subid,
@@ -140,7 +144,7 @@ class RSARunner:
         modeldf = modelrdm.rdm_to_df(df_inc_models)
 
         ## get neural data
-        _, neural_rdm = self.get_neuralRDM(subid)
+        _, neural_rdm, _ = self.get_neuralRDM(subid)
         neuralrdmdf = modelrdm.rdm_to_df(modelnames="neural",rdms=neural_rdm)
         neuralrdmdf = neuralrdmdf.join(modeldf).reset_index().assign(subid=subid)
         
@@ -167,7 +171,7 @@ class RSARunner:
 
         t0 = time.time()
 
-        _, neural_rdm = self.get_neuralRDM(subid)
+        _, neural_rdm, _ = self.get_neuralRDM(subid)
 
         ## compute model rdm
         corr_df_list = []
@@ -205,7 +209,7 @@ class RSARunner:
             sys.stderr.write(f"{subid}\r")
         
         ## get neural data
-        activitypattern, _ = self.get_neuralRDM(subid)
+        activitypattern, _, _ = self.get_neuralRDM(subid)
         ## compute MDS
         embedding = MDS(
                 n_components=2,
@@ -229,123 +233,129 @@ class RSARunner:
 
         return mds_df
     
-    def _singleparticipant_ROIPS(self,subid):
-        X, _ = self.get_neuralRDM(subid)
+    def _singleparticipant_ROIPS(self,subid,outputdir):
+        X, _, _ = self.get_neuralRDM(subid)
+        #generate a randomly permutated X (randomly permutated within each row):
+        randX = np.empty_like(X)
+        for j in range(X.shape[0]):
+            randX[j,:] = np.random.permutation(X.shape[1])
+       
+        # get stimuli properties
         modelrdm  = self.get_modelRDM(subid)
+
+        # compute coding directions between any two stimuli
         iter_pairs = enumerate(zip(
             itertools.product(np.arange(len(X)),np.arange(len(X))),
-            itertools.product(X,X)
+            itertools.product(X,X),
+            itertools.product(randX,randX)
             ))
         dirs_mat = np.empty((len(X),len(X),X.shape[1]))
-        cols = ['stim1', 'stim2', 'attrx1', 'attrx2', 'attry1', 'attry2', 'training1',
-            'training2','run1','run2']
-        dir_info_mat =  np.empty((len(X),len(X),len(cols)),dtype='int')
-        for jpair,((jpS1,jpS2), (u,v)) in list(iter_pairs):
+        dirs_mat_rand = np.empty((len(X),len(X),X.shape[1]))
+        cols = ['stim1', 'stim2','run1','run2', #stim id and run id of stimulus 1 (starting stim) and 2 (ending stim)
+                'sx','ex', #x location on groundtruth map for starting stim (sx) and ending stim (ex)
+                'sy','ey', #y location on groundtruth map for starting stim (sy) and ending stim (ey)
+                'sc','ec', #colour for starting stim (sc) and ending stim (ec)
+                'ss','es'  #shape for starting stim (ss) and ending stim (es)
+                ]
+        dir_info_mat =  np.empty((len(X),len(X),len(cols)))
+        for jpair,((jpS1,jpS2), (u,v), (urand,vrand)) in list(iter_pairs):
             dirs_mat[jpS1,jpS2,:] = u-v
+            dirs_mat_rand[jpS1,jpS2,:] = urand - vrand
             dir_info_mat[jpS1,jpS2,:] = np.array([modelrdm.stimid.flatten()[jpS1],
                                                   modelrdm.stimid.flatten()[jpS2],
+                                                  modelrdm.stimsession.flatten()[jpS1],
+                                                  modelrdm.stimsession.flatten()[jpS2],
                                                   modelrdm.stimloc[:,0][jpS1],
                                                   modelrdm.stimloc[:,0][jpS2],
                                                   modelrdm.stimloc[:,1][jpS1],
                                                   modelrdm.stimloc[:,1][jpS2],
-                                                  modelrdm.stimgroup.flatten()[jpS1],
-                                                  modelrdm.stimgroup.flatten()[jpS2],
-                                                  modelrdm.stimsession.flatten()[jpS1],
-                                                  modelrdm.stimsession.flatten()[jpS2]]).astype('int')
+                                                  modelrdm.stimfeature[:,0][jpS1],
+                                                  modelrdm.stimfeature[:,0][jpS2],
+                                                  modelrdm.stimfeature[:,1][jpS1],
+                                                  modelrdm.stimfeature[:,1][jpS2]
+                                                  ])
 
-        dirs_arr = dirs_mat.reshape((-1,X.shape[1]))
-        dir_info_arr = dir_info_mat.reshape((-1,len(cols)))
+        
+        dp_idx = np.tril_indices(dirs_mat.shape[0], k = -1)
+        dirs_arr = dirs_mat[dp_idx]
+        dirs_arr_rand = dirs_mat_rand[dp_idx]
+        dir_info_arr = dir_info_mat[dp_idx] #dir_info_mat.reshape((-1,len(cols)))
         dir_df = pd.DataFrame(dir_info_arr,columns=cols)
-        dir_df["same_x"] =  dir_df["attrx1"] ==  dir_df["attrx2"]
-        dir_df["same_y"] =  dir_df["attry1"] ==  dir_df["attry2"]
-        dir_df["withintrainstim"] =  (dir_df["training1"] ==  1) & (dir_df["training2"] ==  1)
-        dir_df["withinrun"] =  dir_df["run1"] ==  dir_df["run2"]
-        dir_pairs_dict = {
-            'sXdY':dir_df[(dir_df["same_x"])&(~dir_df["same_y"])],
-            'dXsY':dir_df[(~dir_df["same_x"])&(dir_df["same_y"])],
-            'dXdY':dir_df[(~dir_df["same_x"])&(~dir_df["same_y"])],
-        }
-        dir_pairs_dict = {
-            'dXdY':dir_df[(~dir_df["same_x"])&(~dir_df["same_y"])],
-        }
-        for x,y in zip(np.arange(5),np.arange(5)):
-            dir_pairs_dict |= {
-                f'X{x}': dir_df[
-                    (dir_df["same_x"]) & (~dir_df["same_y"]) & (dir_df["attrx1"] == x) & (dir_df["attrx2"] == x)
-                ],
-                f'Y{y}': dir_df[
-                    (~dir_df["same_x"]) & (dir_df["same_y"]) & (dir_df["attry1"] == y) & (dir_df["attry2"] == y)
-                ],
-            }
-        def compute_theoretical_dir(sel_pair_df,idx1,idx2):
-            # groundtruth feature vectors
-            gt_dir1_stim1 = np.array([sel_pair_df['attrx1'][idx1], sel_pair_df['attry1'][idx1]]) #for stimuli 1 in direction 1
-            gt_dir1_stim2 = np.array([sel_pair_df['attrx2'][idx1], sel_pair_df['attry2'][idx1]]) #for stimuli 2 in direction 1
-            gt_dir2_stim1 = np.array([sel_pair_df['attrx1'][idx2], sel_pair_df['attry1'][idx2]]) #for stimuli 1 in direction 2
-            gt_dir2_stim2 = np.array([sel_pair_df['attrx2'][idx2], sel_pair_df['attry2'][idx2]]) #for stimuli 2 in direction 2
+        
+        # cosine similarity between pairs of coding directions
+        iter_dir_pairs = list(itertools.combinations(dirs_arr,r=2))
+        iter_dir_pairs_rand = list(itertools.combinations(dirs_arr_rand,r=2))
+        idx_pairs = list(itertools.combinations(np.array(dir_df.index),r=2))                    
 
-            #theoretical cosine similarity between direction
-            gt_dir1 = gt_dir1_stim1 - gt_dir1_stim2
-            gt_dir2 = gt_dir2_stim1 - gt_dir2_stim2
-            return 1 - scipy.spatial.distance.cosine(gt_dir1,gt_dir2)
+        cos_sim  = np.array([1 - scipy.spatial.distance.cosine(dir1,dir2) for dir1,dir2 in iter_dir_pairs])
+        cos_sim_rand  = np.array([1 - scipy.spatial.distance.cosine(dir1,dir2) for dir1,dir2 in iter_dir_pairs_rand])
 
-        sub_metric_df = []
-        for pairtype,sel_pair_df in dir_pairs_dict.items():
-            print(f'{subid} - {pairtype}')
-            selected_dirs = dirs_arr[np.array(sel_pair_df.index)]
-            iter_dir_pairs = list(itertools.combinations(selected_dirs,r=2))
-            idx_pairs = list(itertools.combinations(np.array(sel_pair_df.index),r=2))
+        dir_df = dir_df.assign(tmpvar=1).reset_index() # create a temporary variable so that we can use merge without index
+        create_dir_pair_df = lambda idx1,idx2,dir_df: pd.merge(dir_df.loc[[idx1]], dir_df.loc[[idx2]], on="tmpvar", how="outer", suffixes=('_dir1', '_dir2'))
+        dir_pair_df = pd.concat([create_dir_pair_df(idx1,idx2,dir_df)  for idx1,idx2 in idx_pairs],axis=0)
+        dir_pair_df["neural"] = cos_sim
+        dir_pair_df["neuralrand"] = cos_sim_rand
+
+        def get_pair_type_loc(df_row):
+            df_row["same_sx"] = df_row["sx_dir1"] == df_row["sx_dir2"]
+            df_row["same_sy"] = df_row["sy_dir1"] == df_row["sy_dir2"]
+            df_row["same_ex"] = df_row["ex_dir1"] == df_row["ex_dir2"]
+            df_row["same_ey"] = df_row["ey_dir1"] == df_row["ey_dir2"]
+
+            ## two coding directions that have the same start and end x but in different y rows
+            if df_row['same_sx'] & df_row['same_ex'] & (df_row['sy_dir1'] == df_row['ey_dir1']) & (df_row['sy_dir2'] == df_row['ey_dir2']):
+                pair_type = "betweenX"
             
+            ## two coding directions that have the same start and end y but in different x columns
+            elif df_row['same_sy'] & df_row['same_ey'] & (df_row['sx_dir1'] == df_row['ex_dir1']) & (df_row['sx_dir2'] == df_row['ex_dir2']):
+                pair_type = "betweenY"
 
-            if np.size(idx_pairs)>0:
-                dir_pair_stimgroup = [f"{sel_pair_df['withintrainstim'][idx1]*1}_{1*sel_pair_df['withintrainstim'][idx2]}" for idx1,idx2 in idx_pairs]
-                dirp_sg_dict = {
-                    '1_1':"Within Training",
-                    '1_0':"Training-Test",
-                    '0_1':"Training-Test",
-                    '0_0':"Within test",
-                }
-                dir_pair_stimgroup = np.array([dirp_sg_dict[x] for x in dir_pair_stimgroup])
+            ## two coding directions that are in the same x column
+            elif np.all([y == df_row['sy_dir1'] for y in [df_row['sy_dir1'],df_row['ey_dir1'],df_row['sy_dir2'],df_row['ey_dir2']]]):
+                pair_type = "withinX"
 
-                dir_pair_stimrun = [f"{sel_pair_df['withinrun'][idx1]*1}_{1*sel_pair_df['withinrun'][idx2]}" for idx1,idx2 in idx_pairs]
-                dirp_sr_dict = {
-                    '1_1':"Within Run",
-                    '1_0':"Within-Across",
-                    '0_1':"Within-Across",
-                    '0_0':"Across Run",
-                }
-                dir_pair_stimrun = np.array([dirp_sr_dict[x] for x in dir_pair_stimrun])
+            ## two coding directions that are in the same y row
+            elif np.all([x == df_row['sx_dir1'] for x in [df_row['sx_dir1'],df_row['ex_dir1'],df_row['sx_dir2'],df_row['ex_dir2']]]):
+                pair_type = "withinY"
+            else:
+                pair_type = "others"
+            return pair_type
+        
+        def get_pair_type_feature(df_row):
+            df_row["same_sc"] = df_row["sc_dir1"] == df_row["sc_dir2"]
+            df_row["same_ss"] = df_row["ss_dir1"] == df_row["ss_dir2"]
+            df_row["same_ec"] = df_row["ec_dir1"] == df_row["ec_dir2"]
+            df_row["same_es"] = df_row["es_dir1"] == df_row["es_dir2"]
+            ## two coding directions that have the same start and end colours but in different shape rows
+            if df_row['same_sc'] & df_row['same_ec'] & (df_row['ss_dir1'] == df_row['es_dir1']) & (df_row['ss_dir2'] == df_row['es_dir2']):
+                pair_type = "betweenColour"
+            ## two coding directions that have the same start and end shape but in different colour columns
+            elif df_row['same_ss'] & df_row['same_es'] & (df_row['sc_dir1'] == df_row['ec_dir1']) & (df_row['sc_dir2'] == df_row['ec_dir2']):
+                pair_type = "betweenShape"
+            ## two coding directions that are in the same colour column
+            elif np.all([y == df_row['ss_dir1'] for y in [df_row['ss_dir1'],df_row['es_dir1'],df_row['ss_dir2'],df_row['es_dir2']]]):
+                pair_type = "withinColour"
+            ## two coding directions that are in the same shape row
+            elif np.all([x == df_row['sc_dir1'] for x in [df_row['sc_dir1'],df_row['ec_dir1'],df_row['sc_dir2'],df_row['ec_dir2']]]):
+                pair_type = "withinShape"
+            else:
+                pair_type = "others"
+            return pair_type
 
-                theoretical_cos = np.array([compute_theoretical_dir(sel_pair_df,idx1,idx2) for idx1,idx2 in idx_pairs])
-                theoretical_PS  = abs(theoretical_cos)
-                cos_sim  = np.array([1 - scipy.spatial.distance.cosine(dir1,dir2) for dir1,dir2 in iter_dir_pairs])
-                P_scores = abs(cos_sim)
+        dir_pair_df = dir_pair_df.assign(subid=subid)
+        dir_pair_df.to_csv(os.path.join(outputdir,f'{subid}.csv'))
 
-                cos_iter = list(itertools.product(np.unique(theoretical_cos),np.unique(dir_pair_stimgroup),np.unique(dir_pair_stimrun)))
-                g_idx_cos = [np.where((theoretical_cos==x) & (dir_pair_stimgroup==g) & (dir_pair_stimrun==r)) for x,g,r in cos_iter]
-                cos_iter = [x for x,y in zip(cos_iter,g_idx_cos) if np.size(y)>0 ]
-                g_idx_cos = [x for x in g_idx_cos if np.size(x)>0 ]
+        dir_pair_dfl,dir_pair_dff = deepcopy(dir_pair_df),deepcopy(dir_pair_df)
+        dir_pair_dfl["pairtype"] = dir_pair_df.apply(get_pair_type_loc, axis=1)
+        dir_pair_df_suml = dir_pair_dfl.groupby(['subid','pairtype'])[['neural','neuralrand']].mean().reset_index()
+        dir_pair_dff["pairtype"] = dir_pair_df.apply(get_pair_type_feature, axis=1)
+        dir_pair_df_sumf = dir_pair_dff.groupby(['subid','pairtype'])[['neural','neuralrand']].mean().reset_index()
+        dir_pair_df_sum = pd.concat([
+            dir_pair_df_suml[dir_pair_df_suml["pairtype"]!="others"],
+            dir_pair_df_sumf[dir_pair_df_sumf["pairtype"]!="others"],
+        ],axis=0)
 
-                PS_iter = list(itertools.product(np.unique(theoretical_PS),np.unique(dir_pair_stimgroup),np.unique(dir_pair_stimrun)))
-                g_idx_PS = [np.where((theoretical_PS==x) & (dir_pair_stimgroup==g) & (dir_pair_stimrun==r)) for x,g,r in PS_iter]
-                PS_iter = [x for x,y in zip(PS_iter,g_idx_PS) if np.size(y)>0 ]
-                g_idx_PS = [x for x in g_idx_PS if np.size(x)>0 ]
-
-
-                mean_cos_sim = [cos_sim[g_idx].mean() for g_idx in g_idx_cos]
-                mean_PS = [P_scores[g_idx].mean() for g_idx in g_idx_PS]
-
-                sub_metric_df.append(
-                    pd.DataFrame({
-                        "neural":     np.concatenate((mean_cos_sim,mean_PS)),
-                        "groundtruth":np.array(cos_iter+PS_iter)[:,0],
-                        "withinTraining":np.array(cos_iter+PS_iter)[:,1],
-                        "withinRun":np.array(cos_iter+PS_iter)[:,2],
-                        "metric":    np.concatenate((["CosineSimilarity"]*len(mean_cos_sim),["ParallelScore"]*len(mean_PS)))
-                    }).assign(pairtype = pairtype)
-                )
-
-        return pd.concat(sub_metric_df,axis=0).assign(subid=subid)
+        return dir_pair_df_sum
     
 ############################################### GROUP LEVEL  ANALSYSIS METHODS ###################################################   
     def run_ROIRSA(self,njobs:int=1):#cpu_count()
@@ -409,9 +419,10 @@ class RSARunner:
             nullgroupmu_df = perms_df.groupby(["analysis","randomseed"]).mean(numeric_only=True).reset_index()
         return perms_df,nullgroupmu_df
     
-    def run_ROIPS(self,njobs:int=1):
+    def run_ROIPS(self,outputdir:str,njobs:int=1):
+        checkdir(outputdir)
         with Parallel(n_jobs=njobs) as parallel:
             dfs_list = parallel(
-                delayed(self._singleparticipant_ROIPS)(subid) for subid in self.participants)
+                delayed(self._singleparticipant_ROIPS)(subid,outputdir) for subid in self.participants)
         PS_df = pd.concat(dfs_list,axis=0) 
         return PS_df
