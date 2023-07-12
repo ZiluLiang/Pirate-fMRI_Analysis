@@ -59,7 +59,8 @@ This can be tested by comparing the actual data with different models of represe
 2) **High_D10**:A colour/shape factorized but still high-dimensional representation, this is implemented by having a one-hot coding vector for each shape and another one-hot coding vector for each colour. The shape and color vectors are concatenated to form the feature vector of one stimuli of length 10.
 3) **Low_D2**:A factorized and low-dimensional representation where colour is projected onto one axis (each colour ordered according to the groundtruth map) and shape is projected onto another axis (also ordered according to the groundtruth map). The feature vector is of length 2, which is essentially the groundtruth 2D location on the map.
 
-![feature matrices for different models of representation](<img src="/plot/featurematrix_by_representationmodels.png"/>)   
+![**feature matrices for different models of representation**](/plot/featurematrix_by_representationmodels.png)  
+
 
 ### Analysis
 To compare the data and model prediction, we analyze the cosine similarity between any given pair of directions (neural vector from one stimuli to another). See 
