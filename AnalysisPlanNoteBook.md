@@ -44,7 +44,28 @@ Three common metrics of similarity metric:
 (1) sanity check model RDMs  
 (2) feature-based model RDMs  
 (3) map-based model RDMs  
-## Hypothesis 2: color or shape will be represented by two orthogonal neural axis - Decoding analysis
+
+## Hypothesis 2: If Hippocampus(HPC), prefrontal cortex(PFC), and maybe post-parietal cortex (PPC) represent the map, then the cosine similarity between neural vectors can be predicted by the groundtruth directions on the treasure map - Neural Vector Analysis
+### Rationale
+The previous distance RDM analysis did not yield sensible results. So we reflect on the constraints that underlies the first hypothesis.  
+The groundtruth model RDM has three assumption (ordered by dependency on the previous one):
+1) factorize into color and shape
+2) project high dimensional color representation onto one axis (and shape onto another)
+3) instances on one axis is equidistance from one another
+We can gradually relax each one of these assumptions and test if it holds
+
+This can be tested by comparing the actual data with different models of representation: 
+1) **High_D25**:A high-dimensional representation with no factorization at all, this is implemented by having a one-hot coding vector for each stimuli
+2) **High_D10**:A colour/shape factorized but still high-dimensional representation, this is implemented by having a one-hot coding vector for each shape and another one-hot coding vector for each colour. The shape and color vectors are concatenated to form the feature vector of one stimuli of length 10.
+3) **Low_D2**:A factorized and low-dimensional representation where colour is projected onto one axis (each colour ordered according to the groundtruth map) and shape is projected onto another axis (also ordered according to the groundtruth map). The feature vector is of length 2, which is essentially the groundtruth 2D location on the map.
+
+![feature matrix by different models of representation](<img src="/plot/featurematrix_by_representationmodels.png"/>)   
+
+### Analysis
+To compare the data and model prediction, we analyze the cosine similarity between any given pair of directions (neural vector from one stimuli to another). See 
+###
+
+## Hypothesis 3: color or shape will be represented by two orthogonal neural axis - Decoding analysis
 ### Literature
 tbc
 ### Analysis
