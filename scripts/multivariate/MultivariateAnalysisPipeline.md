@@ -38,7 +38,6 @@ If we replace $𝑓_𝑗$   and $𝑓_𝑘$ with the feature vector from the thr
 ![feature matrices for different models of representation](<img src="/plot/featurematrix_by_representationmodels.png"/>)  
 
 
-
 ## RSA
 ### Regions
 #### 1. Brain parcellation based RSA: obtaining ROI masks from AAL parcellation
