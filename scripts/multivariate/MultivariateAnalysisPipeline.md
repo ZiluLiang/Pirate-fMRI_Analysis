@@ -25,6 +25,20 @@ $$R_{i} = Spearman's r(M1_{i},M2_{i})$$
 A nifti file of the reliability map is saved in the first level directory of the participants. Then a threshold of 0 is applied to binarize the map into a reliability mask which specifies the reliable voxels.
 This is implemented in the [`create_reliability_mask` script](/scripts/multivariate/create_reliability_mask.py)
 
+## Neural Vector Analysis
+Let $𝑓_𝑗$ be the coordinate of stimuli $j$ in neural representation space $ℝ^𝑚$ ($m$ being the number of voxels). For any two stimuli $𝑗,𝑘$, we define the neural vector (coding direction) from $𝑗$ to $𝑘$ as:  
+$$
+𝑣_{𝑗𝑘}=𝑓_𝑗− 𝑓_𝑘
+$$
+For any given pair of neural vectors, we can compute its cosine similarity as an indicator of how parallel these two neural vectors are
+$$
+cos⁡(𝑣_1, 𝑣_2)=  \frac{𝑣_1 \times 𝑣_2}{\left\Vert 𝑣_1 \right\Vert \times \left\Vert 𝑣_2 \right\Vert}
+$$
+If we replace $𝑓_𝑗$   and $𝑓_𝑘$ with the feature vector from the three models of representation (row vector from the feature matrices), we can compute the theoretical cosine similarity of any given pair of coding directions, and compare that with our data.
+![feature matrices for different models of representation](<img src="/plot/featurematrix_by_representationmodels.png"/>)  
+
+
+
 ## RSA
 ### Regions
 #### 1. Brain parcellation based RSA: obtaining ROI masks from AAL parcellation
