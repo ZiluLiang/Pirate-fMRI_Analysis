@@ -24,15 +24,13 @@ Using a [split-half approach](https://doi.org/10.1016/j.neuroimage.2019.116350),
 Let $M1$ and $M2$ be the $N_{stimuli}\times N_{voxels}$ activity pattern matrices for the odd and even runs respectively. Then $M1_{i}$ and $M2_{i}$ (column $i$ in $M1$ and $M2$) defines the response profile of voxel $i$ in odd and even runs. Reliability is defined as the stability of the response profile, i.e., the reliability of a given voxel $i$ is computed by  
 $$R_{i} = Spearman's r(M1_{i},M2_{i})$$ 
 A nifti file of the reliability map is saved in the first level directory of the participants. Then a threshold of 0 is applied to binarize the map into a reliability mask which specifies the reliable voxels.
-This is implemented in the [`create_reliability_mask` script](/scripts/multivariate/create_reliability_mask.py)
+This is implemented in the [`create_reliability_mask.py`](/scripts/multivariate/create_reliability_mask.py)
 
 # Different types of RSA Analysis
 Several types of RSA analysis are designed to test the representation geometry. Analyses are performed via different class of [`Estimators`](/scripts/multivariate/rsa_estimator.py)
 ## Neural Vector Analysis
 Let $𝑓_𝑗$ be the coordinate of stimuli $j$ in neural representation space $ℝ^𝑚$ ($m$ being the number of voxels). For any two stimuli $𝑗,𝑘$, we define the neural vector (coding direction) from $𝑗$ to $𝑘$ as:  
-$$
-𝑣_{𝑗𝑘}=𝑓_𝑗− 𝑓_𝑘
-$$
+$$𝑣_{𝑗𝑘}=𝑓_𝑗− 𝑓_𝑘$$
 For any given pair of neural vectors, we can compute its cosine similarity as an indicator of how parallel these two neural vectors are
 $$
 cos⁡(𝑣_1, 𝑣_2)=  \frac{𝑣_1 \times 𝑣_2}{\left\Vert 𝑣_1 \right\Vert \times \left\Vert 𝑣_2 \right\Vert}
