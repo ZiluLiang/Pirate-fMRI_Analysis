@@ -57,7 +57,7 @@ Similarly, we can use a feature-based groundtruth map, disregarding which featur
 #### highDim-25
 Under the assumption of highDim-25 model, there are three possible values of cosine similarity between any given pair of coding directions: $0.5$, $0$, $-0.5$.
 When the pair of coding directions intersect at the starting location or ending location, its  cosine similarity is $0.5$ or $-0.5$. When the pair do not share starting or ending location, its cosine similarity is 0. To better understand why this is the case, here is an illustration that represent 4 stimuli using one hot coding. The locations of these 4 stimuli in this representation space form a tetrahedron.  
-![cosine similarity between coding directions in one-hot coding case](/plot/highDcodingdir_cossim.png)
+[cosine similarity between coding directions in one-hot coding case](/plot/highDcodingdir_cossim.png)
 
 Coming back to the 25 stimuli in our experiment, in the within X/Y case, each X column/Y row has 5 stimuli, which yields ${5\choose2} = 10$ coding directions. These $10$ coding directions constitutes ${10\choose2} = 45$ pairs of coding directions to compute cosine similarity measures on. Among all $45$ pairs of coding directions, there are: 
  - $\left[{4\choose2} + {3\choose2} + {2\choose2}\right]*2 = 20$ pairs of stimuli that share the same starting/ending locations
