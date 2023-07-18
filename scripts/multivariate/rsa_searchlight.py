@@ -226,9 +226,9 @@ class RSASearchLight:
         patternimg_paths : str or list
             path to the activity pattern images. It can be path to a 4D image or paths to multiple 3D images.
         mask_img_path : str
-            path to the mask image. The mask image is a boolean image specifying voxels whose signals should be included into computation
+            path to the mask image. The mask image is a boolean image specifying voxels whose signals should be included into computation (of neural rdm etc)
         process_mask_img_path : str, optional
-            path to the process mask image. The process mask image is a boolean image specifying voxels on which searchlight analysis is performed, by default None
+            path to the process mask image. The process mask image is a boolean image specifying voxels on which searchlight analysis is performed. If None, will use the mask_img_path by default None
         radius : float, optional
             the radius of the searchlight sphere, by default 12.5
         njobs : int, optional
@@ -257,7 +257,7 @@ class RSASearchLight:
             voxel_neighbours.append(vidx) 
         return voxel_neighbours
 
-    def run(self,estimator,models,modelnames,outputpath,outputregexp,verbose):
+    def run(self,estimator,estimator_kwargs,outputpath,outputregexp,verbose):
         t0 = time.time()
         self.estimator = estimator
         # split patches for parallelization
@@ -266,20 +266,21 @@ class RSASearchLight:
             results = parallel(
                 delayed(self.fitPatchGroup)(
                     [self.neighbour_idx_lists[i] for i in list_i],
-                    models,
                     thread_id + 1,
                     self.A.shape[0],
-                    verbose,
+                    estimator_kwargs,
+                    verbose
                 )
                 for thread_id, list_i in enumerate(group_iter)
             )
 
-        result = np.vstack(results)
+        result = np.vstack([x[0] for x in results])
+        estimator_details = results[0][1]
         sys.stderr.write((f" completed searchlight on {len(self.neighbour_idx_lists)} voxels in {time.time()-t0} seconds. \n"))
-        self.write(result,models,modelnames,outputpath,outputregexp)
+        self.write(result,estimator_details,outputpath,outputregexp)
         return self
     
-    def write(self,result,models,modelnames,outputpath,outputregexp,ensure_finite:bool=False):
+    def write(self,result,estimator_details,outputpath,outputregexp,ensure_finite:bool=False):
         if '.nii' not in outputregexp:
             outputregexp = f'{outputregexp}.nii'
         checkdir(outputpath)
@@ -294,31 +295,23 @@ class RSASearchLight:
             curr_fn = os.path.join(outputpath,outputregexp % (k))
             nib.save(curr_img, curr_fn)
         # create a json file storing regressor information
-        json_fn = os.path.join(outputpath,'searchlight.json')
-        self.config.update({"estimator":str(self.estimator)})
-        config = deepcopy(self.config)
-        X = {"names":modelnames,
-             "xX":[m.tolist() for m in models]}
-        with open(os.path.join(outputpath,json_fn), "w") as outfile:
-            json.dump({"config":config,"X":X}, outfile)
-        
+        with open(os.path.join(outputpath,'searchlight.json'), "w") as outfile:
+            json.dump({"searchlight_config":self.config,"estimator":estimator_details}, outfile)        
         return self 
 
     
-    def fitPatchGroup(self,neighbour_idx_list, model,thread_id,total,verbose:bool = True):
+    def fitPatchGroup(self,neighbour_idx_list,thread_id,total, estimator_kwargs,verbose:bool = True):
         voxel_results = []
         t0 = time.time()
         for i,neighbour_idx in enumerate(neighbour_idx_list):
             if neighbour_idx.size==0:
-                voxel_results.append(np.full((1,len(model)),fill_value=np.nan))
+                voxel_results.append([])
             else:
-                # centering feature columns (for each voxel, demean the column corresponding to its activity)
                 patternmatrix = self.X[:,neighbour_idx]
-                neuralrdm = compute_rdm(patternmatrix,"correlation")
                 # instantiate estimator for current voxel
                 curr_estimator =  self.estimator(
-                    neuralrdm,
-                    model)
+                    patternmatrix,
+                    **estimator_kwargs)
                 # perform estimation
                 voxel_results.append(curr_estimator.fit().result)
             if verbose:
@@ -332,8 +325,23 @@ class RSASearchLight:
                         f"job {thread_id}, processed {i}/{len(neighbour_idx_list)} voxels"
                         f"({pt:0.2f}%, {remaining} seconds remaining){crlf}"
                     )
+        
+        #double check if results are of same length (except for empty voxels)
+        voxresult_count = [len(x) for x in voxel_results if len(x)!=0]
+        if np.all([x == voxresult_count[0] for x in voxresult_count]):
+            voxresult_count = voxresult_count[0]
+        else:
+            raise ValueError("shape of voxel-wise searchlight results mismatch!")
+        
+        #find empty voxel and fill with nans
+        empty_vox = [j for j,x in enumerate(voxel_results) if len(x)==0]
+        for k in empty_vox:
+            voxel_results[k] = np.full_like(voxresult_count,fill_value=np.nan)
+        
+        #get estimator information to write into json file
+        estimator_details = curr_estimator.get_details()
         sys.stderr.write(f"job {thread_id}, processed {len(neighbour_idx_list)} voxels in {time.time()-t0} seconds\n")
-        return np.asarray(voxel_results)    
+        return np.asarray(voxel_results),estimator_details
 
     def genPatches(self):
         print("generating searchlight patches")

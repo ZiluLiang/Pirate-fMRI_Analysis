@@ -19,7 +19,7 @@ sys.path.append(os.path.join(project_path,'scripts'))
 from multivariate.dataloader import ActivityPatternDataLoader
 from multivariate.helper import ModelRDM, compute_rdm, checkdir, scale_feature
 from multivariate.rsa_searchlight import RSASearchLight
-from multivariate.rsa_estimator import PatternCorrelation,MultipleRDMRegression
+from multivariate.rsa_estimator import PatternCorrelation,MultipleRDMRegression,NeuralDirectionCosineSimilarity
 
 class RSARunner:
     def __init__(self,participants,fmribeh_dir,
@@ -144,7 +144,7 @@ class RSARunner:
         modeldf = modelrdm.rdm_to_df(df_inc_models)
 
         ## get neural data
-        _, neural_rdm, _ = self.get_neuralRDM(subid)
+        activitypattern, neural_rdm, _ = self.get_neuralRDM(subid)
         neuralrdmdf = modelrdm.rdm_to_df(modelnames="neural",rdms=neural_rdm)
         neuralrdmdf = neuralrdmdf.join(modeldf).reset_index().assign(subid=subid)
         
@@ -156,7 +156,7 @@ class RSARunner:
         
         corr_df = []
         for cr in corr_type:
-            PC_s =  PatternCorrelation(neuralrdm = neural_rdm,
+            PC_s =  PatternCorrelation(activitypattern = activitypattern,
                                     modelrdms = corr_rdm_vals,
                                     modelnames = corr_rdm_names,
                                     type=cr)
@@ -171,7 +171,7 @@ class RSARunner:
 
         t0 = time.time()
 
-        _, neural_rdm, _ = self.get_neuralRDM(subid)
+        activitypattern, _, _ = self.get_neuralRDM(subid)
 
         ## compute model rdm
         corr_df_list = []
@@ -187,10 +187,10 @@ class RSARunner:
             corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
             
             ## compute correlations between neural rdm and model rdms
-            PC_s =  PatternCorrelation(neuralrdm = neural_rdm,
+            PC_s =  PatternCorrelation(activitypattern = activitypattern,
                                        modelrdm = corr_rdm_vals,
                                         type="spearman").fit()
-            PC_k =  PatternCorrelation(neuralrdm = neural_rdm,
+            PC_k =  PatternCorrelation(activitypattern = activitypattern,
                                     modelrdm = corr_rdm_vals,
                                     type="kendall").fit()
             corr_name_dict = dict(zip(range(len(corr_rdm_vals)),corr_rdm_names))
@@ -234,128 +234,17 @@ class RSARunner:
         return mds_df
     
     def _singleparticipant_ROIPS(self,subid,outputdir):
-        X, _, _ = self.get_neuralRDM(subid)
-        #generate a randomly permutated X (randomly permutated within each row):
-        randX = np.empty_like(X)
-        for j in range(X.shape[0]):
-            randX[j,:] = np.random.permutation(X.shape[1])
-       
+        # get activity pattern matrix
+        X, _, _ = self.get_neuralRDM(subid) #  X, _, _ = self.get_neuralRDM(subid,preproc="PCA")
         # get stimuli properties
         modelrdm  = self.get_modelRDM(subid)
-
-        # compute coding directions between any two stimuli
-        iter_pairs = enumerate(zip(
-            itertools.product(np.arange(len(X)),np.arange(len(X))),
-            itertools.product(X,X),
-            itertools.product(randX,randX)
-            ))
-        dirs_mat = np.empty((len(X),len(X),X.shape[1]))
-        dirs_mat_rand = np.empty((len(X),len(X),X.shape[1]))
-        cols = ['stim1', 'stim2','run1','run2', #stim id and run id of stimulus 1 (starting stim) and 2 (ending stim)
-                'sx','ex', #x location on groundtruth map for starting stim (sx) and ending stim (ex)
-                'sy','ey', #y location on groundtruth map for starting stim (sy) and ending stim (ey)
-                'sc','ec', #colour for starting stim (sc) and ending stim (ec)
-                'ss','es'  #shape for starting stim (ss) and ending stim (es)
-                ]
-        dir_info_mat =  np.empty((len(X),len(X),len(cols)))
-        for jpair,((jpS1,jpS2), (u,v), (urand,vrand)) in list(iter_pairs):
-            dirs_mat[jpS1,jpS2,:] = u-v
-            dirs_mat_rand[jpS1,jpS2,:] = urand - vrand
-            dir_info_mat[jpS1,jpS2,:] = np.array([modelrdm.stimid.flatten()[jpS1],
-                                                  modelrdm.stimid.flatten()[jpS2],
-                                                  modelrdm.stimsession.flatten()[jpS1],
-                                                  modelrdm.stimsession.flatten()[jpS2],
-                                                  modelrdm.stimloc[:,0][jpS1],
-                                                  modelrdm.stimloc[:,0][jpS2],
-                                                  modelrdm.stimloc[:,1][jpS1],
-                                                  modelrdm.stimloc[:,1][jpS2],
-                                                  modelrdm.stimfeature[:,0][jpS1],
-                                                  modelrdm.stimfeature[:,0][jpS2],
-                                                  modelrdm.stimfeature[:,1][jpS1],
-                                                  modelrdm.stimfeature[:,1][jpS2]
-                                                  ])
-
+        stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature}        
         
-        dp_idx = np.tril_indices(dirs_mat.shape[0], k = -1)
-        dirs_arr = dirs_mat[dp_idx]
-        dirs_arr_rand = dirs_mat_rand[dp_idx]
-        dir_info_arr = dir_info_mat[dp_idx] #dir_info_mat.reshape((-1,len(cols)))
-        dir_df = pd.DataFrame(dir_info_arr,columns=cols)
-        
-        # cosine similarity between pairs of coding directions
-        iter_dir_pairs = list(itertools.combinations(dirs_arr,r=2))
-        iter_dir_pairs_rand = list(itertools.combinations(dirs_arr_rand,r=2))
-        idx_pairs = list(itertools.combinations(np.array(dir_df.index),r=2))                    
+        PS_estimator = NeuralDirectionCosineSimilarity(activitypattern = X,stim_dict=stim_dict)
+        PS_estimator.fit()
+        #PS_estimator.dir_pair_df.to_csv(os.path.join(outputdir,f'{subid}.csv'))
 
-        cos_sim  = np.array([1 - scipy.spatial.distance.cosine(dir1,dir2) for dir1,dir2 in iter_dir_pairs])
-        cos_sim_rand  = np.array([1 - scipy.spatial.distance.cosine(dir1,dir2) for dir1,dir2 in iter_dir_pairs_rand])
-
-        dir_df = dir_df.assign(tmpvar=1).reset_index() # create a temporary variable so that we can use merge without index
-        create_dir_pair_df = lambda idx1,idx2,dir_df: pd.merge(dir_df.loc[[idx1]], dir_df.loc[[idx2]], on="tmpvar", how="outer", suffixes=('_dir1', '_dir2'))
-        dir_pair_df = pd.concat([create_dir_pair_df(idx1,idx2,dir_df)  for idx1,idx2 in idx_pairs],axis=0)
-        dir_pair_df["neural"] = cos_sim
-        dir_pair_df["neuralrand"] = cos_sim_rand
-
-        def get_pair_type_loc(df_row):
-            df_row["same_sx"] = df_row["sx_dir1"] == df_row["sx_dir2"]
-            df_row["same_sy"] = df_row["sy_dir1"] == df_row["sy_dir2"]
-            df_row["same_ex"] = df_row["ex_dir1"] == df_row["ex_dir2"]
-            df_row["same_ey"] = df_row["ey_dir1"] == df_row["ey_dir2"]
-
-            ## two coding directions that have the same start and end x but in different y rows
-            if df_row['same_sx'] & df_row['same_ex'] & (df_row['sy_dir1'] == df_row['ey_dir1']) & (df_row['sy_dir2'] == df_row['ey_dir2']):
-                pair_type = "betweenX"
-            
-            ## two coding directions that have the same start and end y but in different x columns
-            elif df_row['same_sy'] & df_row['same_ey'] & (df_row['sx_dir1'] == df_row['ex_dir1']) & (df_row['sx_dir2'] == df_row['ex_dir2']):
-                pair_type = "betweenY"
-
-            ## two coding directions that are in the same x column
-            elif np.all([y == df_row['sy_dir1'] for y in [df_row['sy_dir1'],df_row['ey_dir1'],df_row['sy_dir2'],df_row['ey_dir2']]]):
-                pair_type = "withinX"
-
-            ## two coding directions that are in the same y row
-            elif np.all([x == df_row['sx_dir1'] for x in [df_row['sx_dir1'],df_row['ex_dir1'],df_row['sx_dir2'],df_row['ex_dir2']]]):
-                pair_type = "withinY"
-            else:
-                pair_type = "others"
-            return pair_type
-        
-        def get_pair_type_feature(df_row):
-            df_row["same_sc"] = df_row["sc_dir1"] == df_row["sc_dir2"]
-            df_row["same_ss"] = df_row["ss_dir1"] == df_row["ss_dir2"]
-            df_row["same_ec"] = df_row["ec_dir1"] == df_row["ec_dir2"]
-            df_row["same_es"] = df_row["es_dir1"] == df_row["es_dir2"]
-            ## two coding directions that have the same start and end colours but in different shape rows
-            if df_row['same_sc'] & df_row['same_ec'] & (df_row['ss_dir1'] == df_row['es_dir1']) & (df_row['ss_dir2'] == df_row['es_dir2']):
-                pair_type = "betweenColour"
-            ## two coding directions that have the same start and end shape but in different colour columns
-            elif df_row['same_ss'] & df_row['same_es'] & (df_row['sc_dir1'] == df_row['ec_dir1']) & (df_row['sc_dir2'] == df_row['ec_dir2']):
-                pair_type = "betweenShape"
-            ## two coding directions that are in the same colour column
-            elif np.all([y == df_row['ss_dir1'] for y in [df_row['ss_dir1'],df_row['es_dir1'],df_row['ss_dir2'],df_row['es_dir2']]]):
-                pair_type = "withinColour"
-            ## two coding directions that are in the same shape row
-            elif np.all([x == df_row['sc_dir1'] for x in [df_row['sc_dir1'],df_row['ec_dir1'],df_row['sc_dir2'],df_row['ec_dir2']]]):
-                pair_type = "withinShape"
-            else:
-                pair_type = "others"
-            return pair_type
-
-        dir_pair_df = dir_pair_df.assign(subid=subid)
-        dir_pair_df.to_csv(os.path.join(outputdir,f'{subid}.csv'))
-
-        dir_pair_dfl,dir_pair_dff = deepcopy(dir_pair_df),deepcopy(dir_pair_df)
-        dir_pair_dfl["pairtype"] = dir_pair_df.apply(get_pair_type_loc, axis=1)
-        dir_pair_df_suml = dir_pair_dfl.groupby(['subid','pairtype'])[['neural','neuralrand']].mean().reset_index()
-        dir_pair_dff["pairtype"] = dir_pair_df.apply(get_pair_type_feature, axis=1)
-        dir_pair_df_sumf = dir_pair_dff.groupby(['subid','pairtype'])[['neural','neuralrand']].mean().reset_index()
-        dir_pair_df_sum = pd.concat([
-            dir_pair_df_suml[dir_pair_df_suml["pairtype"]!="others"],
-            dir_pair_df_sumf[dir_pair_df_sumf["pairtype"]!="others"],
-        ],axis=0)
-
-        return dir_pair_df_sum
+        return PS_estimator.resultdf.assign(subid=subid)
     
 ############################################### GROUP LEVEL  ANALSYSIS METHODS ###################################################   
     def run_ROIRSA(self,njobs:int=1):#cpu_count()
@@ -395,18 +284,44 @@ class RSARunner:
             ## compute model rdm
             modelrdm  = self.get_modelRDM(subid)
             if self.taskname == "localizer":
-                m_regs = ['feature1dx','feature1dy','loc2d']
+                m_regs = ['feature2d','loc2d']
                 corr_rdm_names = [x for x in modelrdm.models.keys() if not np.logical_or(x.endswith('session'),x.endswith('stimuli'))]
                 corr_rdm_names = [x for x in corr_rdm_names if not np.logical_or(x.endswith('session'),x.endswith('stimuligroup'))]
             else:
-                m_regs = ['feature1dx','feature1dy','stimuligroup','loc2d']
+                m_regs = ['feature2d','stimuligroup','loc2d']
                 corr_rdm_names = [x for x in modelrdm.models.keys() if not np.logical_or(x.endswith('session'),x.endswith('stimuli'))]
             regress_models = [modelrdm.models[m] for m in m_regs]
             corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
+
+            # run search light
             print('running regression searchlight')
-            subRSA.run(MultipleRDMRegression,regress_models,m_regs,os.path.join(outputdir,'regression','first',subid), 'beta_%04d.nii', j == 0) # only show details at the first sub
+            subRSA.run(
+                estimator = MultipleRDMRegression,
+                estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
+                outputpath   = os.path.join(outputdir,'regression','first',subid), 
+                outputregexp = 'beta_%04d.nii', 
+                verbose      = j == 0
+                ) # only show details at the first participant
+            
             print('running correlation searchlight')
-            subRSA.run(PatternCorrelation,corr_rdm_vals,corr_rdm_names,os.path.join(outputdir,'correlation','first',subid), 'rho_%04d.nii', j == 0)
+            subRSA.run(
+                estimator = PatternCorrelation,
+                estimator_kwargs = {"modelrdms":corr_rdm_vals, "modelnames":corr_rdm_names, "type":"spearman"},
+                outputpath   = os.path.join(outputdir,'correlation','first',subid), 
+                outputregexp = 'rho_%04d.nii', 
+                verbose      = j == 0
+                )# only show details at the first participant
+
+            print('running parallelism  analysis searchlight')
+            stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature} 
+            subRSA.run(
+                estimator = NeuralDirectionCosineSimilarity,
+                estimator_kwargs = {"stim_dict":stim_dict},
+                outputpath   = os.path.join(outputdir,'cosinesimilarity','first',subid), 
+                outputregexp = 'ps_%04d.nii', 
+                verbose      = j == 0
+                )# only show details at the first participant
+
         dump(sphere_vox_count,os.path.join(outputdir,'searchlight_voxcount.pkl'))
 
     def run_randomROIRSA(self,n_permutations:int=5000,njobs:int=cpu_count()):
