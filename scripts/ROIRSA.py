@@ -42,33 +42,39 @@ anatmaskdir = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\ma
 with open(os.path.join(project_path,'scripts','anatomical_masks.json')) as f:    
     anat_roi = list(json.load(f).keys())
 laterality = ["left","right","bilateral"]
+laterality = ["bilateral"]
 
 n_sess = {
           "localizer":1,
-          "fourruns":4,
-          "concatall":1
+          "concatall":1,
+          "concateven":1,
+          "concatodd":1
           }
 
 corr_df_list = []
-
-for p in preprocess:
+n_job = 15
+for p in preprocess[:1]:
     beta_dir = {
         "localizer":[os.path.join(fmridata_dir,p,'LSA_stimuli_localizer')],
-        "fourruns":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
-        "concatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall')]
+        "concatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall')],
+        "concateven":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concateven')],
+        "concatodd":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatodd')]
         }
     beta_fname = {
         "localizer":['stimuli_1r.nii'],
-        "fourruns":['stimuli_4r.nii'],
-        "concatall":['stimuli_all.nii']
+        "concatall":['stimuli_all.nii'],
+        "concateven":['stimuli_even.nii'],
+        "concatodd":['stimuli_odd.nii']
         }
-    vs_dir = {"no_selection":[],
-              "reliability_ths0":[os.path.join(fmridata_dir,p,'reliability_concat')],
-              "perm_rmask":[os.path.join(fmridata_dir,p,'reliability_concat')]}
+    vs_dir = {
+              "no_selection":[]
+              }
     for ds_name,ds in beta_dir.items():
-        mds_df_list = []
-        rdm_df_list = []
         for vselect,vdir in vs_dir.items():
+            mds_df_list = []
+            rdm_df_list = []
+            PS_df_list = []
+
             vsmask_dir = ds + vdir
             if vselect == "no_selection":
                 vsmask_fname = ['mask.nii']*len(ds)
@@ -89,18 +95,22 @@ for p in preprocess:
                                 anatmasks=anatmasks,
                                 nsession=n_sess[ds_name],
                                 taskname=taskname)
-                mdsdf = RSA.run_ROIMDS(10)
-                corr_df,rdm_df = RSA.run_ROIRSA(10)
+                
+                #RSA._singleparticipant_ROIPS(subid_list[0],ROIRSA_output_path)
 
-                mdsdf = mdsdf.assign(roi = roi, laterality = lat, voxselect = vselect, preprocess=p,ds = ds_name)
+                corr_df,rdm_df = RSA.run_ROIRSA(n_job)
                 rdm_df = rdm_df.assign(roi = roi, laterality = lat, voxselect = vselect, preprocess=p,ds = ds_name)
                 corr_df = corr_df.assign(roi = roi, laterality = lat, voxselect = vselect, preprocess=p,ds = ds_name)                
-
-                mds_df_list.append(mdsdf)
                 rdm_df_list.append(rdm_df)
                 corr_df_list.append(corr_df)
-        pd.concat(mds_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roimds_nocentering_{p}_{ds_name}_{vselect}.csv'))
-        pd.concat(rdm_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roirdm_nocentering_{p}_{ds_name}_{vselect}.csv'))
+                
+                PS_df = RSA.run_ROIPS(outputdir=os.path.join(ROIRSA_output_path,'individual_cossim'),njobs=n_job)
+                PS_df = PS_df.assign(roi = roi, laterality = lat, voxselect = vselect, preprocess=p,ds = ds_name)
+                PS_df_list.append(PS_df)
+            
+            pd.concat(rdm_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roirdm_nocentering_{p}_{ds_name}_{vselect}.csv'))
+            pd.concat(PS_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roiPS_nocentering_{p}_{ds_name}_{vselect}.csv'))
+
 pd.concat(corr_df_list, axis=0).to_csv(
     os.path.join(ROIRSA_output_path, 'roicorr_nocentering.csv')
 )

@@ -1,26 +1,230 @@
+""" Class for estimators for RSA analysis
+    All classes takes activity pattern matrix as an input and performs different types of RSA analysis based on the activity pattern matrix.
+    An estimator class has at least four methods:
+    (1) fit: by calling estimator.fit(), RSA analysis is performed, `result` attribute will be set. `estimator.result` is an 1D numpy array.
+    (2) visualize: by calling estimator.visualize(), the result of RSA analysis will visualized, a figure handle will be returned
+    (3) __str__: return the name of estimator class
+    (4) get_details: return the details of estimator class in a dictonary, data will be serialized so that it can be written into JSON 
+"""
+
 import numpy
 import scipy
 from sklearn.linear_model import LinearRegression
-from multivariate.helper import lower_tri, upper_tri, scale_feature, compute_R2
+from multivariate.helper import lower_tri, upper_tri, scale_feature, compute_R2, compute_rdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+import itertools
+import pandas
+from copy import deepcopy
+import time
+
+
+def _get_pair_type_loc(dirpair_info_arr,dirpair_info_arr_cols):
+    sx_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sx_dir1")[0]]
+    sx_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sx_dir2")[0]]
+    sy_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sy_dir1")[0]]
+    sy_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sy_dir2")[0]]
+    ex_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ex_dir1")[0]]
+    ex_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ex_dir2")[0]]
+    ey_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ey_dir1")[0]]
+    ey_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ey_dir2")[0]]
+    
+    same_sx = sx_dir1 == sx_dir2
+    same_sy = sy_dir1 == sy_dir2
+    same_ex = ex_dir1 == ex_dir2
+    same_ey = ey_dir1 == ey_dir2
+
+    pair_type_dict = {
+        ## two coding directions that have the same start and end x but in different y rows
+        "betweenX": numpy.all(
+                        numpy.hstack([same_sx,same_ex,(sy_dir1 == ey_dir1),(sy_dir2 == ey_dir2)]),# a n_pairs*n_criteria array
+                        axis=1),# compressed into (n_pairs,) array specifying which pair can be classified as betweenX, all criterial must be fullfiled for a pair to be classified as betweenX             
+        ## two coding directions that have the same start and end y but in different x columns
+        "betweenY": numpy.all(
+                        numpy.hstack([same_sy,same_ey,(sx_dir1 == ex_dir1),(sx_dir2 == ex_dir2)]),
+                        axis=1),
+        ## two coding directions that are in the same x column
+        "withinX": numpy.all(
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1]),
+                        axis=1),                
+        ## two coding directions that are in the same y row
+        "withinY": numpy.all(
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1]),
+                        axis=1)
+    }
+    return pair_type_dict
+        
+def _get_pair_type_feature(dirpair_info_arr,dirpair_info_arr_cols):
+    sc_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sc_dir1")[0]]
+    sc_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sc_dir2")[0]]
+    ss_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ss_dir1")[0]]
+    ss_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ss_dir2")[0]]
+    ec_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ec_dir1")[0]]
+    ec_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ec_dir2")[0]]
+    es_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="es_dir1")[0]]
+    es_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="es_dir2")[0]]
+    
+    same_sc = sc_dir1 == sc_dir2
+    same_ss = ss_dir1 == ss_dir2
+    same_ec = ec_dir1 == ec_dir2
+    same_es = es_dir1 == es_dir2
+
+    pair_type_dict = {
+        ## two coding directions that have the same start and end colours but in different shape rows
+        "betweenColour": numpy.all(
+                        numpy.hstack([same_sc,same_ec,ss_dir1 == es_dir1,ss_dir2 == es_dir2]),# a n_pairs*n_criteria array
+                        axis=1),# compressed into (n_pairs,) array specifying which pair can be classified as betweenColour, all criterial must be fullfiled for a pair to be classified as betweenColour                
+        ## two coding directions that have the same start and end shape but in different colour columns
+        "betweenShape": numpy.all(
+                        numpy.hstack([same_ss, same_es, sc_dir1 == ec_dir1, sc_dir2 == ec_dir2]),
+                        axis=1),
+        ## two coding directions that are in the same colour column
+        "withinColour": numpy.all(
+                        numpy.hstack([es_dir1 == ss_dir1, ss_dir2 == ss_dir1, es_dir2 == ss_dir1]),
+                        axis=1),                
+        ## two coding directions that are in the same shape row
+        "withinShape": numpy.all(
+                        numpy.hstack([ec_dir1 == sc_dir1, sc_dir2 == sc_dir1, ec_dir2 == sc_dir1]),
+                        axis=1) 
+    }
+    return pair_type_dict
+
+
+class NeuralDirectionCosineSimilarity:
+    def __init__(self,activitypattern:numpy.ndarray,stim_dict:dict):
+        self.X = activitypattern
+        self.stimid = stim_dict["stimid"]
+        self.stimsession = stim_dict["stimsession"]
+        self.stimloc = stim_dict["stimloc"]
+        self.stimfeature = stim_dict["stimfeature"]
+
+    def fit(self):
+        X = self.X
+        #generate a randomly permutated X (randomly permutated within each row):
+        randX = numpy.empty_like(X)
+        for j in range(X.shape[0]):
+            randX[j,:] = numpy.random.default_rng(seed=j).permutation(X.shape[1])
+       
+        # compute coding directions between any two stimuli
+        vidxs, uidxs = numpy.meshgrid(range(len(X)),range(len(X)))
+        dirs_mat = X[uidxs]-X[vidxs]
+        dirs_mat_rand = randX[uidxs]-randX[vidxs]
+        dir_info_mat = numpy.dstack((
+            self.stimid[uidxs],          self.stimid[vidxs],
+            self.stimsession[uidxs],     self.stimsession[vidxs],
+            self.stimloc[:,0][uidxs],     self.stimloc[:,0][vidxs],
+            self.stimloc[:,1][uidxs],     self.stimloc[:,1][vidxs],
+            self.stimfeature[:,0][uidxs], self.stimfeature[:,0][vidxs],
+            self.stimfeature[:,1][uidxs], self.stimfeature[:,1][vidxs]
+            ))
+        dir_info_arr_cols = ['stim1', 'stim2','run1','run2', #stim id and run id of stimulus 1 (starting stim) and 2 (ending stim)
+                'sx','ex', #x location on groundtruth map for starting stim (sx) and ending stim (ex)
+                'sy','ey', #y location on groundtruth map for starting stim (sy) and ending stim (ey)
+                'sc','ec', #colour for starting stim (sc) and ending stim (ec)
+                'ss','es'  #shape for starting stim (ss) and ending stim (es)
+                ]
+
+        dir_idx = numpy.tril_indices(dirs_mat.shape[0], k = -1)
+        dirs_arr = dirs_mat[dir_idx]
+        dirs_arr_rand = dirs_mat_rand[dir_idx]
+        dir_info_arr = dir_info_mat[dir_idx] #dir_info_mat.reshape((-1,len(cols)))
+        
+        # get all possible pairs of coding directions
+        dir1idxs, dir2idxs = numpy.meshgrid(range(dirs_arr.shape[0]),range(dirs_arr.shape[0]))
+        dirpair_info_mat =  numpy.dstack((
+            dir_info_arr[dir1idxs],dir_info_arr[dir2idxs]
+            ))
+        dirpair_idx = numpy.tril_indices(dirpair_info_mat.shape[0], k = -1)  
+        dirpair_info_arr = dirpair_info_mat[dirpair_idx]
+        dirpair_info_arr_cols = [x+'_dir1' for x in dir_info_arr_cols] + [x+'_dir2' for x in dir_info_arr_cols]
+        dir1idxs_arr, dir2idxs_arr = dir1idxs[dirpair_idx], dir2idxs[dirpair_idx]
+        
+        # select a subset of pairs to do the computation
+        pair_type_dict = {}
+        pair_type_dict.update(
+            _get_pair_type_loc(dirpair_info_arr,dirpair_info_arr_cols)
+        )
+        pair_type_dict.update(
+            _get_pair_type_feature(dirpair_info_arr,dirpair_info_arr_cols)
+        ) 
+        #dirpair_idx_selected = (dirpair_idx[0][numpy.any(numpy.vstack(list(pair_type_dict.values())),axis=0)],
+        #                        dirpair_idx[1][numpy.any(numpy.vstack(list(pair_type_dict.values())),axis=0)])        
+        
+        # cosine similarity between pairs of coding directions
+        cosine_similarity = lambda dir1, dir2: numpy.dot(dir1, dir2)/(numpy.linalg.norm(dir1)*numpy.linalg.norm(dir2))
+        cos_similarity_neural = dict()
+        cos_similarity_rand = dict()
+        pairtypes=[]
+        for k,v in pair_type_dict.items():
+            if v.sum() > 0:
+                cos_similarity_neural |= {
+                    k:numpy.array([
+                        cosine_similarity(dir1, dir2) for dir1,dir2 in zip(dirs_arr[dir1idxs_arr[v]],dirs_arr[dir2idxs_arr[v]])
+                        ]).mean() # 1 - scipy.spatial.distance.cosine(dir1,dir2) 
+                }
+                cos_similarity_rand |= {
+                    k:numpy.array([
+                        cosine_similarity(dir1, dir2) for dir1,dir2 in zip(dirs_arr_rand[dir1idxs_arr[v]],dirs_arr_rand[dir2idxs_arr[v]])
+                        ]).mean()
+                }
+                pairtypes.append(k)
+        
+        self.resultdf = pandas.DataFrame({"pairtype":pairtypes,
+                                          "neural":list(cos_similarity_neural.values()),
+                                          "neuralrand":list(cos_similarity_rand.values())})
+
+        #self.dir_pair_df = dir_pair_df
+        self.result = numpy.array(list(cos_similarity_neural.values())+list(cos_similarity_rand.values()))
+        self.resultnames = ['neuraldata_'+x for x in pairtypes] + ['shuffleddata_'+x for x in pairtypes]
+        return self
+    
+    def visualize(self):
+        try:
+            self.resultdf
+        except Exception:
+            self.fit()        
+
+        plotdf = pandas.melt(self.resultdf, id_vars=['pairtype'], value_vars=['neural','neuralrand'],
+                         var_name='datatype', value_name='Cosine Similarity')
+        plotdf["datatype"] = plotdf["datatype"].map({'neural': 'neural data', 'neuralrand': 'shuffled data'})
+
+        fig = sns.catplot(data=plotdf,x="pairtype",y="Cosine Similarity",hue="datatype",kind="point")
+        return fig
+    
+
+    def __str__(self) -> str:
+        return f"NeuralDirectionCosineSimilarity"
+    
+    def get_details(self):
+        details = {"name":self.__str__(),
+                   "resultnames":self.resultnames,
+                   "stim_dict":{"stimid":self.stimid.tolist(),
+                                "stimsession":self.stimsession.tolist(),
+                                "stimloc":self.stimloc.tolist(),
+                                "stimfeature":self.stimfeature.tolist()}
+                  }
+        return  details
+
 
 class PatternCorrelation:
     """calculate the correlation between neural rdm and model rdm
 
     Parameters
     ----------
-    neuralrdm : numpy.ndarray
-        a 2D numpy array. the neural representation dissimilarity matrix. 
+    activitypattern : numpy.ndarray
+        a 2D numpy array. the neural activity pattern matrix used for computing representation dissimilarity matrix. size = (nsample,nfeatures)
     modelrdm : numpy.ndarray or list of numpy.ndarray
-        a 2D numpy array. the model representation dissimilarity matrix. 
+        a 2D numpy array. the dissimilarity matrices from different models of representation. size = (nsample,nsample)
+    modelnames: list
+        a list of model names. If `None` models will be named as m1,m2,..., by default `None`
     type : str, optional
-        type of correlation measure, by default "spearman".
-        must be one of: "spearman", "pearson", "kendall", "linreg"
+        type of correlation measure, by default `"spearman"`.
+        must be one of: `"spearman", "pearson", "kendall", "linreg"`
     """
-    def __init__(self,neuralrdm:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,type:str="spearman",ztransform:bool=False) -> None:        
+    def __init__(self,activitypattern:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,type:str="spearman",ztransform:bool=False) -> None:        
 
         #neural rdm
+        neuralrdm = compute_rdm(activitypattern,"correlation")
         self.rdm_shape = neuralrdm.shape        
         self.Y,_ = lower_tri(neuralrdm)
 
@@ -50,10 +254,6 @@ class PatternCorrelation:
         else:
             self.type = type
         self.outputtransform = lambda x: numpy.arctanh(x) if ztransform else x
-
-    
-    def __str__(self) -> str:
-        return f"PatternCorrelation with {self.type}"
     
     def fit(self):
         self.na_filters = []
@@ -98,9 +298,31 @@ class PatternCorrelation:
                     axes[k][j].set_title(t)
         fig.suptitle(f'{self.type} correlation: {self.result}')
         return fig
+    
+    def __str__(self) -> str:
+        return f"PatternCorrelation with {self.type}"
+    
+    def get_details(self):        
+        details = {"name":self.__str__(),
+                   "corrtype":self.type,
+                   "NAfilters":dict(zip(self.modelnames,[x.tolist() for x in self.na_filters])),
+                   "modelRDMs":dict(zip(self.modelnames,[x.tolist() for x in self.Xs]))
+                  }
+        return  details
 
 class MultipleRDMRegression:
-    def __init__(self,neuralrdm,modelrdms,modelnames:list=None) -> None:
+    """estimate the regression coefficient when using the model rdms to predict neural rdm
+
+    Parameters
+    ----------
+    activitypattern : numpy.ndarray
+        a 2D numpy array. the neural activity pattern matrix used for computing representation dissimilarity matrix. size = (nsample,nfeatures)
+    modelrdm : numpy.ndarray or list of numpy.ndarray
+        a 2D numpy array. the dissimilarity matrices from different models of representation. size = (nsample,nsample)
+    modelnames: list
+        a list of model names. If `None` models will be named as m1,m2,..., by default `None`
+    """
+    def __init__(self,activitypattern:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,standardize:bool=True) -> None:
 
         #model rdm and names        
         if isinstance(modelrdms,list):
@@ -113,29 +335,38 @@ class MultipleRDMRegression:
         if modelnames is None:
             modelnames = [f'm{str(j)}' for j in range(len(modelrdms))]
         assert len(modelnames) == len(modelrdms), 'number of model names must be equal to number of model rdms'
+
+        #neural rdm
+        neuralrdm = compute_rdm(activitypattern,"correlation")
         self.rdm_shape = neuralrdm.shape
         self.modelnames = modelnames
 
         Y,_ = lower_tri(neuralrdm)
 
         self.n_reg = len(modelrdms) # number of model rdms
-        X = numpy.empty((len(Y),self.n_reg))
+        X = numpy.empty((len(Y),self.n_reg)) # X is a nvoxel * nmodel matrix
         for j,m in enumerate(modelrdms):
             X[:,j],_ = lower_tri(m)
 
-        xna_filters = numpy.all(~numpy.isnan(X),1) # find out rows that are not nans in all columns
-        self.na_filters = numpy.logical_and(~numpy.isnan(Y),xna_filters)
+        self.X = X
+        self.Y = Y
 
-        #standardize design matrix independently within each column
-        self.X = scale_feature(X[self.na_filters,:],1)
-        # standardize Y
-        self.Y = scale_feature(Y[self.na_filters])
-    
-    def __str__(self) -> str:
-        return "MultipleRDMRegression"
+        self.standardize = standardize
     
     def fit(self):
-        reg = LinearRegression().fit(self.X,self.Y)
+        xna_filters = numpy.all(~numpy.isnan(self.X),1) # find out rows that are not nans in all columns
+        self.na_filters = numpy.logical_and(~numpy.isnan(self.Y),xna_filters)
+
+        if self.standardize:
+            #standardize design matrix independently within each column
+            X = scale_feature(self.X[self.na_filters,:],1)
+            # standardize Y
+            Y = scale_feature(self.Y[self.na_filters])
+        else:
+            X = self.X[self.na_filters,:]
+            Y = self.Y[self.na_filters]
+
+        reg = LinearRegression().fit(X,Y)
         self.reg = reg
         self.result = reg.coef_
         self.score  = reg.score(self.X,self.Y)
@@ -154,11 +385,23 @@ class MultipleRDMRegression:
             v = numpy.full(self.rdm_shape,numpy.nan)
             _,idx = lower_tri(v)
             fillidx = (idx[0][self.na_filters],idx[1][self.na_filters])
-            v[fillidx] = m
+            v[fillidx] = m[self.na_filters]
             sns.heatmap(v,ax=axes.flatten()[j],square=True,cbar_kws={"shrink":0.85})
             if j == 0:
                 axes.flatten()[j].set_title(t)
             else:
                 axes.flatten()[j].set_title(f"{t}:{self.result[j-1]}")
-        fig.suptitle(f'R2: {self.reg.score(self.X,self.Y)}')
+        fig.suptitle(f'R2: {self.score}')
         return fig
+
+    def __str__(self) -> str:
+        return "MultipleRDMRegression"
+    
+    def get_details(self):        
+        details = {"name":self.__str__(),
+                   "standardize":self.standardize*1,
+                   "NAfilters":self.na_filters.tolist(),
+                   "modelRDMs":dict(zip(self.modelnames,[x.tolist() for x in self.X.T]))
+                  }
+        return  details
+    
