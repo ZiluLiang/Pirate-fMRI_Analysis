@@ -34,7 +34,7 @@ $$𝑣_{𝑗𝑘}=𝑓_𝑗− 𝑓_𝑘$$
 For any given pair of neural vectors, we can compute its cosine similarity as an indicator of how parallel these two neural vectors are
 $$cos⁡(𝑣_1, 𝑣_2)=  \frac{𝑣_1 \times 𝑣_2}{\left\Vert 𝑣_1 \right\Vert \times \left\Vert 𝑣_2 \right\Vert}$$
 If we replace $𝑓_𝑗$ and $𝑓_𝑘$ with the feature vector from the three models of representation (row vector from the feature matrices), we can compute the theoretical cosine similarity of any given pair of coding directions, and compare that with our data.
-![feature matrices for different models of representation](/plot/featurematrix_by_representationmodels.png)  
+![feature matrices for different models of representation](/plot/featurematrix_by_representationmodels.png)
 
 ### Direction pair types
 If we plot the groundtruth map of stimuli (based on groundtruth x/y locations), we can define different coding direction pairs. In this analysis, we focused on four types of direction pairs:
