@@ -68,7 +68,7 @@ Coming back to the 25 stimuli in our experiment, in the within X/Y case, each X 
  - $15$ pairs of stimuli that do not share the same starting/ending locations  
 
 Therefore, 
-- the average cosine similarity of within X/Y pairs is ${{20*0.5+10*(-0.5)}\over 45} = {5\over45} = {1\over9} = 0.111111$...
+- the average cosine similarity of within X/Y pairs is ${{20\times0.5+10\times(-0.5)}\over 45} = {5\over45} = {1\over9} = 0.111111$...
 
 For between X/Y pairs, the coding directions in any pair never cross with each other. Hence, 
 - the cosine similarity of between X/Y pairs will always be $0$
