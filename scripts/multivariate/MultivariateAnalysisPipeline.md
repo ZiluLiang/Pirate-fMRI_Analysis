@@ -34,7 +34,7 @@ $$𝑣_{𝑗𝑘}=𝑓_𝑗− 𝑓_𝑘$$
 For any given pair of neural vectors, we can compute its cosine similarity as an indicator of how parallel these two neural vectors are
 $$cos⁡(𝑣_1, 𝑣_2)=  \frac{𝑣_1 \times 𝑣_2}{\left\Vert 𝑣_1 \right\Vert \times \left\Vert 𝑣_2 \right\Vert}$$
 If we replace $𝑓_𝑗$ and $𝑓_𝑘$ with the feature vector from the three models of representation (row vector from the feature matrices), we can compute the theoretical cosine similarity of any given pair of coding directions, and compare that with our data.
-![feature matrices for different models of representation](/plot/featurematrix_by_representationmodels.png)
+![feature matrices for different models of representation](/readmeplots/featurematrix_by_representationmodels.png)
 
 ### Direction pair types
 If we plot the groundtruth map of stimuli (based on groundtruth x/y locations), we can define different coding direction pairs. In this analysis, we focused on four types of direction pairs:
@@ -50,14 +50,14 @@ If we plot the groundtruth map of stimuli (based on groundtruth x/y locations), 
   1) locate within the same x column
 - **within Y**: cosine similarity between two horizontal coding directions that
   1) locate within the same y row
-![different types of coding direction pairs](/plot/codingdirectionpairtypes.png)  
+![different types of coding direction pairs](/readmeplots/codingdirectionpairtypes.png)  
 
 Similarly, we can use a feature-based groundtruth map, disregarding which feature maps onto x and which feature maps onto y, to derive the above direction types.
 ### Predicted Cosine Similarity of different models of representation
 #### highDim-25
 Under the assumption of highDim-25 model, there are three possible values of cosine similarity between any given pair of coding directions: $0.5$, $0$, $-0.5$.
 When the pair of coding directions intersect at the starting location or ending location, its  cosine similarity is $0.5$ or $-0.5$. When the pair do not share starting or ending location, its cosine similarity is 0. To better understand why this is the case, here is an illustration that represent 4 stimuli using one hot coding. The locations of these 4 stimuli in this representation space form a tetrahedron.  
-[cosine similarity between coding directions in one-hot coding case](/plot/highDcodingdir_cossim.png)
+![cosine similarity between coding directions in one-hot coding case](/readmeplots/highDcodingdir_cossim.png)
 
 Coming back to the 25 stimuli in our experiment, in the within X/Y case, each X column/Y row has 5 stimuli, which yields ${5\choose2} = 10$ coding directions. These $10$ coding directions constitutes ${10\choose2} = 45$ pairs of coding directions to compute cosine similarity measures on. Among all $45$ pairs of coding directions, there are: 
  - $\left[{4\choose2} + {3\choose2} + {2\choose2}\right]*2 = 20$ pairs of stimuli that share the same starting/ending locations
@@ -82,7 +82,7 @@ This model assumes that not only the representations factorise color and shape, 
 - the average cosine similarity of between X/Y pairs is $0$ 
 
 Similarly, we can calculate the theoretical prediction of these models using a feature-based groundtruth map for classifying direction pairs. Togther we can arrive at the following predictions:  
-![Theoretical Predictions of cosine similarity between coding directions](/plot/TheoPred_codingdir_cossim.png) 
+![Theoretical Predictions of cosine similarity between coding directions](/readmeplots/TheoPred_codingdir_cossim.png) 
 
 ## Correlation / Regression Analysis on neural and model RDM
 ### Neural RDM
