@@ -10,16 +10,28 @@
 import numpy
 import scipy
 from sklearn.linear_model import LinearRegression
-from multivariate.helper import lower_tri, upper_tri, scale_feature, compute_R2, compute_rdm
+from multivariate.helper import lower_tri, scale_feature, compute_rdm
 import matplotlib.pyplot as plt
 import seaborn as sns
-import itertools
 import pandas
-from copy import deepcopy
 import time
 
 
-def _get_pair_type_loc(dirpair_info_arr,dirpair_info_arr_cols):
+def _get_pair_type_loc(dirpair_info_arr:numpy.array,dirpair_info_arr_cols:list)->dict:
+    """classify coding direction pair type based on groundtruth location
+
+    Parameters
+    ----------
+    dirpair_info_arr : numpy.array
+        attribute of coding direction pair stored in a n_pairs * n_attributes numpy array
+    dirpair_info_arr_cols : list
+        names of the attributes (columns) in dirpair_info_arr
+
+    Returns
+    -------
+    pair_type_dict:dict
+        a dictionary. key is the name of the type of coding direction pairs, value is a (n_pairs,) boolean array used to filter the coding direction pairs that are classified as this type
+    """
     sx_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sx_dir1")[0]]
     sx_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sx_dir2")[0]]
     sy_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sy_dir1")[0]]
@@ -54,7 +66,21 @@ def _get_pair_type_loc(dirpair_info_arr,dirpair_info_arr_cols):
     }
     return pair_type_dict
         
-def _get_pair_type_feature(dirpair_info_arr,dirpair_info_arr_cols):
+def _get_pair_type_feature(dirpair_info_arr:numpy.array,dirpair_info_arr_cols:list)->dict:
+    """classify coding direction pair type based on visual features
+
+    Parameters
+    ----------
+    dirpair_info_arr : numpy.array
+        attribute of coding direction pair stored in a n_pairs * n_attributes numpy array
+    dirpair_info_arr_cols : list
+        names of the attributes (columns) in dirpair_info_arr
+
+    Returns
+    -------
+    pair_type_dict:dict
+        a dictionary. For each key-value pair, key is the name of the type of coding direction pairs, value is a (n_pairs,) boolean array used to filter the coding direction pairs that are classified as this type
+    """
     sc_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sc_dir1")[0]]
     sc_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="sc_dir2")[0]]
     ss_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ss_dir1")[0]]
@@ -91,19 +117,42 @@ def _get_pair_type_feature(dirpair_info_arr,dirpair_info_arr_cols):
 
 
 class NeuralDirectionCosineSimilarity:
-    def __init__(self,activitypattern:numpy.ndarray,stim_dict:dict):
+    """class for running neural vector analysis. It calculates the cosine similarities in coding direction pairs.
+
+    Parameters
+    ----------
+    activitypattern : numpy.ndarray
+        a n_sample*n_voxels activity pattern matrix
+    stim_dict : dict
+        dictionary of the information of each of the sample in the activity pattern matrix. Must include the following keys: stimid, stimsession, stimloc, stimfeature
+    seed : int, optional
+        the integer used as a random seed for random generator, by default None
+    """
+    def __init__(self,activitypattern:numpy.ndarray,stim_dict:dict,seed:int=None):
         self.X = activitypattern
         self.stimid = stim_dict["stimid"]
         self.stimsession = stim_dict["stimsession"]
         self.stimloc = stim_dict["stimloc"]
         self.stimfeature = stim_dict["stimfeature"]
+        self.seed = seed
 
     def fit(self):
+        """running neural vector analysis. 
+        
+        The script first retrieve all possible pairs of coding directions and then classify the coding direction pairs into different pair types.
+        For each pair, cosine similarity between the coding directions are computed. Then, the script aggregate within different pair type and return the mean values of all pair types.
+
+        Meanwhile a permutated version of the activitiy matrix is generated, where voxels in one row is shuffled, and each row is shuffled independently. the above analysis is also performed with this shuffled data to use as control.
+
+        """
         X = self.X
         #generate a randomly permutated X (randomly permutated within each row):
         randX = numpy.empty_like(X)
         for j in range(X.shape[0]):
-            randX[j,:] = numpy.random.default_rng(seed=j).permutation(X.shape[1])
+            if self.seed is None:
+                randX[j,:] = numpy.random.default_rng(seed=None).permutation(X.shape[1])
+            else:
+                randX[j,:] = numpy.random.default_rng(seed=self.seed+j*1000).permutation(X.shape[1])
        
         # compute coding directions between any two stimuli
         vidxs, uidxs = numpy.meshgrid(range(len(X)),range(len(X)))
