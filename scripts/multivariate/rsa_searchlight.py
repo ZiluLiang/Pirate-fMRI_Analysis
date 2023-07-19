@@ -240,8 +240,7 @@ class RSASearchLight:
         self.radius           = radius
         self.njobs            = njobs
         # get search light spheres
-        self.X, self.A = self.genPatches()
-        self.neighbour_idx_lists = self.find_neighbour_idx()
+        self.X, self.A, self.neighbour_idx_lists = self.genPatches()
         print(f"total number of voxels to perform searchlight: {len(self.neighbour_idx_lists)}")
 
         ## create a searchlight summary
@@ -250,14 +249,28 @@ class RSASearchLight:
                       "scans":patternimg_paths,
                       "njobs":njobs}
 
-    def find_neighbour_idx(self):
-        voxel_neighbours = []
-        for _,row in enumerate(self.A):
-            _, vidx, _ = find(row)
-            voxel_neighbours.append(vidx) 
-        return voxel_neighbours
+    def run(self,estimator,estimator_kwargs:dict,outputpath:str,outputregexp:str="beta_%04d.nii",verbose:bool=True):
+        """run searchlight analysis and save results.  
 
-    def run(self,estimator,estimator_kwargs,outputpath,outputregexp,verbose):
+        Whole brain searchlight spheres are split into `self.jobs` number of chunks and the searchlight for these chunks are performed in parallel.
+
+        In each searchlight sphere, its neural activity pattern as well as the `estimator_kwargs` are passed to `estimator` to instantiate an estimator class for running the analysis
+
+        After all jobs are done, results are written into a nii file and saved to the output directory
+
+        Parameters
+        ----------
+        estimator : class
+            an estimator class that is called to perform rsa analysis in each sphere
+        estimator_kwargs : dict
+            other arguments passed to instantiate an estimator class in each sphere
+        outputpath : str
+            output directory, results will be written to a nii file and saved to this directory
+        outputregexp : str
+            regular expression that is used to contruct output nii file name.  by default "beta_%04d.nii"
+        verbose : bool, optional
+            display progress or not, by default True
+        """
         t0 = time.time()
         self.estimator = estimator
         # split patches for parallelization
@@ -300,7 +313,29 @@ class RSASearchLight:
         return self 
 
     
-    def fitPatchGroup(self,neighbour_idx_list,thread_id,total, estimator_kwargs,verbose:bool = True):
+    def fitPatchGroup(self,neighbour_idx_list:list,thread_id:int,total:int, estimator_kwargs:dict,verbose:bool = True):
+        """_summary_
+
+        Parameters
+        ----------
+        neighbour_idx_list : list
+            a list of indices of voxels that should be included in each searchlight sphere
+        thread_id : int
+            thread id for the current job, used for display
+        total : int
+            total number of voxels to perform searchlight on across all jobs
+        estimator_kwargs : dict
+            _other arguments passed to instantiate an estimator class in each sphere
+        verbose : bool, optional
+            display progress or not, by default True
+
+        Returns
+        -------
+        result: np.array
+            searchlight results for the list of voxels 
+        estimator_details: dict
+            details of estimator returned by the estimator class. values in the dictionary should be serialized and ready to be written in to json format.
+        """
         voxel_results = []
         t0 = time.time()
         for i,neighbour_idx in enumerate(neighbour_idx_list):
@@ -344,6 +379,9 @@ class RSASearchLight:
         return np.asarray(voxel_results),estimator_details
 
     def genPatches(self):
+        """
+        extract wholebrain activity pattern matrix and find indices of voxels that should be included in each searchlight sphere
+        """
         print("generating searchlight patches")
         t0 = time.time()
         ## voxels to perform searchlight on
@@ -369,4 +407,10 @@ class RSASearchLight:
                 )        
         A = A.tocsr()
         print(f"finished generating searchlight patches in {time.time()-t0}") 
-        return X, A 
+
+        voxel_neighbours = []
+        for _,row in enumerate(A):
+            _, vidx, _ = find(row)
+            voxel_neighbours.append(vidx) 
+    
+        return X, A, voxel_neighbours

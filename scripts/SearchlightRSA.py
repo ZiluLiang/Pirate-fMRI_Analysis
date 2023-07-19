@@ -26,7 +26,7 @@ preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
 n_sess = {
           "localizer":1,
           "concatall":1}
-for p in preprocess[:1]:
+for p in preprocess:
     corr_df_list = []
     beta_dir = {
         "localizer":[os.path.join(fmridata_dir,p,'LSA_stimuli_localizer')],
