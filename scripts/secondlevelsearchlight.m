@@ -2,63 +2,66 @@ clear;clc
 
 [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
 
-par_dirs = {'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\LSA_stimuli_navigation\searchlight_wb_rsa',...
-    'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\LSA_stimuli_navigation\searchlight_wb_rsa'};
-for x = 2
+par_dirs = {'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\rsa_searchlight\localizer_no_selection',...
+            'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\rsa_searchlight\concatall_no_selection'};
+for x = 1:2
     searchlight_rsa_dir = par_dirs{x};
-    
-    vselect = {'noselection','reliability_ths0'};
-    ds      = {'oddeven','fourruns'};
-    analysis = struct(...
-            ...% image-based rdm
-            "sc_betweens_stimuli",   {{'between_stimuli'}},...
-            "sc_alls_stimuli",       {{'stimuli'}},...
-            ...% feature-based: color(x) or shape(y)
-            "sc_withins_feature1d",  {{'within_feature1dx','within_feature1dy'}},...
-            "sc_betweens_feature1d", {{'between_feature1dx','between_feature1dy'}},...
-            "sc_alls_feature1d",     {{'feature1dx','feature1dy'}},...
-            ...% train-test
-            "tt_withins_stimuligroup",  {{'within_stimuligroup'}},...
-            "tt_betweens_stimuligroup", {{'between_stimuligroup'}},...
-            "tt_alls_stimuligroup",     {{'stimuligroup'}},...
-            ...% map-based
-            "betweens_loc2d",  {{"between_loc2d"}},...
-            "withins_loc2d",   {{"within_loc2d"}},...
-            "alls_loc2d",      {{"loc2d"}},...
-            "betweens_loc1d",  {{"between_loc1dx","between_loc1dy"}},...
-            "withins_loc1d",   {{"within_loc1dx","within_loc1dy"}},...
-            "alls_loc1d",      {{"loc1dx","loc1dy"}},...
-            ...% map-based plus control for train test
-            "betweens_loc2d_c",  {{"between_stimuligroup","between_loc2d"}},...
-            "withins_loc2d_c",   {{"within_stimuligroup","within_loc2d"}},...
-            "alls_loc2d_c",      {{"stimuligroup","loc2d"}},...
-            "betweens_loc1d_c",  {{"between_stimuligroup","between_loc1dx","between_loc1dy"}},...
-            "withins_loc1d_c",   {{"within_stimuligroup","within_loc1dx","within_loc1dy"}},...
-            "alls_loc1d_c",      {{"stimuligroup","loc1dx","loc1dy"}}...
-            );
-    
-    a_names = fieldnames(analysis);
-    for v = 1:numel(vselect)
-        for d = 1:numel(ds)
-            parfor j = 1:numel(a_names)        
-                a = a_names{j};
-                rsa_dir = fullfile(searchlight_rsa_dir,vselect{v},ds{d},a);
-                for k = 1:numel(analysis.(a))
-                    cd('D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\scripts')
-                    regressor_name = analysis.(a){k};
-                    outputdir = fullfile(rsa_dir,'second',regressor_name);
-                    if exist(outputdir,'dir')
-                        disp('exist')
-                        rmdir(outputdir,'s')                        
-                    end
-                    
-                    beta_img = sprintf("beta_%04d.nii",k-1);
-                    scans = cellstr(fullfile(rsa_dir,'first',participants.validids,beta_img));
-                    specify_estimate_grouplevel(outputdir,{scans},{regressor_name});
-                    specify_estimate_contrast(outputdir,cellstr(regressor_name),{[1]});
-                    report_results(outputdir,struct('type','none','val',0.001,'extent',0),{'xls'})
+    analysis = {'correlation','cosinesimilarity','regression'};       
+    for j_analysis = 2%numel(analysis)
+        rsa_dir = fullfile(searchlight_rsa_dir,analysis{j_analysis});
+
+        switch analysis{j_analysis}
+            case "correlation"
+                metric_names = fieldnames(loadjson(fullfile(rsa_dir,'first',participants.validids{1},'searchlight.json')).estimator.modelRDMs);
+                img_regexp ="rho_%04d.nii";
+                get_new_imgname = @(x) strcat('transformed_',x);                
+                trans_formula = 'atanh(i1)';
+            case "regression"
+                metric_names = fieldnames(loadjson(fullfile(rsa_dir,'first',participants.validids{1},'searchlight.json')).estimator.modelRDMs);
+                img_regexp ="beta_%04d.nii";
+                get_new_imgname = @(x) x;
+                trans_formula = '';
+            case "cosinesimilarity"
+                metric_names = loadjson(fullfile(rsa_dir,'first',participants.validids{1},'searchlight.json')).estimator.resultnames;
+                img_regexp ="ps_%04d.nii";                
+        end
+
+        for k = 1:numel(metric_names)
+            cd(fullfile(directory.projectdir,'scripts'))
+            curr_metric = metric_names{k};
+            
+            if analysis{j_analysis} == "cosinesimilarity"
+                if contains(curr_metric,'within')
+                    get_new_imgname = @(x) strcat('transformed_',x);
+                    trans_formula = 'i1-1/9';
+                else
+                    get_new_imgname = @(x) x;
+                    trans_formula = '';
                 end
             end
+
+            img_transform = @(firstlvldir,x) spm_imcalc(char(fullfile(firstlvldir,x)),char(fullfile(firstlvldir,get_new_imgname(x))),trans_formula,struct("dtype",16));        
+
+            outputdir = fullfile(rsa_dir,'second',curr_metric);
+            if exist(outputdir,'dir')
+                disp('exist')
+                rmdir(outputdir,'s')                        
+            end
+            
+            metric_imgname = sprintf(img_regexp,k-1);
+            
+            
+            if ~isempty(trans_formula)
+                cellfun(@(subid) img_transform(fullfile(rsa_dir,'first',subid),metric_imgname),participants.validids);
+                scans = cellstr(fullfile(rsa_dir,'first',participants.validids,get_new_imgname(metric_imgname)));                
+            else
+                scans = cellstr(fullfile(rsa_dir,'first',participants.validids,metric_imgname));
+            end
+
+            glm_grouplevel(outputdir,{scans},{curr_metric});
+            glm_estimate(outputdir)
+            glm_contrast(outputdir,cellstr(curr_metric),{[1]});
+            glm_results(outputdir,1,struct('type','none','val',0.001,'extent',0),{'xls'})
         end
     end
 end
