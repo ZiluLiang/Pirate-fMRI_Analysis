@@ -196,8 +196,6 @@ class NeuralDirectionCosineSimilarity:
         pair_type_dict.update(
             _get_pair_type_feature(dirpair_info_arr,dirpair_info_arr_cols)
         ) 
-        #dirpair_idx_selected = (dirpair_idx[0][numpy.any(numpy.vstack(list(pair_type_dict.values())),axis=0)],
-        #                        dirpair_idx[1][numpy.any(numpy.vstack(list(pair_type_dict.values())),axis=0)])        
         
         # cosine similarity between pairs of coding directions
         cosine_similarity = lambda dir1, dir2: numpy.dot(dir1, dir2)/(numpy.linalg.norm(dir1)*numpy.linalg.norm(dir2))
@@ -209,7 +207,7 @@ class NeuralDirectionCosineSimilarity:
                 cos_similarity_neural |= {
                     k:numpy.array([
                         cosine_similarity(dir1, dir2) for dir1,dir2 in zip(dirs_arr[dir1idxs_arr[v]],dirs_arr[dir2idxs_arr[v]])
-                        ]).mean() # 1 - scipy.spatial.distance.cosine(dir1,dir2) 
+                        ]).mean()
                 }
                 cos_similarity_rand |= {
                     k:numpy.array([
@@ -217,6 +215,24 @@ class NeuralDirectionCosineSimilarity:
                         ]).mean()
                 }
                 pairtypes.append(k)
+        
+        if numpy.any(["between" in x for x in pairtypes]):
+            cos_similarity_neural |= {
+                "between": numpy.array([cos_similarity_neural["betweenX"],cos_similarity_neural["betweenY"]]).mean(),
+                "within": numpy.array([cos_similarity_neural["withinX"],cos_similarity_neural["withinY"]]).mean(),
+                }
+            cos_similarity_rand |= {
+                "between": numpy.array([cos_similarity_rand["betweenX"],cos_similarity_rand["betweenY"]]).mean(),
+                "within": numpy.array([cos_similarity_rand["withinX"],cos_similarity_rand["withinY"]]).mean(),
+                }
+        else:
+            cos_similarity_neural |= {
+                "within": numpy.array([cos_similarity_neural["withinX"],cos_similarity_neural["withinY"]]).mean(),
+                }
+            cos_similarity_rand |= {
+                "within": numpy.array([cos_similarity_rand["withinX"],cos_similarity_rand["withinY"]]).mean(),
+                }
+        pairtypes = list(cos_similarity_neural.keys())            
         
         self.resultdf = pandas.DataFrame({"pairtype":pairtypes,
                                           "neural":list(cos_similarity_neural.values()),

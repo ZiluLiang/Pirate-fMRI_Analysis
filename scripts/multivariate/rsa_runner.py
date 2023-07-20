@@ -316,7 +316,7 @@ class RSARunner:
             stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature} 
             subRSA.run(
                 estimator = NeuralDirectionCosineSimilarity,
-                estimator_kwargs = {"stim_dict":stim_dict,"seed":j},
+                estimator_kwargs = {"stim_dict":stim_dict,"seed":None},
                 outputpath   = os.path.join(outputdir,'cosinesimilarity','first',subid), 
                 outputregexp = 'ps_%04d.nii', 
                 verbose      = j == 0
