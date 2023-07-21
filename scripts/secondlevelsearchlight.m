@@ -3,11 +3,13 @@ clear;clc
 [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
 
 par_dirs = {'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\rsa_searchlight\localizer_no_selection',...
-            'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\rsa_searchlight\concatall_no_selection'};
-for x = 1:2
+            'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\rsa_searchlight\concatall_no_selection',...
+            'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\rsa_searchlight\localizer_no_selection',...
+            'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\rsa_searchlight\concatall_no_selection'};
+for x = 1:numel(par_dirs)
     searchlight_rsa_dir = par_dirs{x};
     analysis = {'correlation','cosinesimilarity','regression'};       
-    for j_analysis = 2%numel(analysis)
+    for j_analysis = 1:numel(analysis)
         rsa_dir = fullfile(searchlight_rsa_dir,analysis{j_analysis});
 
         switch analysis{j_analysis}
@@ -53,15 +55,23 @@ for x = 1:2
             
             if ~isempty(trans_formula)
                 cellfun(@(subid) img_transform(fullfile(rsa_dir,'first',subid),metric_imgname),participants.validids);
-                scans = cellstr(fullfile(rsa_dir,'first',participants.validids,get_new_imgname(metric_imgname)));                
-            else
-                scans = cellstr(fullfile(rsa_dir,'first',participants.validids,metric_imgname));
             end
+            scans = cellstr(fullfile(rsa_dir,'first',participants.validids,get_new_imgname(metric_imgname)));
+            scans_g = cellstr(fullfile(rsa_dir,'first',participants.generalizerids,get_new_imgname(metric_imgname)));
+            scans_ng = cellstr(fullfile(rsa_dir,'first',participants.nongeneralizerids,get_new_imgname(metric_imgname)));
 
-            glm_grouplevel(outputdir,{scans},{curr_metric});
-            glm_estimate(outputdir)
-            glm_contrast(outputdir,cellstr(curr_metric),{[1]});
-            glm_results(outputdir,1,struct('type','none','val',0.001,'extent',0),{'xls'})
+            glm_grouplevel(fullfile(outputdir,'allparticipants'),'t1',{scans},{curr_metric});
+            glm_estimate(fullfile(outputdir,'allparticipants'))
+            glm_contrast(fullfile(outputdir,'allparticipants'),cellstr(curr_metric),{[1]});
+            glm_results(fullfile(outputdir,'allparticipants'),1,struct('type','none','val',0.001,'extent',0),{'xls'})
+            
+            glm_grouplevel(fullfile(outputdir,'generalizer_vs_nongeneralizer'),'t2',{scans_g,scans_ng},{curr_metric});
+            glm_estimate(fullfile(outputdir,'generalizer_vs_nongeneralizer'))
+            glm_contrast(fullfile(outputdir,'generalizer_vs_nongeneralizer'), ...
+                        {strcat('G>NG: ',curr_metric),strcat('G:',curr_metric),strcat('NG:',curr_metric)}, ...
+                        {[1,-1],[1,0],[0,1]});
+            glm_results(fullfile(outputdir,'generalizer_vs_nongeneralizer'),1,struct('type','none','val',0.001,'extent',0),{'xls'})
+            
         end
     end
 end
