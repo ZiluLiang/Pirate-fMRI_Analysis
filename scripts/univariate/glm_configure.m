@@ -204,4 +204,16 @@ function glms = glm_gallery
     glms(14).contrasts(1).name = 'stimuli';
     glms(14).contrasts(1).wvec = cell2struct(num2cell(ones(numel(exp.allstim),1)),...
                                              arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0));
+
+    % ==============================================================================================
+    % FEATURE-BASED Repetition Suppression MODELS
+    % ==============================================================================================
+    glms(15).name        = 'rs_feacture2d_navigation';
+    glms(15).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(15).conditions  = {'rstrials','response','excluders'};
+    glms(15).modelopt    = struct('use_stick', {false,false,false});
+    glms(15).pmods       = {{'featuredist'}};
+    glms(15).contrasts(1).name = 'feature-based distance';
+    glms(15).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
+    
 end

@@ -8,8 +8,9 @@ clear;clc
 
 [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
 masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\anat','.*.nii'));
-% run Repetition Supression GLMs
-RSglm_names = {'rs_loc2d_navigation','rs_resploc2d_navigation','rs_loc2d_localizer','traintest_navigation'};
+
+%% run Repetition Supression GLMs
+RSglm_names = {'rs_feacture2d_navigation','rs_loc2d_navigation','rs_resploc2d_navigation','rs_loc2d_localizer','traintest_navigation'};
 flag_runGLM  = true;
 if flag_runGLM
     steps = struct('first', {{'specify','estimate','contrast'}}, ...
@@ -17,7 +18,7 @@ if flag_runGLM
     err_tracker   = struct(); %#ok<*UNRCH>
     for j = 1:numel(RSglm_names)
         glm_name = RSglm_names{j};        
-        %err_tracker.(glm_name) = glm_runner(glm_name, rmfield(steps,'second'));
+        err_tracker.(glm_name) = glm_runner(glm_name, rmfield(steps,'second'));
         cd(fullfile(directory.projectdir,'scripts'))
         if exist(fullfile(directory.fmri_data,glm_name,'second'),"dir")
             rmdir(fullfile(directory.fmri_data,glm_name,'second'),'s')
