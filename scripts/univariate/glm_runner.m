@@ -1,4 +1,4 @@
-function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidlist,groupglm_pref,groupglm_cov)
+function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidlist,groupglm_pref,subgroups,groupglm_cov)
 % run first and second level analysis for different glms
 % INPUT:
 % - glm_name: name of the glm, this will be used to find glm
@@ -29,7 +29,8 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
 % -----------------------------------------------------------------------    
 % Author: Zilu Liang
 
-% TODO: make second level accommodate different types of first level
+% TODO: second level factorial design not tested yet! second level contrast
+% with covariates not tested yet!
 % contrasts
 
     spm('defaults','FMRI')
@@ -42,7 +43,8 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
     if nargin < 4 || isempty(preproc_img_dir), preproc_img_dir = directory.smoothed; end
     if nargin < 5 || isempty(subidlist),       subidlist = participants.validids; end
     if nargin < 6 || isempty(groupglm_pref),   groupglm_pref = ''; end
-    if nargin < 7 || isempty(groupglm_cov),    groupglm_cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}); end
+    if nargin < 7 || isempty(subgroups),       subgroups = ones(size(subidlist)); end
+    if nargin < 8 || isempty(groupglm_cov),    groupglm_cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}); end
 
 
     nsub = numel(subidlist);
@@ -60,12 +62,12 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
 
     %% run second-level analysis
     if isfield(steps,'second') && ~isempty(steps.second)
-        err_tracker(2) = run_secondlevel(glm_name,glm_dir,steps.second,subidlist,groupglm_pref,groupglm_cov);
+        err_tracker(2) = run_secondlevel(glm_name,glm_dir,steps.second,subidlist,groupglm_pref,subgroups,groupglm_cov);
     end
 end
 
+%==========================First Level=====================
 function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,steps)
-    filepattern = get_pirate_defaults(false,'filepattern');
     subimg_dir  = fullfile(preproc_img_dir,subid);
     glm_config  = glm_configure(glm_name);    
     output_dir  = fullfile(glm_dir,'first',subid);
@@ -112,35 +114,55 @@ function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,s
     end
 end
 
-function error_tracker = run_secondlevel(glm_name,glm_dir,steps,subidlist,groupglm_pref,groupglm_cov)
+%==========================Second Level=====================
+function error_tracker = run_secondlevel(glm_name,glm_dir,steps,subidlist,groupglm_pref,subgroups,groupglm_cov)
     error_tracker = {''};
     nsub = numel(subidlist);
+    if isnumeric(subgroups)
+        subgroups_strs = arrayfun(@string,unique(subgroups));
+    else
+        subgroups_strs = unique(subgroups);
+        subgroups = cellfun(@(x) find(ismember(subgroups_strs,x)),subgroups);
+    end
+    ngroup = numel(unique(subgroups));
+    designs = {"t1","t2","factorial"};
+    des = designs{ngroup};
     try
         fprintf('%s: Running second-level\n', glm_name)
         firstlvlSPM_dirs = fullfile(glm_dir,'first',subidlist);
         glm_config = glm_configure(glm_name);  
         for j = 1:numel(glm_config.contrasts)
-            scans = cell(1,1);
+            scans_all = cell(nsub,1);
             for isub = 1:nsub
                 [~,contrast_img,~] = find_contrast_idx(fullfile(firstlvlSPM_dirs{isub},'SPM.mat'),glm_config.contrasts(j).name);
-                scans{1,1}{isub} = fullfile(firstlvlSPM_dirs{isub},contrast_img);
+                scans_all{isub} = fullfile(firstlvlSPM_dirs{isub},contrast_img);
             end
-            second_level_dir = fullfile(glm_dir,'second',[groupglm_pref,glm_config.contrasts(j).name]);
+            scans = arrayfun(@(x) scans_all(subgroups==x),unique(subgroups),'uni',0);
+            second_level_dir = fullfile(glm_dir,'second',glm_config.contrasts(j).name,groupglm_pref);
             if ismember('specify',steps)
                 glm_grouplevel(second_level_dir, ...
+                               des,...
                                scans, ...
-                               "factorial",...
                                {glm_config.contrasts(j).name}, ...
                                groupglm_cov)
             end
             if ismember('estimate',steps), glm_estimate(second_level_dir);  end
-            if ismember('contrast',steps)
-                ncov = numel(groupglm_cov);
-                groupcon_wv   = num2cell(eye(ncov+1),2);
-                groupcon_name = [{glm_config.contrasts(j).name},{groupglm_cov.cname}];                    
-                glm_contrast(second_level_dir,...
-                             groupcon_name,...
-                             groupcon_wv);
+            if ismember('contrast',steps) 
+                switch des
+                    case "t1"
+                        ncov = numel(groupglm_cov);
+                        groupcon_wv   = num2cell(eye(ncov+1),2);
+                        groupcon_name = [{glm_config.contrasts(j).name},{groupglm_cov.cname}];                    
+                        glm_contrast(second_level_dir,...
+                                     groupcon_name,...
+                                     groupcon_wv);
+                    case "t2"
+                        glm_contrast(second_level_dir, ...
+                                    {strcat(subgroups_strs{1},'>',subgroups_strs{2},': ',glm_config.contrasts(j).name), ...
+                                     strcat(subgroups_strs{1},':',glm_config.contrasts(j).name), ...
+                                     strcat(subgroups_strs{2},':',glm_config.contrasts(j).name)}, ...
+                                    {[1,-1],[1,0],[0,1]});
+                end
             end
             if ismember('result',steps), glm_results(second_level_dir); end
         end
