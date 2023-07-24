@@ -40,12 +40,20 @@ def _get_pair_type_loc(dirpair_info_arr:numpy.array,dirpair_info_arr_cols:list)-
     ex_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ex_dir2")[0]]
     ey_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ey_dir1")[0]]
     ey_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="ey_dir2")[0]]
-    
+
     same_sx = sx_dir1 == sx_dir2
     same_sy = sy_dir1 == sy_dir2
     same_ex = ex_dir1 == ex_dir2
     same_ey = ey_dir1 == ey_dir2
 
+    sg_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="group1_dir1")[0]]
+    eg_dir1 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="group2_dir1")[0]]
+    sg_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="group1_dir2")[0]]
+    eg_dir2 = dirpair_info_arr[:,numpy.where(numpy.array(dirpair_info_arr_cols)=="group2_dir2")[0]]
+    traintrainpair = numpy.atleast_2d(numpy.all(numpy.hstack([sg_dir1==eg_dir1,sg_dir2==eg_dir2,sg_dir1==1,sg_dir2==1]),axis=1)).T
+    testtestpair =  numpy.atleast_2d(numpy.all(numpy.hstack([sg_dir1==eg_dir1,sg_dir2==eg_dir2,sg_dir1==0,sg_dir2==0]),axis=1)).T
+    mixpair =  numpy.atleast_2d(numpy.all(numpy.hstack([~traintrainpair,~testtestpair]),axis=1)).T
+    
     pair_type_dict = {
         ## two coding directions that have the same start and end x but in different y rows
         "betweenX": numpy.all(
@@ -62,7 +70,32 @@ def _get_pair_type_loc(dirpair_info_arr:numpy.array,dirpair_info_arr_cols:list)-
         ## two coding directions that are in the same y row
         "withinY": numpy.all(
                         numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1]),
-                        axis=1)
+                        axis=1),
+        ################################ incorporate grouping into pair type classification ################################
+        "withintrainX": numpy.all(
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,traintrainpair]),
+                        axis=1),
+        "withintrainY": numpy.all(
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,traintrainpair]),
+                        axis=1),
+        "withintestX": numpy.all(
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,testtestpair]),
+                        axis=1),
+        "withintestY": numpy.all(
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,testtestpair]),
+                        axis=1), 
+        "betweentraintestX": numpy.all(
+                        numpy.hstack([same_sx,same_ex,(sy_dir1 == ey_dir1),(sy_dir2 == ey_dir2),mixpair]),
+                        axis=1),
+        "betweentraintestY": numpy.all(
+                        numpy.hstack([same_sy,same_ey,(sx_dir1 == ex_dir1),(sx_dir2 == ex_dir2),mixpair]),
+                        axis=1),
+        "betweentestX": numpy.all(
+                        numpy.hstack([same_sx,same_ex,(sy_dir1 == ey_dir1),(sy_dir2 == ey_dir2),testtestpair]),
+                        axis=1),
+        "betweentestY": numpy.all(
+                        numpy.hstack([same_sy,same_ey,(sx_dir1 == ex_dir1),(sx_dir2 == ex_dir2),testtestpair]),
+                        axis=1)              
     }
     return pair_type_dict
         
@@ -134,6 +167,7 @@ class NeuralDirectionCosineSimilarity:
         self.stimsession = stim_dict["stimsession"]
         self.stimloc = stim_dict["stimloc"]
         self.stimfeature = stim_dict["stimfeature"]
+        self.stimgroup = stim_dict["stimgroup"]
         self.seed = seed
 
     def fit(self):
@@ -161,12 +195,13 @@ class NeuralDirectionCosineSimilarity:
         dir_info_mat = numpy.dstack((
             self.stimid[uidxs],          self.stimid[vidxs],
             self.stimsession[uidxs],     self.stimsession[vidxs],
+            self.stimgroup[uidxs],        self.stimgroup[vidxs],
             self.stimloc[:,0][uidxs],     self.stimloc[:,0][vidxs],
             self.stimloc[:,1][uidxs],     self.stimloc[:,1][vidxs],
             self.stimfeature[:,0][uidxs], self.stimfeature[:,0][vidxs],
-            self.stimfeature[:,1][uidxs], self.stimfeature[:,1][vidxs]
+            self.stimfeature[:,1][uidxs], self.stimfeature[:,1][vidxs]            
             ))
-        dir_info_arr_cols = ['stim1', 'stim2','run1','run2', #stim id and run id of stimulus 1 (starting stim) and 2 (ending stim)
+        dir_info_arr_cols = ['stim1', 'stim2','run1','run2','group1','group2', #stim id, run id and group id of stimulus 1 (starting stim) and 2 (ending stim)
                 'sx','ex', #x location on groundtruth map for starting stim (sx) and ending stim (ex)
                 'sy','ey', #y location on groundtruth map for starting stim (sy) and ending stim (ey)
                 'sc','ec', #colour for starting stim (sc) and ending stim (ec)
@@ -219,11 +254,19 @@ class NeuralDirectionCosineSimilarity:
         if numpy.any(["between" in x for x in pairtypes]):
             cos_similarity_neural |= {
                 "between": numpy.array([cos_similarity_neural["betweenX"],cos_similarity_neural["betweenY"]]).mean(),
+                "betweentraintest": numpy.array([cos_similarity_neural["betweentraintestX"],cos_similarity_neural["betweentraintestY"]]).mean(),
+                "betweentest": numpy.array([cos_similarity_neural["betweentestX"],cos_similarity_neural["betweentestY"]]).mean(),
                 "within": numpy.array([cos_similarity_neural["withinX"],cos_similarity_neural["withinY"]]).mean(),
+                "withintrain":numpy.array([cos_similarity_neural["withintrainX"],cos_similarity_neural["withintrainY"]]).mean(),
+                "withintest":numpy.array([cos_similarity_neural["withintestX"],cos_similarity_neural["withintestY"]]).mean(),
                 }
             cos_similarity_rand |= {
                 "between": numpy.array([cos_similarity_rand["betweenX"],cos_similarity_rand["betweenY"]]).mean(),
+                "betweentraintest": numpy.array([cos_similarity_rand["betweentraintestX"],cos_similarity_rand["betweentraintestY"]]).mean(),
+                "betweentest": numpy.array([cos_similarity_rand["betweentestX"],cos_similarity_rand["betweentestY"]]).mean(),
                 "within": numpy.array([cos_similarity_rand["withinX"],cos_similarity_rand["withinY"]]).mean(),
+                "withintrain":numpy.array([cos_similarity_rand["withintrainX"],cos_similarity_rand["withintrainY"]]).mean(),
+                "withintest":numpy.array([cos_similarity_rand["withintestX"],cos_similarity_rand["withintestY"]]).mean(),
                 }
         else:
             cos_similarity_neural |= {

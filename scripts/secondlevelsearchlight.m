@@ -2,10 +2,12 @@ clear;clc
 
 [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
 
-par_dirs = {'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\rsa_searchlight\localizer_no_selection',...
+par_dirs = {
+            'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\rsa_searchlight\localizer_no_selection',...
             'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\unsmoothedLSA\rsa_searchlight\concatall_no_selection',...
             'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\rsa_searchlight\localizer_no_selection',...
-            'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\rsa_searchlight\concatall_no_selection'};
+            'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\rsa_searchlight\concatall_no_selection'
+            };
 for x = 1:numel(par_dirs)
     searchlight_rsa_dir = par_dirs{x};
     analysis = {'correlation','cosinesimilarity','regression'};       
