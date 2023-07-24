@@ -37,7 +37,11 @@ for x = 1:numel(par_dirs)
             if analysis{j_analysis} == "cosinesimilarity"
                 if contains(curr_metric,'within')
                     get_new_imgname = @(x) strcat('transformed_',x);
-                    trans_formula = 'i1-1/9';
+                    if contains(curr_metric,'test')
+                        trans_formula = 'i1-2/15';
+                    else
+                        trans_formula = 'i1-1/9';
+                    end
                 else
                     get_new_imgname = @(x) x;
                     trans_formula = '';
