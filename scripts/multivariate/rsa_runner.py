@@ -238,7 +238,7 @@ class RSARunner:
         X, _, _ = self.get_neuralRDM(subid) #  X, _, _ = self.get_neuralRDM(subid,preproc="PCA")
         # get stimuli properties
         modelrdm  = self.get_modelRDM(subid)
-        stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature}        
+        stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
         
         PS_estimator = NeuralDirectionCosineSimilarity(activitypattern = X,stim_dict=stim_dict)
         PS_estimator.fit()
@@ -313,7 +313,7 @@ class RSARunner:
                 )# only show details at the first participant
 
             print('running parallelism  analysis searchlight')
-            stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature} 
+            stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
             subRSA.run(
                 estimator = NeuralDirectionCosineSimilarity,
                 estimator_kwargs = {"stim_dict":stim_dict,"seed":None},
