@@ -19,7 +19,7 @@ sys.path.append(os.path.join(project_path,'scripts'))
 from multivariate.dataloader import ActivityPatternDataLoader
 from multivariate.helper import ModelRDM, compute_rdm, checkdir, scale_feature
 from multivariate.rsa_searchlight import RSASearchLight
-from multivariate.rsa_estimator import PatternCorrelation,MultipleRDMRegression,NeuralDirectionCosineSimilarity
+from multivariate.rsa_estimator import PatternCorrelation,MultipleRDMRegression,NeuralDirectionCosineSimilarity,SVMDecoder
 
 class RSARunner:
     def __init__(self,participants,fmribeh_dir,
@@ -238,7 +238,10 @@ class RSARunner:
         X, _, _ = self.get_neuralRDM(subid) #  X, _, _ = self.get_neuralRDM(subid,preproc="PCA")
         # get stimuli properties
         modelrdm  = self.get_modelRDM(subid)
-        stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
+        stim_dict = {"stimid":modelrdm.stimid.flatten(), 
+                     "stimsession":modelrdm.stimsession.flatten(), 
+                     "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, 
+                     "stimgroup":modelrdm.stimgroup.flatten()}        
         
         PS_estimator = NeuralDirectionCosineSimilarity(activitypattern = X,stim_dict=stim_dict)
         PS_estimator.fit()
@@ -262,7 +265,20 @@ class RSARunner:
         mds_df = pd.concat(dfs_list,axis=0) 
         return mds_df
     
-    def run_SearchLightRSA(self,radius,outputdir,njobs:int=cpu_count()-1):
+    def run_SearchLightRSA(self,radius:float,outputdir:str,analysis:list,njobs:int=cpu_count()-1):
+        """running searchlight analysis
+
+        Parameters
+        ----------
+        radius : float
+            the radius of searchlight
+        outputdir : str
+            output directory of searchlight analysis
+        analysis : list
+            name of analysis to be performed in each searchlight sphere
+        njobs : int, optional
+            number of parallel jobs, by default cpu_count()-1
+        """
         sphere_vox_count = []
         for j,subid in enumerate(self.participants):
             print(f'running searchlight in {j}/{len(self.participants)}: {subid}')
@@ -294,33 +310,47 @@ class RSARunner:
             corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
 
             # run search light
-            print('running regression searchlight')
-            subRSA.run(
-                estimator = MultipleRDMRegression,
-                estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
-                outputpath   = os.path.join(outputdir,'regression','first',subid), 
-                outputregexp = 'beta_%04d.nii', 
-                verbose      = j == 0
-                ) # only show details at the first participant
+            if "decoding" in analysis:
+                print('running decoding analysis searchlight')
+                stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
+                subRSA.run(
+                    estimator = SVMDecoder,
+                    estimator_kwargs = {"stim_dict":stim_dict,"seed":None,"sdir":None},
+                    outputpath   = os.path.join(outputdir,'decoding_AxisLocDiscrete','first',subid), 
+                    outputregexp = 'acc_%04d.nii', 
+                    verbose      = j == 0
+                    )# only show details at the first participant
+                
+            elif "regression" in analysis:                
+                print('running regression searchlight')
+                subRSA.run(
+                    estimator = MultipleRDMRegression,
+                    estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
+                    outputpath   = os.path.join(outputdir,'regression','first',subid), 
+                    outputregexp = 'beta_%04d.nii', 
+                    verbose      = j == 0
+                    ) # only show details at the first participant
             
-            print('running correlation searchlight')
-            subRSA.run(
-                estimator = PatternCorrelation,
-                estimator_kwargs = {"modelrdms":corr_rdm_vals, "modelnames":corr_rdm_names, "type":"spearman"},
-                outputpath   = os.path.join(outputdir,'correlation','first',subid), 
-                outputregexp = 'rho_%04d.nii', 
-                verbose      = j == 0
-                )# only show details at the first participant
+            elif "correlation" in analysis:
+                print('running correlation searchlight')
+                subRSA.run(
+                    estimator = PatternCorrelation,
+                    estimator_kwargs = {"modelrdms":corr_rdm_vals, "modelnames":corr_rdm_names, "type":"spearman"},
+                    outputpath   = os.path.join(outputdir,'correlation','first',subid), 
+                    outputregexp = 'rho_%04d.nii', 
+                    verbose      = j == 0
+                    )# only show details at the first participant
 
-            print('running parallelism  analysis searchlight')
-            stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
-            subRSA.run(
-                estimator = NeuralDirectionCosineSimilarity,
-                estimator_kwargs = {"stim_dict":stim_dict,"seed":None},
-                outputpath   = os.path.join(outputdir,'cosinesimilarity','first',subid), 
-                outputregexp = 'ps_%04d.nii', 
-                verbose      = j == 0
-                )# only show details at the first participant
+            elif "neuralvector" in analysis:
+                print('running neuralvector analysis searchlight')
+                stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
+                subRSA.run(
+                    estimator = NeuralDirectionCosineSimilarity,
+                    estimator_kwargs = {"stim_dict":stim_dict,"seed":None},
+                    outputpath   = os.path.join(outputdir,'cosinesimilarity','first',subid), 
+                    outputregexp = 'ps_%04d.nii', 
+                    verbose      = j == 0
+                    )# only show details at the first participant
 
         dump(sphere_vox_count,os.path.join(outputdir,'searchlight_voxcount.pkl'))
 
