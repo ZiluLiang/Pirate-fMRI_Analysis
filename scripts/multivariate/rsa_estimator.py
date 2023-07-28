@@ -631,11 +631,11 @@ class SVMDecoder:
                                         groups = traintestsplit,
                                         cv = LeaveOneGroupOut(),
                                         return_train_score=True)
-                training_scores[curr_ax].append(tmp_scores['train_score'].mean())
-                evaluation_scores[curr_ax].append(tmp_scores['test_score'].mean())
+                training_scores[curr_ax].append(tmp_scores['train_score'])
+                evaluation_scores[curr_ax].append(tmp_scores['test_score'])
         #self.result = [numpy.array(v).mean() for v in training_scores.values()] + [numpy.array(v).mean() for v in evaluation_scores.values()]
         #self.resultnames = [f"train_{x}" for x in training_scores.keys()] + [f"test_{x}" for x in evaluation_scores.keys()]
-        self.result = list(training_scores.values()) + list(evaluation_scores.values())
+        self.result = numpy.array(list(training_scores.values()) + list(evaluation_scores.values())).flatten()
         self.resultnames = sum(
             [[f"training_trainstim{x}",f"training_teststim{x}"] for x in training_scores.keys()] + [[f"evaluation_teststim{x}",f"evaluation_trainstim{x}"] for x in evaluation_scores.keys()],
             [])
