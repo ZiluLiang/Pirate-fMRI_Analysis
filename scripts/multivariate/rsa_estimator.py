@@ -651,7 +651,7 @@ class SVMDecoder:
     def get_details(self):
         details = {"name":self.__str__(),
                    "resultnames":self.resultnames,
-                   "scale_feature":self.scale_feature,
+                   "scale_feature":self.sdir,
                    "stim_dict":{"stimid":self.stimid.tolist(),
                                 "stimsession":self.stimsession.tolist(),
                                 "stimloc":self.stimloc.tolist(),
