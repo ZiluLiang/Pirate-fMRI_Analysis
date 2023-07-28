@@ -1,4 +1,4 @@
-function glm_grouplevel(outputdir,design_type,scans,factor_names,cov)
+function glm_grouplevel(outputdir,design_type,scans,factor_names,within_factors,cov)
 % glm_grouplevel(outputdir,scans,factor_names,cov)
 % INPUT:
 %  - otputdir: output directory of second level analysis
@@ -16,6 +16,7 @@ function glm_grouplevel(outputdir,design_type,scans,factor_names,cov)
 %           scans{1,2,3,4} specifies the first level contrasts images 
 %           corresponding to condition A1B2C3D4.
 %  - factor_names: cell array of names of each factor. 
+%  - within_factors: logical array of whether each factor is a within-partcipant 
 %  - cov: covariates
 % -----------------------------------------------------------------------    
 % Author: Zilu Liang
@@ -43,8 +44,9 @@ function glm_grouplevel(outputdir,design_type,scans,factor_names,cov)
     end
     % number of factors
     nF  = numel(factor_names);
-
-    if nargin<5, cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}); end
+    
+    if nargin<5, within_factors = zeros(size(factor_names)); end
+    if nargin<6, cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}); end
         
     %% Directory
     checkdir(outputdir)
@@ -71,13 +73,18 @@ function glm_grouplevel(outputdir,design_type,scans,factor_names,cov)
             for f = 1:nF
                 fd.fact(f).name = factor_names{f};
                 fd.fact(f).levels = nLs(f);
-                fd.fact(f).dept = 0;
+                fd.fact(f).dept = within_factors(f);
                 fd.fact(f).variance = 1;
                 fd.fact(f).gmsca = 0;
                 fd.fact(f).ancova = 0;
             end
             for j = 1:numel(scans)
-                fd.icell(j).levels = ind2sub(nLs,j);
+                [a,b] = ind2sub(nLs,j);
+                if nF==1
+                    fd.icell(j).levels = a;
+                else
+                    fd.icell(j).levels = [a,b];
+                end
                 fd.icell(j).scans  = reshape(scans{j},[],1);
             end
             fd.contrasts = 1;
