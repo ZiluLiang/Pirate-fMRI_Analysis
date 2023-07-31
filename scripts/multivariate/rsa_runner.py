@@ -249,6 +249,18 @@ class RSARunner:
 
         return PS_estimator.resultdf.assign(subid=subid)
     
+    def _singleparticipant_ROISVMAxis(self,subid,estimator_kwargs):
+        X, _, _ = self.get_neuralRDM(subid)
+        modelrdm  = self.get_modelRDM(subid)
+        stim_dict = {"stimid":modelrdm.stimid.flatten(), 
+                     "stimsession":modelrdm.stimsession.flatten(), 
+                     "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, 
+                     "stimgroup":modelrdm.stimgroup.flatten()}
+        SVM_estimator = SVMDecoder(activitypattern=X,stim_dict=stim_dict,**estimator_kwargs)
+         
+        SVM_estimator.fit()
+        return SVM_estimator.result
+    
 ############################################### GROUP LEVEL  ANALSYSIS METHODS ###################################################   
     def run_ROIRSA(self,njobs:int=1):#cpu_count()
         with Parallel(n_jobs=njobs) as parallel:
@@ -311,13 +323,21 @@ class RSARunner:
 
             # run search light
             if "decoding" in analysis:
-                print('running decoding analysis searchlight')
+                print('running classification decoding analysis searchlight')
                 stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
                 subRSA.run(
                     estimator = SVMDecoder,
-                    estimator_kwargs = {"stim_dict":stim_dict,"seed":None,"sdir":None},
+                    estimator_kwargs = {"stim_dict":stim_dict,"categorical_decoder":True,"seed":None,"PCA_component":None},
                     outputpath   = os.path.join(outputdir,'decoding_AxisLocDiscrete','first',subid), 
                     outputregexp = 'acc_%04d.nii', 
+                    verbose      = j == 0
+                    )# only show details at the first participant
+                print('running regression decoding analysis searchlight')
+                subRSA.run(
+                    estimator = SVMDecoder,
+                    estimator_kwargs = {"stim_dict":stim_dict,"categorical_decoder":False,"seed":None,"PCA_component":None},
+                    outputpath   = os.path.join(outputdir,'decoding_AxisLocContinuous','first',subid), 
+                    outputregexp = 'rsquare_%04d.nii', 
                     verbose      = j == 0
                     )# only show details at the first participant
                 
