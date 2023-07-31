@@ -17,7 +17,9 @@ import pandas
 import itertools
 import time
 from sklearn.svm import SVR,SVC
+from sklearn.decomposition import PCA
 from sklearn.model_selection import LeaveOneGroupOut, cross_val_score, cross_validate
+from sklearn.preprocessing import StandardScaler
 
 
 
@@ -582,25 +584,28 @@ class SVMDecoder:
         a n_sample*n_voxels activity pattern matrix
     stim_dict : dict
         dictionary of the information of each of the sample in the activity pattern matrix. Must include the following keys: stimid, stimsession, stimloc, stimfeature
+    categorical_decoder: bool, optional
+        whether decoder should do continuous or categorical output
+    PCA_component: float, optional
+        Controller for performing PCA before doing decoding analysis. It is the n_component argument passed to `PCA` class from sklearn.decomposition module. It specifies the number of PCA components(when n_component>1) or ratio of variance explained(when n_component<1) when performing PCA on the activity pattern matrix.
     seed : int, optional
         the integer used as a random seed for random generator, by default None
-    sdir: int, optional
-        the direction of scaling the activity pattern matrix using function `scale_feature`, by default None
     """
-    def __init__(self,activitypattern:numpy.ndarray,stim_dict:dict,sdir:int=None,seed:int=None):
-        assert sdir in [None,0,1,2], "sdir must be one of : [None, 0, 1, 2]"
-
-        self.sdir = sdir
-        if self.sdir is None:
-            self.X = activitypattern
-        else:
-            self.X = scale_feature(self.X,s_dir=self.sdir)
+    def __init__(self,activitypattern:numpy.ndarray,stim_dict:dict,categorical_decoder:bool=True,PCA_component:float=None,seed:int=None):
+        
         self.stimid = stim_dict["stimid"]
         self.stimsession = stim_dict["stimsession"]
         self.stimloc = stim_dict["stimloc"]
         self.stimfeature = stim_dict["stimfeature"]
         self.stimgroup = stim_dict["stimgroup"]
         self.seed = seed
+        self.categorical_decoder = categorical_decoder
+        self.PCA_component = PCA_component
+        
+        if self.PCA_component is None:
+            self.X = activitypattern
+        else:            
+            self.X = PCA(n_components=self.PCA_component).fit_transform(activitypattern)
 
     def fit(self):
         """running decoding analysis. 
@@ -621,24 +626,31 @@ class SVMDecoder:
                     traintestsplit = numpy.in1d(self.stimfeature[:,1], rc)*1
                 else:
                     traintestsplit = numpy.in1d(self.stimfeature[:,0], rc)*1
-                clf = SVC(max_iter=10000, tol=1e-4, 
-                        C = 0.1,
-                        kernel='linear',
-                        random_state = None)
+                if self.categorical_decoder:
+                    clf = SVC(max_iter=10000, tol=1e-3, 
+                            C = 0.1,
+                            kernel='linear',
+                            random_state = self.seed)
+                else:
+                    clf = SVR(max_iter=10000, tol=1e-3, 
+                            C = 0.1,
+                            kernel='linear')
                 tmp_scores = cross_validate(estimator = clf,
-                                        X = APM,
+                                        X = StandardScaler().fit_transform(APM),
                                         y = labels[curr_ax],
                                         groups = traintestsplit,
                                         cv = LeaveOneGroupOut(),
                                         return_train_score=True)
                 training_scores[curr_ax].append(tmp_scores['train_score'])
                 evaluation_scores[curr_ax].append(tmp_scores['test_score'])
-        #self.result = [numpy.array(v).mean() for v in training_scores.values()] + [numpy.array(v).mean() for v in evaluation_scores.values()]
-        #self.resultnames = [f"train_{x}" for x in training_scores.keys()] + [f"test_{x}" for x in evaluation_scores.keys()]
-        self.result = numpy.array(list(training_scores.values()) + list(evaluation_scores.values())).flatten()
-        self.resultnames = sum(
+        subset_scores = numpy.concatenate(list(training_scores.values()) + list(evaluation_scores.values()),axis=1).squeeze()
+        average_scores = [numpy.array(v).mean() for v in training_scores.values()] + [numpy.array(v).mean() for v in evaluation_scores.values()]
+        subset_scorenames = sum(
             [[f"training_trainstim{x}",f"training_teststim{x}"] for x in training_scores.keys()] + [[f"evaluation_teststim{x}",f"evaluation_trainstim{x}"] for x in evaluation_scores.keys()],
             [])
+        average_scorenames = [f"training_{x}" for x in training_scores.keys()] + [f"evaluation_{x}" for x in evaluation_scores.keys()]
+        self.result = numpy.concatenate((subset_scores,average_scores))
+        self.resultnames = sum([subset_scorenames,average_scorenames],[])
         return self
     
     def visualize(self):
@@ -651,7 +663,7 @@ class SVMDecoder:
     def get_details(self):
         details = {"name":self.__str__(),
                    "resultnames":self.resultnames,
-                   "scale_feature":self.sdir,
+                   "PCA_component":self.PCA_component,
                    "stim_dict":{"stimid":self.stimid.tolist(),
                                 "stimsession":self.stimsession.tolist(),
                                 "stimloc":self.stimloc.tolist(),
