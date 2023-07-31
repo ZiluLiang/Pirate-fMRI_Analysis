@@ -12,7 +12,7 @@ function glm_results(SPMmat_dir,contrasts,ths_cfg,output_fmt,masks)
     xCon = load(fullfile(SPMmat_dir,'SPM.mat')).SPM.xCon;
     nC = numel(load(fullfile(SPMmat_dir,'SPM.mat')).SPM.xCon);
     def_contrast_idxs = 1:nC;
-    if nargin<2, contrasts = def_contrast_idxs;end    
+    if nargin<2 || isempty(contrasts), contrasts = def_contrast_idxs;end    
     if isstring(contrasts) || ischar(contrasts),contrasts = {contrasts}; end
     if isnumeric(contrasts) && any(arrayfun(@(x) ismember(x,def_contrast_idxs),contrasts))
         contrast_idxs = contrasts(arrayfun(@(x) ismember(x,def_contrast_idxs),contrasts));

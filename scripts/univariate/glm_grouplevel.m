@@ -79,12 +79,9 @@ function glm_grouplevel(outputdir,design_type,scans,factor_names,within_factors,
                 fd.fact(f).ancova = 0;
             end
             for j = 1:numel(scans)
-                [a,b] = ind2sub(nLs,j);
-                if nF==1
-                    fd.icell(j).levels = a;
-                else
-                    fd.icell(j).levels = [a,b];
-                end
+                subscripts = cell(size(nLs));
+                [subscripts{:}] = ind2sub(nLs,j);
+                fd.icell(j).levels = cell2mat(subscripts);
                 fd.icell(j).scans  = reshape(scans{j},[],1);
             end
             fd.contrasts = 1;
