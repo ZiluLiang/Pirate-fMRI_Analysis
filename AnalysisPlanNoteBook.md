@@ -1,6 +1,6 @@
 This is the analysis plan/log notebook for the pirate project. It keeps tracks of hypotheses we intended to test and different analysis plans we designed to test these hypotheses.
 
-# Hypotheses
+# Stage 1: testing Hypotheses in cue stage
 ## Hypothesis 1: If Hippocampus(HPC), prefrontal cortex(PFC), and maybe post-parietal cortex (PPC) represent the map, then the representation similarity of the stimuli will be predicted by their distance on the treasure map - RSA analysis
 ### Literature
 tbc
@@ -45,13 +45,17 @@ Three common metrics of similarity metric:
 (2) feature-based model RDMs  
 (3) map-based model RDMs  
 
+### Unresolved issues
+1. what is the best "preprocessing" pipeline before running the MVPA analysis?   
+
 ## Hypothesis 2: If Hippocampus(HPC), prefrontal cortex(PFC), and maybe post-parietal cortex (PPC) represent the map, then the cosine similarity between neural vectors can be predicted by the groundtruth directions on the treasure map - Neural Vector Analysis
 ### Rationale
-The previous distance RDM analysis did not yield sensible results. So we reflect on the constraints that underlies the first hypothesis.  
+The previous distance RDM analysis did not find much results outside occipital cortex. So we reflect on the constraints that underlies the first hypothesis.  
 The groundtruth model RDM has three assumption (ordered by dependency on the previous one):
 1) factorize into color and shape
 2) project high dimensional color representation onto one axis (and shape onto another)
-3) instances on one axis is equidistance from one another
+3) instances on one axis is equidistance from one another  
+
 We can gradually relax each one of these assumptions and test if it holds
 
 This can be tested by comparing the actual data with different models of representation: 
@@ -64,7 +68,8 @@ This can be tested by comparing the actual data with different models of represe
 
 ### Analysis
 To compare the data and model prediction, we analyze the cosine similarity between any given pair of directions (neural vector from one stimuli to another). See [neural vector analysis](/scripts/multivariate/MultivariateAnalysisPipeline.md#neural-vector-analysis)
-###
+### Unresolved issues:
+1. how to test this when there are multiple runs? will there be some sort of representation drift between runs?
 
 ## Hypothesis 3: color or shape will be represented by two orthogonal neural axis - Decoding analysis
 ### Literature
@@ -73,8 +78,28 @@ tbc
 use neural activity to predict locations
 split train/evaluation set by: actual train/test, random row/col, cross-task generalization (localizer to navigation, navigation to localizer)
 
+### Unresolved issues:
+1. how to choose decoder?
+2. how to perform effective yet unbiased hyper-parameter search?
+3. what is the theoretical upper bound for decoding accuracy and the parallel score?
 
 # References
 1. [Walther, A., Nili, H., Ejaz, N., Alink, A., Kriegeskorte, N., & Diedrichsen, J. (2016). Reliability of dissimilarity measures for multi-voxel pattern analysis. Neuroimage, 137, 188-200.](https://doi.org/10.1016/j.neuroimage.2015.12.012)  
 2. [Bobadilla-Suarez, S., Ahlheim, C., Mehrotra, A., Panos, A., & Love, B. C. (2020). Measures of neural similarity. Computational brain & behavior, 3, 369-383.](https://doi.org/10.1007/s42113-019-00068-5)  
 3. [Diedrichsen, J., & Kriegeskorte, N. (2017). Representational models: A common framework for understanding encoding, pattern-component, and representational-similarity analysis. PLoS computational biology, 13(4), e1005508.](https://doi.org/10.1371/journal.pcbi.1005508)
+
+# Stage 2: moving beyond cue stage
+It is a bit unlikely that only the visual cortex is involved in solving the task. Before tweaking the multivariate analysis, we should go back to the univariate analysis and find regions that are involved in inference in successful generalizers. There are two main things we can consider:
+I. Participants are not actively recalling the location of the stimuli on the map during the cue stage, that's why we are not seeing effects of H1-3 in this stage.  
+Things that we can explore to test this
+Todo:
+1. look at trials with/without response separately
+2. time-lock to cue offset (use the cue offset as regressor onset)
+3. split into train and test stimuli
+4. include behavioural covariates into the univariate analysis: moving speed, distance to the correct location
+
+II. Maybe there are different levels of engagement of the hippocampal/prefrontal region depending on the need to make novel inferences:
+If the previous cue shares any feature with the current cue, then the previous cue may serve as a hint and less inference will be required?
+Todo:
+1. repetition suppression analysis with cosine similarity as p-mod
+2. look at behavioural data and explore how much this affects accuracy/response time.
