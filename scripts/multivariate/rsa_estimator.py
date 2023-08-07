@@ -391,17 +391,17 @@ class PatternCorrelation:
         type of correlation measure, by default `"spearman"`.
         must be one of: `"spearman", "pearson", "kendall", "linreg"`
     """
-    def __init__(self,activitypattern:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,type:str="spearman",ztransform:bool=False) -> None:        
+    def __init__(self,activitypattern:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,type:str="spearman",ztransform:bool=False,rdm_metric:str="correlation") -> None:        
 
         #neural rdm
-        neuralrdm = compute_rdm(activitypattern,"correlation")
+        neuralrdm = compute_rdm(activitypattern,rdm_metric)
         self.rdm_shape = neuralrdm.shape        
         self.Y,_ = lower_tri(neuralrdm)
 
         #model rdm and names        
         if isinstance(modelrdms,list):
             modelrdms = modelrdms
-        elif isinstance(modelrdms,numpy.ndarrray):
+        elif isinstance(modelrdms,numpy.ndarray):
             modelrdms = [modelrdms]
         else:
             raise TypeError('model rdm must be numpy ndarray or a list of numpy ndarray')
@@ -497,7 +497,7 @@ class MultipleRDMRegression:
         #model rdm and names        
         if isinstance(modelrdms,list):
             modelrdms = modelrdms
-        elif isinstance(modelrdms,numpy.ndarrray):
+        elif isinstance(modelrdms,numpy.ndarray):
             modelrdms = [modelrdms]
         else:
             raise TypeError('model rdm must be numpy ndarray or a list of numpy ndarray')
