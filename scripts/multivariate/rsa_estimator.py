@@ -71,43 +71,70 @@ def _get_pair_type_loc(dirpair_info:numpy.array,dirpair_info_cols:list)->dict:
     
     pair_type_dict = {
         ################################ incorporate grouping into pair type classification ################################
-        "wrun_wtrainX": numpy.all(
-                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~(same_sx&same_ex),traintrainpair,withinrunpair]),
+        "wrun_train_withinX": numpy.all(
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~same_sx, ~same_ex, ex_dir1 != sx_dir2, ex_dir2 != sx_dir1,traintrainpair,withinrunpair]),
                         axis=1),
-        "wrun_wtrainY": numpy.all(
-                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~(same_sy&same_ey),traintrainpair,withinrunpair]),
+        "wrun_train_withinY": numpy.all(
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~same_sy, ~same_ey, ey_dir1 != sy_dir2, ey_dir2 != sy_dir1,traintrainpair,withinrunpair]),
                         axis=1),
-        "brun_wtrainX": numpy.all(
-                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~(same_sx&same_ex),traintrainpair,betweenrunpair]),
+        "brun_train_withinX": numpy.all(
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~same_sx, ~same_ex, ex_dir1 != sx_dir2, ex_dir2 != sx_dir1,traintrainpair,betweenrunpair]),
                         axis=1),
-        "brun_wtrainY": numpy.all(
-                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~(same_sy&same_ey),traintrainpair,betweenrunpair]),
+        "brun_train_withinY": numpy.all(
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~same_sy, ~same_ey, ey_dir1 != sy_dir2, ey_dir2 != sy_dir1,traintrainpair,betweenrunpair]),
                         axis=1),
     
-        "wrun_wtestX": numpy.all(
-                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~(same_sx&same_ex),testtestpair,withinrunpair]),
+        "wrun_test_withinX": numpy.all(
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~same_sx, ~same_ex, ex_dir1 != sx_dir2, ex_dir2 != sx_dir1,testtestpair,withinrunpair]),
                         axis=1),
-        "wrun_wtestY": numpy.all(
-                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~(same_sy&same_ey),testtestpair,withinrunpair]),
+        "wrun_test_withinY": numpy.all(
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~same_sy, ~same_ey, ey_dir1 != sy_dir2, ey_dir2 != sy_dir1,testtestpair,withinrunpair]),
                         axis=1),
-        "brun_wtestX": numpy.all(
-                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~(same_sx&same_ex),testtestpair,betweenrunpair]),
+        "brun_test_withinX": numpy.all(
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~same_sx, ~same_ex, ex_dir1 != sx_dir2, ex_dir2 != sx_dir1,testtestpair,betweenrunpair]),
                         axis=1),
-        "brun_wtestY": numpy.all(
-                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~(same_sy&same_ey),testtestpair,betweenrunpair]),
+        "brun_test_withinY": numpy.all(
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~same_sy, ~same_ey, ey_dir1 != sy_dir2, ey_dir2 != sy_dir1,testtestpair,betweenrunpair]),
                         axis=1),
+
+        "wrun_test_betweenX": numpy.all(
+                        numpy.hstack([same_sx,same_ex,(sy_dir1 == ey_dir1),(sy_dir2 == ey_dir2), (sy_dir1 != sy_dir2),testtestpair, withinrunpair]),
+                        axis=1),
+        "wrun_test_betweenY": numpy.all(
+                        numpy.hstack([same_sy,same_ey,(sx_dir1 == ex_dir1),(sx_dir2 == ex_dir2), (sx_dir1 != sx_dir2),testtestpair, withinrunpair]),
+                        axis=1),
+        "brun_test_betweenX": numpy.all(
+                        numpy.hstack([same_sx,same_ex,(sy_dir1 == ey_dir1),(sy_dir2 == ey_dir2), (sy_dir1 != sy_dir2),testtestpair, betweenrunpair]),
+                        axis=1),
+        "brun_test_betweenY": numpy.all(
+                                numpy.hstack([same_sy,same_ey,(sx_dir1 == ex_dir1),(sx_dir2 == ex_dir2), (sx_dir1 != sx_dir2),testtestpair, betweenrunpair]),
+                                axis=1),
+
+        "wrun_mix_betweenX": numpy.all(
+                        numpy.hstack([same_sx,same_ex,(sy_dir1 == ey_dir1),(sy_dir2 == ey_dir2), (sy_dir1 != sy_dir2), mixgrouppair, withinrunpair]),
+                        axis=1),
+        "wrun_mix_betweenY": numpy.all(
+                        numpy.hstack([same_sy,same_ey,(sx_dir1 == ex_dir1),(sx_dir2 == ex_dir2), (sx_dir1 != sx_dir2), mixgrouppair, withinrunpair]),
+                        axis=1),
+        "brun_mix_betweenX": numpy.all(
+                        numpy.hstack([same_sx,same_ex,(sy_dir1 == ey_dir1),(sy_dir2 == ey_dir2), (sy_dir1 != sy_dir2), mixgrouppair, betweenrunpair]),
+                        axis=1),
+        "brun_mix_betweenY": numpy.all(
+                                numpy.hstack([same_sy,same_ey,(sx_dir1 == ex_dir1),(sx_dir2 == ex_dir2), (sx_dir1 != sx_dir2), mixgrouppair, betweenrunpair]),
+                                axis=1),
+                                
         ################################ no grouping in pair type classification ################################
         "wrun_withinX": numpy.all(
-                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~(same_sx&same_ex),withinrunpair]),
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~same_sx, ~same_ex, ex_dir1 != sx_dir2, ex_dir2 != sx_dir1, withinrunpair]),
                         axis=1),
         "wrun_withinY": numpy.all(
-                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~(same_sy&same_ey),withinrunpair]),
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~same_sy, ~same_ey, ey_dir1 != sy_dir2, ey_dir2 != sy_dir1,withinrunpair]),
                         axis=1),
         "brun_withinX": numpy.all(
-                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~(same_sx&same_ex),betweenrunpair]),
+                        numpy.hstack([ey_dir1 == sy_dir1,sy_dir2 == sy_dir1,ey_dir2 == sy_dir1,~same_sx, ~same_ex, ex_dir1 != sx_dir2, ex_dir2 != sx_dir1,betweenrunpair]),
                         axis=1),
         "brun_withinY": numpy.all(
-                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~(same_sy&same_ey),betweenrunpair]),
+                        numpy.hstack([ex_dir1 == sx_dir1,sx_dir2 == sx_dir1,ex_dir2 == sx_dir1,~same_sy, ~same_ey, ey_dir1 != sy_dir2, ey_dir2 != sy_dir1,betweenrunpair]),
                         axis=1),
         
                         
@@ -297,41 +324,41 @@ class NeuralDirectionCosineSimilarity:
                                 "rand":cos_similarity_rand}
         for k,cos_sim_dict in cos_similarity_dicts.items():            
             cos_sim_dict |= {
-                    "wrun_withintrain":numpy.array([cos_sim_dict["wrun_wtrainX"],cos_sim_dict["wrun_wtrainY"]]).mean()
+                    "wrun_train_within":numpy.array([cos_sim_dict["wrun_train_withinX"],cos_sim_dict["wrun_train_withinY"]]).mean()
                     }
             # if there are multiple runs
             if numpy.any(["brun" in x for x in pairtypes]):
                 cos_sim_dict |= {
-                    "brun_withintrain":numpy.array([cos_sim_dict["brun_wtrainX"],cos_sim_dict["brun_wtrainY"]]).mean()}
+                    "brun_train_within":numpy.array([cos_sim_dict["brun_train_withinX"],cos_sim_dict["brun_train_withinY"]]).mean()}
                 ## because there are unequal number of withinrun-withintrain and betweenrun-withintrain pairs, we need to calculate the average as a weighted average
                 cos_sim_dict |= {    
-                    "withintrain":
-                    numpy.average([cos_sim_dict["wrun_withintrain"],cos_sim_dict["brun_withintrain"]],
-                                  weights=[pair_type_dict["wrun_wtrainX"].sum(),pair_type_dict["brun_wtrainX"].sum()])
+                    "train_within":
+                    numpy.average([cos_sim_dict["wrun_train_within"],cos_sim_dict["brun_train_within"]],
+                                  weights=[pair_type_dict["wrun_train_withinX"].sum(),pair_type_dict["brun_train_withinX"].sum()])
                     }
             
             # if there are test stimuli
             if numpy.any(["test" in x for x in pairtypes]):            
                 cos_sim_dict |= {
                     "wrun_between": numpy.array([cos_sim_dict["wrun_betweenX"],cos_sim_dict["wrun_betweenY"]]).mean(),
-                    "wrun_withintest":numpy.array([cos_sim_dict["wrun_wtestX"],cos_sim_dict["wrun_wtestY"]]).mean(),
+                    "wrun_test_within":numpy.array([cos_sim_dict["wrun_test_withinX"],cos_sim_dict["wrun_test_withinY"]]).mean(),
                     "wrun_within": numpy.array([cos_sim_dict["wrun_withinX"],cos_sim_dict["wrun_withinY"]]).mean()
                     }
                 # if there are multiple runs
                 if numpy.any(["brun" in x for x in pairtypes]):
                     cos_sim_dict |= {
                         "brun_between": numpy.array([cos_sim_dict["brun_betweenX"],cos_sim_dict["brun_betweenY"]]).mean(),
-                        "brun_withintest":numpy.array([cos_sim_dict["brun_wtestX"],cos_sim_dict["brun_wtestY"]]).mean()
+                        "brun_test_within":numpy.array([cos_sim_dict["brun_test_withinX"],cos_sim_dict["brun_test_withinY"]]).mean()
                         }
                     ## because there are unequal number of pairs, we need to calculate the average as a weighted average
                     cos_sim_dict |= {
-                        "withintest":numpy.average([cos_sim_dict["wrun_withintest"],cos_sim_dict["brun_withintest"]],
-                                                   weights=[pair_type_dict["wrun_wtestX"].sum(),pair_type_dict["brun_wtestX"].sum()]),
+                        "test_within":numpy.average([cos_sim_dict["wrun_test_within"],cos_sim_dict["brun_test_within"]],
+                                                   weights=[pair_type_dict["wrun_test_withinX"].sum(),pair_type_dict["brun_test_withinX"].sum()]),
                         "brun_within": numpy.array([cos_sim_dict["brun_withinX"],cos_sim_dict["brun_withinY"]]).mean()                    
                     }
                     cos_sim_dict |= {
-                        "within": numpy.average([cos_sim_dict["withintrain"],cos_sim_dict["withintest"]],
-                                                weights=[pair_type_dict["wrun_wtrainX"].sum(),pair_type_dict["wrun_wtestY"].sum()]),
+                        "within": numpy.average([cos_sim_dict["train_within"],cos_sim_dict["test_within"]],
+                                                weights=[pair_type_dict["wrun_train_withinX"].sum(),pair_type_dict["wrun_test_withinX"].sum()]),
                         "between": numpy.array([cos_sim_dict["wrun_between"],cos_sim_dict["brun_between"]]).mean()                      
                     }
             cos_similarity_dicts[k] = cos_sim_dict
