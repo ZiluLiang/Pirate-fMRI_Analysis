@@ -6,7 +6,7 @@
 clear;clc
 
 [directory,participants,filepattern,exp]  = get_pirate_defaults(false,'directory','participants','filepattern','exp');
-masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\anat','.*.nii'));
+masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\anat','.*_bilateral.nii'));
 
 %% run LSA beta series extrator GLMs (unconcatenated)
 LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer'};
@@ -31,8 +31,13 @@ end
 % extract residuals to double check if models are running okay
 for j = 1:numel(LSAglm_names)
     glm_name = LSAglm_names{j};
-    [~,~,meanResMS1.(glm_name),rangeStat1.(glm_name),meanStat1.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{1},glm_name),masks);
-    [~,~,meanResMS2.(glm_name),rangeStat2.(glm_name),meanStat2.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{2},glm_name),masks);
+    [~,~,meanResMS1.(glm_name),rangeStat1.(glm_name),meanStat1.(glm_name)] = ...
+        extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{1},glm_name), ...
+                                 repmat(masks(1),numel({glm_configure(glm_name).contrasts.name}),1));
+
+    [~,~,meanResMS2.(glm_name),rangeStat2.(glm_name),meanStat2.(glm_name)] = ...
+        extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,lsa_dir{2},glm_name), ...
+                                 repmat(masks(1),numel({glm_configure(glm_name).contrasts.name}),1));
 end
 
 %% concatenate regressor/contrast estimates into 4D series - unconcatenated glms navigation task
