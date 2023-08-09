@@ -36,6 +36,7 @@ function [rangeCon,meanCon,meanResMS,rangeStat,meanStat] = extract_firstlvl_spmS
     
     for isub = 1:numel(participants.validids)
         firstlevel_dir = fullfile(glm_dir,'first',participants.validids{isub});
+        fprintf('extracting %s\r',participants.validids{isub})
         for j = 1:numel(contrast_names)
             try
                 [~,con_img,stat_img] = find_contrast_idx(fullfile(firstlevel_dir,'SPM.mat'),contrast_names{j});
