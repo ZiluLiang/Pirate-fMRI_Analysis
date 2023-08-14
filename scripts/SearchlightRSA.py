@@ -36,12 +36,12 @@ n_sess = {
 for p in preprocess:
     corr_df_list = []
     beta_dir = {
-#        "localizer":[os.path.join(fmridata_dir,p,'LSA_stimuli_localizer')],
-#        "concatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall')],
-#        "noconcatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
-        "oddeven":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')]*2,
-        "fourruns":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
-        }
+            "localizer":[os.path.join(fmridata_dir,p,'LSA_stimuli_localizer')],
+            "noconcatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
+            "concatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall')],
+    #        "oddeven":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')]*2,
+            "fourruns":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
+            }
     beta_fname = {
         "localizer":['stimuli_1r.nii'],
         "concatall":['stimuli_all.nii'],
@@ -79,8 +79,8 @@ for p in preprocess:
                             anatmasks=[],
                             nsession=n_sess[ds_name],
                             taskname=taskname)
-            
             RSA.run_SearchLightRSA(radius=10,
-                                    outputdir=os.path.join(fmridata_dir,p,'rsa_searchlight',f'{ds_name}_{vselect}'),
-                                    analysis=["correlation"],
-                                    njobs=cpu_count()-4)
+                                   outputdir=os.path.join(fmridata_dir,p,'rsa_searchlight',f'{ds_name}_{vselect}'),
+                                   analysis=["correlation"],#neuralvector
+                                   njobs=cpu_count()-2)
+            

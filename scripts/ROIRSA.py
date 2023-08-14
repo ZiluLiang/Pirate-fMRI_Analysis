@@ -35,7 +35,7 @@ with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
     fmridata_dir = pirate_defaults['directory']['fmri_data']
 
 ROIRSA_output_path = os.path.join(fmridata_dir,'ROIRSA','reliability_concat_nanidentity')
-ROIRSA_output_path = os.path.join(fmridata_dir,'ROIRSA','functionalmasks')
+ROIRSA_output_path = os.path.join(fmridata_dir,'ROIRSA','responsemapRDM')
 checkdir(ROIRSA_output_path)
 
 preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
@@ -44,10 +44,11 @@ with open(os.path.join(project_path,'scripts','anatomical_masks.json')) as f:
     anat_roi = list(json.load(f).keys())
 laterality = ["left","right","bilateral"]
 laterality = ["bilateral"]
+anat_roi = ["frontal","ofc","hippocampus","parahippocampus","parietal"]
 
 anatmaskdir = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\func'
-anat_roi = ['G_decodingAxisDiscreteXYconj_ParietalInfL','G_decodingAxisDiscreteXYconj_CalcarineOccipitalMid','G_withintest_hippocampus']
-
+#anat_roi = ['G_decodingAxisDiscreteXYconj_ParietalInfL','G_decodingAxisDiscreteXYconj_CalcarineOccipitalMid','G_withintest_hippocampus']
+anat_roi = ['G_within_TemporalPoleMidR_spherical','G_within_CalcarineL_spherical']
 n_sess = {
           "localizer":1,
           "concatall":1,
@@ -55,16 +56,30 @@ n_sess = {
           "concatodd":1,
           "oddeven":2,
           "fourruns":4,
-          "concatoddeven":2
+          "noconcatall":1,
+          "concatoddeven":2,          
+          "fourrunsRESP":4,
+          "noconcatallRESP":1,
+          "concatallRESP":1,
+          "fourrunsBEFORE":4,
+          "noconcatallBEFORE":1,
+          "concatallBEFORE":1
           }
 
 corr_df_list = []
-n_job = 1
+n_job = 15
 for p in preprocess[:1]:
     beta_dir = {
-#        "fourruns":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')]
-        "localizer":[os.path.join(fmridata_dir,p,'LSA_stimuli_localizer')],
+#        "localizer":[os.path.join(fmridata_dir,p,'LSA_stimuli_localizer')],
+#        "fourruns":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
         "concatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall')],
+        "noconcatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
+#        "fourrunsRESP":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_wvsworesp')],
+#        "noconcatallRESP":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_wvsworesp')],
+#        "concatallRESP":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall_wvsworesp')],
+#        "fourrunsBEFORE":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_bvsaoresp')],
+#        "noconcatallBEFORE":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_bvsaoresp')],
+#        "concatallBEFORE":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall_bvsaresp')],
 #        "concateven":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concateven')],
 #        "concatodd":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatodd')],
 #        "oddeven":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')]*2,
@@ -79,15 +94,22 @@ for p in preprocess[:1]:
         "fourruns":['stimuli_4r.nii'],
         "oddeven":['stimuli_odd.nii',
                    'stimuli_even.nii'],
+        "noconcatall":['stimuli_all.nii'],
         "concatoddeven":['stimuli_odd.nii',
-                         'stimuli_even.nii']
+                         'stimuli_even.nii'],                         
+        "fourrunsRESP":['stimuli_4r_resp.nii'],
+        "noconcatallRESP":['stimuli_all_resp.nii'],
+        "concatallRESP":['stimuli_all_resp.nii'],
+        "fourrunsBEFORE":['stimuli_4r_before.nii'],
+        "noconcatallBEFORE":['stimuli_all_before.nii'],
+        "concatallBEFORE":['stimuli_all_before.nii'],
         }
     vs_dir = {
               "no_selection":[],
               #"reliability_ths0":[os.path.join(fmridata_dir,p,'reliability_noconcat')],
               #"perm_rmask":[os.path.join(fmridata_dir,p,'reliability_noconcat')],
               }
-    for ds_name,ds in beta_dir.items():
+    for ds_name,ds in list(beta_dir.items()):
         for vselect,vdir in vs_dir.items():
             mds_df_list = []
             rdm_df_list = []
@@ -104,7 +126,7 @@ for p in preprocess[:1]:
 
             for roi, lat in itertools.product(anat_roi, laterality):
                 print(f"{p} - {ds_name} - {vselect} - {roi} = {lat}")
-                #anatmasks = [os.path.join(anatmaskdir,f'{roi}_{lat}.nii')]
+                anatmasks = [os.path.join(anatmaskdir,f'{roi}_{lat}.nii')]
                 anatmasks = [os.path.join(anatmaskdir,f'{roi}.nii')]
                 RSA = RSARunner(participants=subid_list,
                                 fmribeh_dir=fmribeh_dir,
@@ -115,21 +137,20 @@ for p in preprocess[:1]:
                                 nsession=n_sess[ds_name],
                                 taskname=taskname)
                 
-                #RSA._singleparticipant_ROISVMAxis(subid_list[0],{"categorical_decoder":True,"seed":None,"PCA_component":None})
-                #RSA._singleparticipant_ROIRSA(subid_list[0])
-
-                corr_df,rdm_df = RSA.run_ROIRSA(n_job)
+                corr_df,rdm_df = RSA.run_ROIRSA(njobs=n_job)
                 rdm_df = rdm_df.assign(roi = roi, laterality = lat, voxselect = vselect, preprocess=p,ds = ds_name)
                 corr_df = corr_df.assign(roi = roi, laterality = lat, voxselect = vselect, preprocess=p,ds = ds_name)                
                 rdm_df_list.append(rdm_df)
                 corr_df_list.append(corr_df)
                 
-                PS_df = RSA.run_ROIPS(outputdir=os.path.join(ROIRSA_output_path,'individual_cossim'),njobs=n_job)
-                PS_df = PS_df.assign(roi = roi, laterality = lat, voxselect = vselect, preprocess=p,ds = ds_name)
-                PS_df_list.append(PS_df)
+                if n_sess[ds_name]<2:
+                    PS_df = RSA.run_ROIPS(outputdir=os.path.join(ROIRSA_output_path,'individual_cossim'),njobs=n_job)
+                    PS_df = PS_df.assign(roi = roi, laterality = lat, voxselect = vselect, preprocess=p,ds = ds_name)
+                    PS_df_list.append(PS_df)
             
             pd.concat(rdm_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roirdm_nocentering_{p}_{ds_name}_{vselect}.csv'))
-            pd.concat(PS_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roiPS_nocentering_{p}_{ds_name}_{vselect}.csv'))
+            if n_sess[ds_name]<2:
+                pd.concat(PS_df_list,axis=0).to_csv(os.path.join(ROIRSA_output_path,f'roiPS_nocentering_{p}_{ds_name}_{vselect}.csv'))
 
 pd.concat(corr_df_list, axis=0).to_csv(
     os.path.join(ROIRSA_output_path, 'roicorr_nocentering.csv')

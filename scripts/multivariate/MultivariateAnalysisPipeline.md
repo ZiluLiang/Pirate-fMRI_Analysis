@@ -56,32 +56,33 @@ If we plot the groundtruth map of stimuli (based on groundtruth x/y locations), 
 
 Similarly, we can use a feature-based groundtruth map, disregarding which feature maps onto x and which feature maps onto y, to derive the above direction types.
 ### Predicted Cosine Similarity of different models of representation
+Right now all the analyses in this section is based on the assumption that there is only one run. All the predictions are within run. We haven't formalize a good hypothesis for between-run data yet.
 #### highDim-25
 Under the assumption of highDim-25 model, there are three possible values of cosine similarity between any given pair of coding directions: $0.5$, $0$, $-0.5$.
-When the pair of coding directions intersect at the starting location or ending location, its  cosine similarity is $0.5$ or $-0.5$. When the pair do not share starting or ending location, its cosine similarity is 0. To better understand why this is the case, here is an illustration that represent 4 stimuli using one hot coding. The locations of these 4 stimuli in this representation space form a tetrahedron.
+To better understand why this is the case, here is an illustration that represent 4 stimuli using one hot coding. The locations of these 4 stimuli in this representation space form a tetrahedron. When the pair of coding directions intersect at the starting location or ending location, its  cosine similarity is $0.5$ or $-0.5$. When the pair do not share starting or ending location, its cosine similarity is 0. However, this is assuming that there are no bias towards certain stimuli (e.g., no shape/color bias, no training/test bias). If there are biases, the vertices of the tetrahedron will not be equidistant. It may strech,  then the cosine similarity of the pair of coding directions that intersect will no longer be 0.5 or -0.5. The true null of this model will be hard to estimate. Therefore, we focus only on the case where there are no intersection (with a theorectical prediciton of 0).
 
 ![cosine similarity between coding directions in one-hot coding case](/readmeplots/highDcodingdir_cossim.png)
 
 Coming back to the 25 stimuli in our experiment, in the within X/Y case, each X column/Y row has 5 stimuli, which yields ${5\choose2} = 10$ coding directions. These $10$ coding directions constitutes ${10\choose2} = 45$ pairs of coding directions to compute cosine similarity measures on. Among all $45$ pairs of coding directions, there are: 
  - $\left[{4\choose2} + {3\choose2} + {2\choose2}\right]*2 = 20$ pairs of stimuli that share the same starting/ending locations
  - $3+2+1+2+1+1 = 10$ pairs of stimuli that starting location of one of the coding direction is the ending location of the other
- - $15$ pairs of stimuli that do not share the same starting/ending locations  
+ - $15$ pairs of stimuli that do not share the same starting/ending locations  - this is the type of pairs we will focus on
 
 Therefore, 
-- the average cosine similarity of within X/Y pairs is ${{20\times0.5+10\times(-0.5)}\over 45} = {5\over45} = {1\over9} = 0.111111$...
+- the average cosine similarity of within X/Y pairs that do not intersect at a vertex is $0$
 
 For between X/Y pairs, the coding directions in any pair never cross with each other. Hence, 
 - the cosine similarity of between X/Y pairs will always be $0$
 
 #### highDim-10
 This model assumes that the representations factorise color and shape, but each color/shape is still represented using one-hot coding. Thus, between X/Y pairs should be parallel, but within X/Y would show similar result as the highDim-25 model. In sum, for this model,
-- the average cosine similarity of within X/Y pairs is $0.111111...$ 
-- the average cosine similarity of between X/Y pairs is $0$ 
+- the average cosine similarity of within X/Y pairs that do not intersect at a vertex is $0$ 
+- the average cosine similarity of between X/Y pairs is $1$ 
   
 #### lowDim-2
 This model assumes that not only the representations factorise color and shape, but also project color/shape onto x/y axis respectively. Thus, between X/Y pairs as well as within X/Y pairs should all be parallel,
-- the average cosine similarity of within X/Y pairs is $0$ 
-- the average cosine similarity of between X/Y pairs is $0$ 
+- the average cosine similarity of within X/Y pairs is $1$ 
+- the average cosine similarity of between X/Y pairs is $1$ 
 
 Similarly, we can calculate the theoretical prediction of these models using a feature-based groundtruth map for classifying direction pairs. Together we can arrive at the following predictions:  
 

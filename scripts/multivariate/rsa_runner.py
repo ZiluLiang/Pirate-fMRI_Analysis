@@ -1,3 +1,7 @@
+"""
+This module contains class that wraps up RSA analysis in ROI or whole brain into a pipeline. The runner class is dependent on the file structure as specified in `FILESTRUCTURE.md`
+"""
+
 import itertools
 import scipy
 import numpy as np
@@ -22,13 +26,44 @@ from multivariate.rsa_searchlight import RSASearchLight
 from multivariate.rsa_estimator import PatternCorrelation,MultipleRDMRegression,NeuralDirectionCosineSimilarity,SVMDecoder
 
 class RSARunner:
-    def __init__(self,participants,fmribeh_dir,
-                 nsession,
-                 beta_dir,beta_fname,
-                 vsmask_dir,vsmask_fname,
-                 pmask_dir=None,pmask_fname=None,
-                 anatmasks=None,
+    """
+    The `RSARunner` set up the paths to the image and calls other
+
+    Parameters
+    ----------
+    participants : list
+        list of participant ids
+    fmribeh_dir : str
+        the parent directory that holds participants' folder of behavioral data
+    nsession : int
+        number of sessions/runs 
+    beta_dir : list
+        the parent directory that holds participants' folder of beta images that are used to construct the activity pattern matrix
+    beta_fname : list
+        _the name of the beta image in each participant's folder
+    vsmask_dir : list
+        the parent directory that holds participants' folder of voxel selection masks
+    vsmask_fname : list
+        the name of the voxel selection masks in each participant's folder
+    pmask_dir : list, optional
+        the parent directory that holds participants' folder of process masks , by default None
+    pmask_fname : list, optional
+        the name of process masks in each participant's folder, by default None
+    anatmasks : list, optional
+        the path to anatomical masks (not participant specific), by default None
+    taskname : str, optional
+        name of the task, by default "localizer"
+    """
+
+    def __init__(self,participants:list,
+                 fmribeh_dir:str,
+                 nsession:int,
+                 beta_dir:list,beta_fname:list,
+                 vsmask_dir:list,vsmask_fname:list,
+                 pmask_dir:list=None,pmask_fname:list=None,
+                 anatmasks:list=None,
                  taskname:str="localizer") -> None:
+        
         self.participants = participants # participant list
         self.fmribeh_dir  = fmribeh_dir  # behavioral data directory to look for stimuli information
 
@@ -50,6 +85,10 @@ class RSARunner:
         # number of sessions
         self.nsession     = nsession
 
+        # options
+        self.config_modelrdm = {"randomseed":None,"nan_identity":True}
+        self.config_neuralrdm = {"preproc":None,"distance_metric":"correlation"}
+
 ############################################### PARTICIPANT-SPECIFIC DATA EXTRACTION METHODS ###################################################
     def get_imagedir(self,subid):
         beta_imgs  = [os.path.join(d,'first',subid,f) for d,f in zip(self.beta_dir,self.beta_fname)]
@@ -57,44 +96,45 @@ class RSARunner:
         pmask_imgs = [os.path.join(d,'first',subid,f) for d,f in zip(self.pmask_dir,self.pmask_fname)]
         return beta_imgs,mask_imgs,pmask_imgs
     
-    def load_stimlist(self,subid):
+    def get_modelRDM(self,subid,randomseed:int=None,nan_identity:bool=True):
         fmribeh_dir = self.fmribeh_dir
         # load stimuli list
         stim_list_fn = glob.glob(os.path.join(fmribeh_dir,subid,'sub*_stimlist.txt'))[0]
         stim_list    =  pd.read_csv(stim_list_fn, sep=",", header=0).sort_values(by = ['stim_id'], ascending=True,inplace=False)# use `sort_values` to make sure stim list is in the same order for all participants
-
+        
         stim_id = np.array(stim_list['stim_id']) # get stimuli id
         stim_image = np.array([x.replace('.png','') for x in stim_list["stim_img"]]) # get stimuli image
         stim_train = np.array(stim_list['training']) # get training/test stimuli classification
+        
         # get 2d location
-        stim_locx = np.array(stim_list['stim_x'])
-        stim_locy = np.array(stim_list['stim_y'])
+        stim_loc = np.array(stim_list[['stim_x','stim_y']])
+        
         # get visual features
         stim_color = np.array([x.replace('.png','').split('_')[0] for x in stim_list["stim_img"]])
         stim_shape = np.array([x.replace('.png','').split('_')[1] for x in stim_list["stim_img"]])
-        _, stim_color = np.unique(stim_color, return_inverse=True)
-        _, stim_shape = np.unique(stim_shape, return_inverse=True)
+        _, stim_color = np.unique(stim_color, return_inverse=True) # recode string into integer
+        _, stim_shape = np.unique(stim_shape, return_inverse=True) # recode string into integer
+        stim_feature = np.vstack([stim_color,stim_shape]).T
 
-        stimid = stim_id
-        stimloc = np.vstack([stim_locx,stim_locy]).T
-        stimfeature = np.vstack([stim_color,stim_shape]).T
-        stimgroup = stim_train
+        filter = np.where(stim_train==1) if self.taskname == "localizer" else (np.arange(stim_train.size),)
+        stimid,stimgtloc,stimfeature,stimgroup =  stim_id[filter],stim_loc[filter],stim_feature[filter],stim_train[filter]    
 
-        if self.taskname == "localizer":
-            training_filter = np.where(stim_train==1)
-            return stimid[training_filter],stimloc[training_filter],stimfeature[training_filter],stimgroup[training_filter]
-        elif self.taskname == "navigation":
-            return stimid,stimloc,stimfeature,stimgroup
+        # load behavioral response
+        participant_resp_fns = glob.glob(os.path.join(fmribeh_dir,subid,'sub*_task-piratenavigation_run-*.csv'))
+        resp_lists = [pd.read_csv(x, sep=",", header=0).sort_values(by = ['stim_id'], ascending=True,inplace=False).iloc[filter[0],:] for x in participant_resp_fns]
+        if self.nsession == 4:
+            resp_df_runs = pd.concat(resp_lists,axis=0)
+            stimresploc = np.array(resp_df_runs[['resp_x','resp_y']])
+        else:
+            stimresploc = np.mean([np.array(x[['resp_x','resp_y']]) for x in resp_lists],axis=0)
 
-    def get_modelRDM(self,subid,randomseed:int=1,nan_identity:bool=True):
-        stimid,stimloc,stimfeature,stimgroup = self.load_stimlist(subid)
-        return ModelRDM(stimid = stimid,
-                        stimloc = stimloc,
+        return ModelRDM(stimid      = stimid,
+                        stimgtloc   = stimgtloc,
                         stimfeature = stimfeature,
                         stimgroup   = stimgroup,
+                        stimresploc = stimresploc,
                         n_session   = self.nsession,
-                        randomseed  = randomseed,
-                        nan_identity = nan_identity)
+                        **self.config_modelrdm)
 
     def get_neuralRDM(self,subid,
                       preproc:str=None):
@@ -132,10 +172,11 @@ class RSARunner:
             sys.stderr.write(f"{subid}\r")
         
         ## compute model rdm
-        modelrdm  = self.get_modelRDM(subid,randomseed,nan_identity)
+        modelrdm  = self.get_modelRDM(subid,randomseed,nan_identity)        
+
         ### choose which model rdm is used for calculating correlation
         if corr_rdm_names is None:
-            corr_rdm_names = [x for x in modelrdm.models.keys() if not np.any([x.endswith('session'),x.endswith('stimuli'),x.endswith('stimuligroup')])]
+            corr_rdm_names = [x for x in modelrdm.models.keys() if not np.any([x.endswith('session'),x.endswith('stimuli')])]
         else:
             corr_rdm_names = [x for x in modelrdm.models.keys() if x in corr_rdm_names]
         corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
@@ -254,7 +295,7 @@ class RSARunner:
         modelrdm  = self.get_modelRDM(subid)
         stim_dict = {"stimid":modelrdm.stimid.flatten(), 
                      "stimsession":modelrdm.stimsession.flatten(), 
-                     "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, 
+                     "stimloc":modelrdm.stimresploc, "stimfeature":modelrdm.stimfeature, 
                      "stimgroup":modelrdm.stimgroup.flatten()}
         SVM_estimator = SVMDecoder(activitypattern=X,stim_dict=stim_dict,**estimator_kwargs)
          
@@ -312,13 +353,10 @@ class RSARunner:
             ## compute model rdm
             modelrdm  = self.get_modelRDM(subid)
             if self.taskname == "localizer":
-                m_regs = ['feature2d','loc2d']
                 corr_rdm_names = [x for x in modelrdm.models.keys() if not np.logical_or(x.endswith('session'),x.endswith('stimuli'))]
                 corr_rdm_names = [x for x in corr_rdm_names if not np.logical_or(x.endswith('session'),x.endswith('stimuligroup'))]
             else:
-                m_regs = ['feature2d','stimuligroup','loc2d']
                 corr_rdm_names = [x for x in modelrdm.models.keys() if not np.logical_or(x.endswith('session'),x.endswith('stimuli'))]
-            regress_models = [modelrdm.models[m] for m in m_regs]
             corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
 
             # run search light
@@ -341,15 +379,15 @@ class RSARunner:
                     verbose      = j == 0
                     )# only show details at the first participant
                 
-            elif "regression" in analysis:                
-                print('running regression searchlight')
-                subRSA.run(
-                    estimator = MultipleRDMRegression,
-                    estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
-                    outputpath   = os.path.join(outputdir,'regression','first',subid), 
-                    outputregexp = 'beta_%04d.nii', 
-                    verbose      = j == 0
-                    ) # only show details at the first participant
+            # elif "regression" in analysis:                
+            #     print('running regression searchlight')
+            #     subRSA.run(
+            #         estimator = MultipleRDMRegression,
+            #         estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
+            #         outputpath   = os.path.join(outputdir,'regression','first',subid), 
+            #         outputregexp = 'beta_%04d.nii', 
+            #         verbose      = j == 0
+            #         ) # only show details at the first participant
             
             elif "correlation" in analysis:
                 print('running correlation searchlight')
