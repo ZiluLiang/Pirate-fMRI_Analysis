@@ -1,4 +1,4 @@
-""" Class for estimators for RSA analysis
+""" Estimator classes for RSA analysis
     All classes takes activity pattern matrix as an input and performs different types of RSA analysis based on the activity pattern matrix.
     An estimator class has at least four methods:
     (1) fit: by calling estimator.fit(), RSA analysis is performed, `result` attribute will be set. `estimator.result` is an 1D numpy array.
@@ -414,11 +414,16 @@ class PatternCorrelation:
         a 2D numpy array. the dissimilarity matrices from different models of representation. size = (nsample,nsample)
     modelnames: list
         a list of model names. If `None` models will be named as m1,m2,..., by default `None`
+    rdm_metric: str, optional
+        dissimilarity/distance metric passed to `scipy.spatial.distance.pdist` to compute neural rdm from activity pattern matrix, by default `"correlation"`
     type : str, optional
         type of correlation measure, by default `"spearman"`.
         must be one of: `"spearman", "pearson", "kendall", "linreg"`
+    ztransform: bool, optional
+        whether or not to perform fisher Z transform to the correlation coefficients, by default `none`.    
     """
-    def __init__(self,activitypattern:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,type:str="spearman",ztransform:bool=False,rdm_metric:str="correlation") -> None:        
+    def __init__(self,activitypattern:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,rdm_metric:str="correlation",
+                 type:str="spearman",ztransform:bool=False) -> None:        
 
         #neural rdm
         neuralrdm = compute_rdm(activitypattern,rdm_metric)
@@ -514,10 +519,12 @@ class MultipleRDMRegression:
     ----------
     activitypattern : numpy.ndarray
         a 2D numpy array. the neural activity pattern matrix used for computing representation dissimilarity matrix. size = (nsample,nfeatures)
-    modelrdm : numpy.ndarray or list of numpy.ndarray
+    modelrdms : numpy.ndarray or list of numpy.ndarray
         a 2D numpy array. the dissimilarity matrices from different models of representation. size = (nsample,nsample)
-    modelnames: list
+    modelnames: list, optional
         a list of model names. If `None` models will be named as m1,m2,..., by default `None`
+    standardize: bool, optional
+        whether or not to standardize the model rdms and neural rdms before running regression, by default `None`
     """
     def __init__(self,activitypattern:numpy.ndarray,modelrdms:numpy.ndarray or list,modelnames:list=None,standardize:bool=True) -> None:
 
@@ -566,7 +573,7 @@ class MultipleRDMRegression:
         reg = LinearRegression().fit(X,Y)
         self.reg = reg
         self.result = reg.coef_
-        self.score  = reg.score(self.X,self.Y)
+        self.score  = reg.score(X,Y)
         return self
     
     def visualize(self):
@@ -598,7 +605,8 @@ class MultipleRDMRegression:
         details = {"name":self.__str__(),
                    "standardize":self.standardize*1,
                    "NAfilters":self.na_filters.tolist(),
-                   "modelRDMs":dict(zip(self.modelnames,[x.tolist() for x in self.X.T]))
+                   "modelRDMs":dict(zip(self.modelnames,[x.tolist() for x in self.X.T])),
+                   "score":self.score
                   }
         return  details
     
