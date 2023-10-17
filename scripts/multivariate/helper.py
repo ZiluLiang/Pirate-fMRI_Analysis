@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import matplotlib
 import pandas
 
+#####################################################################################################################################
+#                                                        FOR GENERAL PURPOSE                                                        #
+#####################################################################################################################################
 def scale_feature(X:numpy.ndarray,s_dir:int=2,standardize:bool=True) -> numpy.ndarray:
     """ standardize or center a 1D or 2D numpy array by using ZX = (X - mean)/std
 
@@ -256,22 +259,32 @@ def load_maskimg(mask_img: str or nibabel.Nifti1Image or numpy.ndarray, ref_mask
         raise AssertionError("mask_img must be the path to nii image or nibabel loaded nii image, or a ndarry of mask image data")
     return nibabel.processing.resample_from_to(mask_img, ref_maskimg)
 
+#####################################################################################################################################
+#                                                        FOR PIRATE PROJECT                                                         #
+#####################################################################################################################################
 class ModelRDM:
-    """ set up the model rdms
+    """ set up the model rdms based on stimuli properties in pirate exp
 
     Parameters
     ----------
     stimid : numpy.ndarray
         a 1D numpy array of stimuli ids
     stimgtloc : numpy.ndarray
-        a 2D numpy array of stimuli groundtruth locations (x and y)
+        a 2D numpy array of stimuli groundtruth locations (x and y), shape = `(nstim,2)`
     stimfeature : numpy.ndarray
-        a 2D numpy array of stimuli features (color and feature)
+        a 2D numpy array of stimuli features (color and feature), shape = `(nstim,2)`
+    stimwrttrainloc : numpy.ndarray
+        a 2D numpy array of stimuli locations with regard to training location, shape = `(nstim,4)`, the four columns corresponds to: xdist, ydist, xsign, ysign
     stimresploc : numpy.ndarray
-        a 2D numpy array of stimuli locations (x and y) based on participants response, by default None
+        a 2D numpy array of stimuli locations (x and y) based on participants response, shape = `(nstim,2)`, by default None
         number of sessions, by default 1
-    split_sess : bool, optional
-        split the rdm into within-session and between-session or not, by default True
+    n_session : int, optional
+        number of sessions, stimuli matrix will be repeated by number of sessions before constructing rdm.
+        If multiple sessions are present, model rdms will be separated in to between and within case as well. by default 1
+    randomseed: int, optional
+        randomseed passed to `self.random` to initiate random generator to create random model rdm, by default 1
+    nan_identity: bool, optional
+        whether or not to nan out same-same stimuli pairs in the model rdm. by default true.    
     """
     
     def __init__(self,
@@ -279,15 +292,17 @@ class ModelRDM:
                  stimgtloc:numpy.ndarray,
                  stimfeature:numpy.ndarray,
                  stimgroup:numpy.ndarray,
+                 stimwrttrainloc:numpy.ndarray,
                  stimresploc:numpy.array=None,
                  n_session:int=1,
                  randomseed:int=1,
-                 nan_identity:bool=False):
+                 nan_identity:bool=True):
         
         self.n_session   = n_session
         self.n_stim      = len(stimid)       
         self.stimid      = numpy.tile(stimid,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
         self.stimloc     = numpy.tile(stimgtloc,(n_session,1)).reshape((self.n_stim*self.n_session,-1)) ## ground-truth location
+        self.stimloc_wrttrain = numpy.tile(stimwrttrainloc,(n_session,1)).reshape((self.n_stim*self.n_session,-1)) ## stimuli location with regard to training locations
         self.stimfeature = numpy.tile(stimfeature,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
         self.stimgroup   = numpy.tile(stimgroup,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
         self.stimsession = numpy.concatenate([numpy.repeat(j,len(stimid)) for j in range(self.n_session)])
@@ -308,7 +323,17 @@ class ModelRDM:
                   "feature1dx":       compute_rdm_identity(self.stimfeature[:,0]),
                   "feature1dy":       compute_rdm_identity(self.stimfeature[:,1]),
                   "stimuli":          compute_rdm_identity(self.stimid),
-                  "stimuligroup":     compute_rdm_identity(self.stimgroup)}
+                  "stimuligroup":     compute_rdm_identity(self.stimgroup),
+                  "locwrttrain_xydistsign": compute_rdm(self.stimloc_wrttrain,metric="euclidean"),
+                  "locwrttrain_xdistsign":  compute_rdm(self.stimloc_wrttrain[:,[0,2]],metric="euclidean"),
+                  "locwrttrain_ydistsign":  compute_rdm(self.stimloc_wrttrain[:,[1,3]],metric="euclidean"),
+                  "locwrttrain_xdist":      compute_rdm(self.stimloc_wrttrain[:,[0]],metric="euclidean"),
+                  "locwrttrain_xsign":      compute_rdm(self.stimloc_wrttrain[:,[2]],metric="euclidean"),
+                  "locwrttrain_ydist":      compute_rdm(self.stimloc_wrttrain[:,[1]],metric="euclidean"),
+                  "locwrttrain_ysign":      compute_rdm(self.stimloc_wrttrain[:,[3]],metric="euclidean"),
+                  "locwrttrain_xysign":     compute_rdm(self.stimloc_wrttrain[:,[2,3]],metric="euclidean"),
+                  "locwrttrain_xydist":     compute_rdm(self.stimloc_wrttrain[:,[0,1]],metric="euclidean"),
+                  }
         models |= {
                   "shuffledloc2d": self.random(randomseed=randomseed,rdm=models["gtlocEuclidean"],mode="permuterdm"),
                   "randfeature2d": self.random(randomseed=randomseed,mode="randomfeature"),
@@ -327,9 +352,14 @@ class ModelRDM:
             WTR[WTR==0]=numpy.nan
             WTE[WTE==0]=numpy.nan
             if gen_resprdm:
-                split_models = ['gtlocEuclidean','gtlocCityBlock','feature2d','resplocEuclidean','resplocCityBlock']
+                split_models = ['gtlocEuclidean','gtlocCityBlock','feature2d',
+                                'locwrttrain_xydistsign','locwrttrain_xdistsign','locwrttrain_ydistsign','locwrttrain_xdist',
+                                'locwrttrain_xsign','locwrttrain_ydist','locwrttrain_ysign','locwrttrain_xysign','locwrttrain_xydist',
+                                'resplocEuclidean','resplocCityBlock']
             else:
-                split_models = ['gtlocEuclidean','gtlocCityBlock','feature2d']
+                split_models = ['gtlocEuclidean','gtlocCityBlock','feature2d',
+                                'locwrttrain_xydistsign','locwrttrain_xdistsign','locwrttrain_ydistsign','locwrttrain_xdist',
+                                'locwrttrain_xsign','locwrttrain_ydist','locwrttrain_ysign','locwrttrain_xysign','locwrttrain_xydist']
             for k in split_models:
                 wtr_n = 'trainstimpairs_' + k
                 rdmwtr = numpy.multiply(models[k],WTR)
