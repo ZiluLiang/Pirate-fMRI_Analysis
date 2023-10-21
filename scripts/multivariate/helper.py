@@ -325,8 +325,8 @@ class ModelRDM:
                   "stimuli":          compute_rdm_identity(self.stimid),
                   "stimuligroup":     compute_rdm_identity(self.stimgroup),
                   "locwrttrain_xydistsign": compute_rdm(self.stimloc_wrttrain,metric="euclidean"),
-                  "locwrttrain_xdistsign":  compute_rdm(self.stimloc_wrttrain[:,[0,2]],metric="euclidean"),
-                  "locwrttrain_ydistsign":  compute_rdm(self.stimloc_wrttrain[:,[1,3]],metric="euclidean"),
+#                  "locwrttrain_xdistsign":  compute_rdm(self.stimloc_wrttrain[:,[0,2]],metric="euclidean"),
+#                  "locwrttrain_ydistsign":  compute_rdm(self.stimloc_wrttrain[:,[1,3]],metric="euclidean"),
                   "locwrttrain_xdist":      compute_rdm(self.stimloc_wrttrain[:,[0]],metric="euclidean"),
                   "locwrttrain_xsign":      compute_rdm(self.stimloc_wrttrain[:,[2]],metric="euclidean"),
                   "locwrttrain_ydist":      compute_rdm(self.stimloc_wrttrain[:,[1]],metric="euclidean"),
@@ -336,13 +336,15 @@ class ModelRDM:
                   }
         models |= {
                   "shuffledloc2d": self.random(randomseed=randomseed,rdm=models["gtlocEuclidean"],mode="permuterdm"),
-                  "randfeature2d": self.random(randomseed=randomseed,mode="randomfeature"),
-                  "randmatrix":    self.random(randomseed=randomseed,mode="randommatrix")
+#                  "randfeature2d": self.random(randomseed=randomseed,mode="randomfeature"),
+#                  "randmatrix":    self.random(randomseed=randomseed,mode="randommatrix")
                 }
         
         if gen_resprdm:
             models |= {"resplocEuclidean":  compute_rdm(self.stimresploc,metric="euclidean"),
-                       "resplocCityBlock":  compute_rdm(self.stimresploc,metric="cityblock"),}
+                       "resplocCityBlock":  compute_rdm(self.stimresploc,metric="cityblock"),
+                       "resploc1dx":        compute_rdm(self.stimresploc[:,[0]],metric="euclidean"),
+                       "resploc1dy":        compute_rdm(self.stimresploc[:,[1]],metric="euclidean")}
 
         # split into train/test
         if numpy.unique(self.stimgroup).size>1:
@@ -352,14 +354,16 @@ class ModelRDM:
             WTR[WTR==0]=numpy.nan
             WTE[WTE==0]=numpy.nan
             if gen_resprdm:
-                split_models = ['gtlocEuclidean','gtlocCityBlock','feature2d',
-                                'locwrttrain_xydistsign','locwrttrain_xdistsign','locwrttrain_ydistsign','locwrttrain_xdist',
-                                'locwrttrain_xsign','locwrttrain_ydist','locwrttrain_ysign','locwrttrain_xysign','locwrttrain_xydist',
-                                'resplocEuclidean','resplocCityBlock']
+                split_models = ['gtlocEuclidean','feature2d',
+                                'locwrttrain_xydistsign','locwrttrain_xysign','locwrttrain_xydist',
+#                                'locwrttrain_xdistsign','locwrttrain_ydistsign',
+                                'locwrttrain_xdist', 'locwrttrain_xsign','locwrttrain_ydist','locwrttrain_ysign',
+                                'resplocEuclidean']
             else:
-                split_models = ['gtlocEuclidean','gtlocCityBlock','feature2d',
-                                'locwrttrain_xydistsign','locwrttrain_xdistsign','locwrttrain_ydistsign','locwrttrain_xdist',
-                                'locwrttrain_xsign','locwrttrain_ydist','locwrttrain_ysign','locwrttrain_xysign','locwrttrain_xydist']
+                split_models = ['gtlocEuclidean','feature2d',
+                                'locwrttrain_xydistsign','locwrttrain_xysign','locwrttrain_xydist',
+#                                'locwrttrain_xdistsign','locwrttrain_ydistsign',
+                                'locwrttrain_xdist', 'locwrttrain_xsign','locwrttrain_ydist','locwrttrain_ysign']
             for k in split_models:
                 wtr_n = 'trainstimpairs_' + k
                 rdmwtr = numpy.multiply(models[k],WTR)
