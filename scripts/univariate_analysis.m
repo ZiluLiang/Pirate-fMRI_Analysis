@@ -11,14 +11,16 @@ masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\
 
 %% run Repetition Supression and train-test GLMs
 RSglm_names = {'traintest_navigation_wvsworesp',...
-    'rs_loc2d_navigation','rs_resploc2d_navigation','rs_feacture2d_navigation','rs_color_navigation','rs_shape_navigation',...
-    'rs_loc2d_localizer','traintest_navigation'};
+    'rs_loc2d_navigation','rs_resploc2d_navigation','rs_loc2d_localizer',...
+    'rs_feacture2d_navigation','rs_color_navigation','rs_shape_navigation',...
+    'rs_hrchydist_navigation',...
+    'traintest_navigation'};
 flag_runGLM  = true;
 if flag_runGLM
     steps = struct('first', {{'specify','estimate','contrast'}}, ...
                    'second',{{'specify','estimate','contrast','result'}});
     err_tracker   = struct(); %#ok<*UNRCH>
-    for j = 1:numel(RSglm_names)
+    for j = numel(RSglm_names)-1%1:numel(RSglm_names)
         glm_name = RSglm_names{j};        
         err_tracker.(glm_name) = glm_runner(glm_name, rmfield(steps,'second'));
         cd(fullfile(directory.projectdir,'scripts'))
@@ -44,12 +46,12 @@ for j = 1:numel(RSglm_names)
 end
 
 %% run neural-axis analysis
-NAglm_names = {'axis_loc_navigation','axis_resploc_navigation','axis_loc_localizer'};
+NAglm_names = {'axis_loc_navigation','axis_resploc_navigation','axis_loc_localizer','axis_loc_wprevtrial_localizer','dist2train_navigation'};
 flag_runGLM  = true;
 if flag_runGLM
     steps = struct('first', {{'specify','estimate','contrast'}}, ...
                    'second',{{'specify','estimate','contrast','result'}});
-    for j = numel(NAglm_names)
+    for j = 4:numel(NAglm_names)
         glm_name = NAglm_names{j};
         err_tracker.(glm_name) = glm_runner(glm_name, rmfield(steps,'second'));
         cd(fullfile(directory.projectdir,'scripts'))

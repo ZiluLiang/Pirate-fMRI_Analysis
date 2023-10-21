@@ -149,31 +149,35 @@ function multi = gen_multiconditions(data,cond_names,pmod_names,custom_cfg)
                 durations{j} = data.(['duration_',cond_names{j}]);
             else
                 warning('fail to find column %s in the data table, using stick function instead',['duration_',cond_names{j}])
-                durations{j} = 0;
+                durations{j} = zeros(size(onsets{j}));
             end
         else
-            durations{j} = 0;
+            durations{j} = zeros(size(onsets{j}));
         end
+        
         % filter out nan values
-        if numel(onsets{j}) == numel(durations{j})             
-            idx = all([~isnan(onsets{j}),~isnan(durations{j})],2);
+        if numel(onsets{j}) == numel(durations{j})          
+            if j<=numel(pmod_names) && ~isempty(pmod_names{j}) % fill in pmod if there are parametric modulators for the current regressor
+                % find columns for parametric modulators
+                pmod_vals = arrayfun(@(k) data.(pmod_names{j}{k}),1:numel(pmod_names{j}),'UniformOutput',false); 
+                % filter out nans
+                pmod_nanfilters = cellfun(@(x) ~isnan(x),pmod_vals,'UniformOutput',false); 
+                idx = all([~isnan(onsets{j}),~isnan(durations{j}),cat(2,pmod_nanfilters{:})],2);
+                % fill in pmod struct
+                for k = 1:numel(pmod_names{j})
+                    pmod(j).name{k} = pmod_names{j}{k};
+                    pmod(j).param{k} = pmod_vals{k}(idx);
+                    pmod(j).poly{k} = 1;
+                end
+            else % if there is no parametric modulator
+                idx = all([~isnan(onsets{j}),~isnan(durations{j})],2);
+            end
             onsets{j} = onsets{j}(idx);
             durations{j} = durations{j}(idx);
-        elseif durations{j}==0
-            onsets{j} = onsets{j}(~isnan(onsets{j}));
         else
             error('size of onset array and duration array do not match!')
         end
-        % find columns for parametric modulators
-        if j<=numel(pmod_names) && ~isempty(pmod_names{j})
-            for k = 1:numel(pmod_names{j})
-                pmod(j).name{k} = pmod_names{j}{k};
-                data_col = data.(pmod_names{j}{k});
-                pmod_val = data_col(~isnan(data_col));
-                pmod(j).param{k} = pmod_val;
-                pmod(j).poly{k} = 1;
-            end
-        end
+
     end
     
     multi = cell2struct({cond_names,onsets,durations,orth,tmod,pmod}',...
