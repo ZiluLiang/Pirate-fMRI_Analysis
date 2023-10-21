@@ -23,6 +23,35 @@ with open(os.path.join(project_path,'scripts','pirate_defaults.json')) as f:
 
 preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
 
+analyses_localizer = [
+                 {"type":"regression",
+                 "name":"gtloc_xy",
+                 "regressors":["gtloc1dx", "gtloc1dy"]},
+                 
+                 {"type":"correlation",
+                  "name":"all"}#"modelrdms":None                  
+            ]
+analyses_navigation = [
+                {"type":"regression",
+                 "name":"loc_wrt_train_4pred",
+                 "regressors":["locwrttrain_xdist", "locwrttrain_xsign","locwrttrain_ydist","locwrttrain_ysign"]},
+                 
+                 {"type":"regression",
+                 "name":"loc_wrt_train_2pred",
+                 "regressors":["locwrttrain_xydist", "locwrttrain_xysign"]},
+
+                 {"type":"regression",
+                 "name":"gtloc_xy",
+                 "regressors":["gtloc1dx", "gtloc1dy"]},
+
+                 {"type":"regression",
+                 "name":"resploc_xy",
+                 "regressors":["resploc1dx", "resploc1dy"]},
+                 
+                 {"type":"correlation",
+                  "name":"all"}
+            ]
+
 n_sess = {
           "localizer":1,
           "concatall":1,
@@ -33,13 +62,13 @@ n_sess = {
           "concatoddeven":2,
           "fourruns":4
           }
-for p in preprocess:
+for p in preprocess[:1]:
     corr_df_list = []
     beta_dir = {
-            "localizer":[os.path.join(fmridata_dir,p,'LSA_stimuli_localizer')],
-            "noconcatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
-            "concatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall')],
+    #        "localizer":[os.path.join(fmridata_dir,p,'LSA_stimuli_localizer')],
+    #        "concatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation_concatall')],
     #        "oddeven":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')]*2,
+    #        "noconcatall":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
             "fourruns":[os.path.join(fmridata_dir,p,'LSA_stimuli_navigation')],
             }
     beta_fname = {
@@ -55,9 +84,9 @@ for p in preprocess:
                          'stimuli_even.nii']
         }
     vs_dir = {
-        "no_selection":[],
-#        "reliability_ths0":[os.path.join(fmridata_dir,p,'reliability_concat')],
-#        "perm_rmask":[os.path.join(fmridata_dir,p,'reliability_concat')]
+#        "no_selection":[],
+        "reliability_ths0":[os.path.join(fmridata_dir,p,'reliability_concat')],
+        "perm_rmask":[os.path.join(fmridata_dir,p,'reliability_concat')]
         }
     for ds_name,ds in beta_dir.items():
         for vselect,vdir in vs_dir.items():
@@ -71,6 +100,8 @@ for p in preprocess:
                 vsmask_fname = ['mask.nii']*len(ds) + ['reliability_mask.nii']
 
             taskname = "navigation" if ds_name != "localizer" else ds_name
+            analyses_list = analyses_navigation if taskname == "navigation" else analyses_localizer
+
             RSA = RSARunner(participants=subid_list,
                             fmribeh_dir=fmribeh_dir,
                             beta_dir=ds, beta_fname=beta_fname[ds_name],
@@ -79,8 +110,8 @@ for p in preprocess:
                             anatmasks=[],
                             nsession=n_sess[ds_name],
                             taskname=taskname)
-            RSA.run_SearchLightRSA(radius=10,
-                                   outputdir=os.path.join(fmridata_dir,p,'rsa_searchlight',f'{ds_name}_{vselect}'),
-                                   analysis=["correlation"],#neuralvector
-                                   njobs=cpu_count()-2)
+            RSA.run_SearchLightRSA(radius = 10,
+                                   outputdir = os.path.join(fmridata_dir,p,'rsa_searchlight',f'{ds_name}_{vselect}'),
+                                   analyses = analyses_list,
+                                   njobs = cpu_count()-2)
             
