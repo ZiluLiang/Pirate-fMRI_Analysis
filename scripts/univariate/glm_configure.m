@@ -383,4 +383,60 @@ function glms = glm_gallery
         glms(24).contrasts(j+curr_ccount).name = sprintf('stim%02dbefore',exp.allstim(j));
         glms(24).contrasts(j+curr_ccount).wvec = struct(sprintf('stim%02dbefore',exp.allstim(j)),{1});
     end
+% ==============================================================================================
+% Neural axis for x/y with resepct to training location
+% ==============================================================================================  
+    glms(25).name = 'dist2train_navigation'; % location based on ground truth
+    glms(25).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(25).conditions  = {'stimuli','response'};
+    glms(25).modelopt    = struct('use_stick', {false,false});
+    glms(25).pmods       = {{'x_sign','x_dist','y_sign','y_dist'}};
+    glms(25).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(25).contrasts(1).name = 'x_sign';
+    glms(25).contrasts(1).wvec = [0,1,0,0,0,0];
+    glms(25).contrasts(2).name = 'x_dist';
+    glms(25).contrasts(2).wvec = [0,0,1,0,0,0];
+    glms(25).contrasts(3).name = 'y_sign';
+    glms(25).contrasts(3).wvec = [0,0,0,1,0,0];
+    glms(25).contrasts(4).name = 'y_dist';
+    glms(25).contrasts(4).wvec = [0,0,0,0,1,0];
+
+% ==============================================================================================
+% Neural axis for x/y in localizer with previous trial taken into account
+% ==============================================================================================
+    glms(26).name = 'axis_loc_wprevtrial_localizer'; % location based on ground truth
+    glms(26).filepattern = 'sub-.*_task-localizer_run-[1]';
+    glms(26).conditions  = {'rstrials','response','excluders'};
+    glms(26).modelopt    = struct('use_stick', {false,true,false});
+    glms(26).pmods       = {{'stim_x','stim_y','prev_stimx','prev_stimy'}};
+    glms(26).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(26).contrasts(1).name = 'stim_x';
+    glms(26).contrasts(1).wvec = [0,1,0,0,0,0,0];
+    glms(26).contrasts(2).name = 'stim_y';
+    glms(26).contrasts(2).wvec = [0,0,1,0,0,0,0];
+    glms(26).contrasts(3).name = 'prev_stimx';
+    glms(26).contrasts(3).wvec = [0,0,0,1,0,0,0];
+    glms(26).contrasts(4).name = 'prev_stimy';
+    glms(26).contrasts(4).wvec = [0,0,0,0,1,0,0];
+
+% ==============================================================================================
+% Repetition Suppression MODELS - Feature Based
+% ==============================================================================================
+    glms(27).name        = 'rs_hrchydist_navigation';
+    glms(27).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(27).conditions  = {'rstrials','response','excluders'};
+    glms(27).modelopt    = struct('use_stick', {true,false,true});
+    glms(27).pmods       = {{'hrchydist_ucord','hrchydist_quadr'}};
+    glms(27).contrasts(1).name = 'dist - unsigned coordinates';
+    glms(27).contrasts(1).wvec = [0,1,0,0,0];
+    glms(27).contrasts(2).name = 'dist - quadrants';
+    glms(27).contrasts(2).wvec = [0,0,1,0,0];
+    % 
+    % glms(28).name        = 'rs_hrchydist_navigation';
+    % glms(28).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    % glms(28).conditions  = {'rstrials','response','excluders'};
+    % glms(28).modelopt    = struct('use_stick', {true,false,true});
+    % glms(28).pmods       = {{'hrchydist_ucord'}};
+    % glms(28).contrasts(1).name = 'same vs diff color';
+    % glms(28).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
 end
