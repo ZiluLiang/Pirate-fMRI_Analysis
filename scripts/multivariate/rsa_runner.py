@@ -1,5 +1,6 @@
 """
-This module contains class that wraps up RSA analysis in ROI or whole brain into a pipeline. The runner class is dependent on the file structure as specified in `FILESTRUCTURE.md`
+This module contains class that wraps up RSA analysis in ROI or whole brain into a pipeline.
+The runner class is dependent on the file structure as specified in `FILESTRUCTURE.md`
 """
 
 import itertools
@@ -27,7 +28,7 @@ from multivariate.rsa_estimator import PatternCorrelation,MultipleRDMRegression,
 
 class RSARunner:
     """
-    The `RSARunner` set up the paths to the image and calls other
+    The `RSARunner` wraps up RSA analysis in ROI and whole brain into a pipeline.
 
     Parameters
     ----------
@@ -63,6 +64,9 @@ class RSARunner:
                  pmask_dir:list=None,pmask_fname:list=None,
                  anatmasks:list=None,
                  taskname:str="localizer") -> None:
+        """
+        set up the paths to the image and calls other
+        """	
         
         self.participants = participants # participant list
         self.fmribeh_dir  = fmribeh_dir  # behavioral data directory to look for stimuli information
@@ -96,7 +100,7 @@ class RSARunner:
         pmask_imgs = [os.path.join(d,'first',subid,f) for d,f in zip(self.pmask_dir,self.pmask_fname)]
         return beta_imgs,mask_imgs,pmask_imgs
     
-    def get_modelRDM(self,subid,randomseed:int=None,nan_identity:bool=True):
+    def get_modelRDM(self,subid):
         fmribeh_dir = self.fmribeh_dir
         # load stimuli list
         stim_list_fn = glob.glob(os.path.join(fmribeh_dir,subid,'sub*_stimlist.txt'))[0]
@@ -107,7 +111,13 @@ class RSARunner:
         stim_train = np.array(stim_list['training']) # get training/test stimuli classification
         
         # get 2d location
-        stim_loc = np.array(stim_list[['stim_x','stim_y']])
+        stim_locori = np.array(stim_list[['stim_x','stim_y']])
+        old_range = np.max(stim_locori) - np.min(stim_locori)
+        new_range = 1-(-1)
+        stim_loc = (new_range*(stim_locori-np.min(stim_locori))/old_range) - 1
+
+        # get location with respect to training locations
+        stim_loc_wrt_train = np.concatenate([np.absolute(stim_loc),np.sign(stim_loc)],axis=1)
         
         # get visual features
         stim_color = np.array([x.replace('.png','').split('_')[0] for x in stim_list["stim_img"]])
@@ -133,11 +143,12 @@ class RSARunner:
                         stimfeature = stimfeature,
                         stimgroup   = stimgroup,
                         stimresploc = stimresploc,
+                        stimwrttrainloc = stim_loc_wrt_train,
                         n_session   = self.nsession,
                         **self.config_modelrdm)
 
-    def get_neuralRDM(self,subid,
-                      preproc:str=None):
+    def get_neuralRDM(self,subid):
+        ##TODO: set up different preprocessing of activity pattern matrix before generating neural RDM
         ## model rdm
         modelrdm = self.get_modelRDM(subid)
 
@@ -148,19 +159,20 @@ class RSARunner:
         
         ## preprocessing
         ev = 1
+        preproc=self.config_neuralrdm["preproc"]
         if preproc is None:
             activitypattern = APD.X
         elif preproc == "cocktail_blank_removal":
             for k in modelrdm.stimgroup:
                 activitypattern[np.where(modelrdm.stimgroup == k),:] = scale_feature(activitypattern[np.where(modelrdm.stimgroup == k),:],1,False)
-        elif preproc=="subtract_mean":
+        elif preproc =="subtract_mean":
             activitypattern = scale_feature(activitypattern,1,False)
-        elif preproc=="PCA":
+        elif preproc =="PCA":
             neuralPCA = PCA(n_components=0.9)
             activitypattern = neuralPCA.fit_transform(APD.X)
             ev = np.sum(neuralPCA.fit(APD.X).explained_variance_ratio_)
             
-        return activitypattern,compute_rdm(activitypattern,'correlation'),ev
+        return activitypattern,compute_rdm(activitypattern,self.config_neuralrdm["distance_metric"]),ev
         
 ############################################### SINGLE PARTICIPANT LEVEL ANALSYSIS METHODS ###################################################
     def _singleparticipant_ROIRSA(self, subid,
@@ -172,7 +184,7 @@ class RSARunner:
             sys.stderr.write(f"{subid}\r")
         
         ## compute model rdm
-        modelrdm  = self.get_modelRDM(subid,randomseed,nan_identity)        
+        modelrdm  = self.get_modelRDM(subid)        
 
         ### choose which model rdm is used for calculating correlation
         if corr_rdm_names is None:
@@ -206,42 +218,6 @@ class RSARunner:
             cr_df = pd.DataFrame(PC_s.result).T.rename(columns = corr_name_dict).assign(analysis=cr,subid=subid)
             corr_df.append(cr_df)
         return pd.concat(corr_df,axis=0),neuralrdmdf
-
-    def _singleparticipant_randomROIRSA(self, subid,
-               verbose:bool=False,n_permutations:int=5000):
-
-        t0 = time.time()
-
-        activitypattern, _, _ = self.get_neuralRDM(subid)
-
-        ## compute model rdm
-        corr_df_list = []
-        for j,randseed in enumerate(np.arange(n_permutations)):
-            if verbose:
-                sys.stderr.write(f"{subid}:  {j} / {n_permutations}\r")
-            modelrdm  = self.get_modelRDM(subid,randomseed = randseed)
-
-            randrdm_names = ["shuffledloc2d", "randfeature2d", "randmatrix",
-                            "between_shuffledloc2d", "between_randfeature2d", "between_randmatrix",
-                            "within_shuffledloc2d", "within_randfeature2d", "within_randmatrix"]
-            corr_rdm_names = [x for x in modelrdm.models.keys() if x in randrdm_names]
-            corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
-            
-            ## compute correlations between neural rdm and model rdms
-            PC_s =  PatternCorrelation(activitypattern = activitypattern,
-                                       modelrdm = corr_rdm_vals,
-                                        type="spearman").fit()
-            PC_k =  PatternCorrelation(activitypattern = activitypattern,
-                                    modelrdm = corr_rdm_vals,
-                                    type="kendall").fit()
-            corr_name_dict = dict(zip(range(len(corr_rdm_vals)),corr_rdm_names))
-            corr_df = pd.concat(
-                [pd.DataFrame(PC_s.result).T.rename(columns = corr_name_dict).assign(analysis="spearman"),
-                    pd.DataFrame(PC_k.result).T.rename(columns = corr_name_dict).assign(analysis="kendall")],
-                    axis=0).assign(subid=subid,randomseed=randseed)
-            corr_df_list.append(corr_df)
-        print(f'{time.time()-t0} seconds elapsed')
-        return pd.concat(corr_df_list,axis=0)
     
     def _singleparticipant_ROIMDS(self, subid,
                randomseed:int=1,
@@ -303,10 +279,10 @@ class RSARunner:
         return SVM_estimator.result
     
 ############################################### GROUP LEVEL  ANALSYSIS METHODS ###################################################   
-    def run_ROIRSA(self,njobs:int=1):#cpu_count()
+    def run_ROIRSA(self,njobs:int=1,roirsa_config:dict={}):#cpu_count()
         with Parallel(n_jobs=njobs) as parallel:
             dfs_list = parallel(
-                delayed(self._singleparticipant_ROIRSA)(subid) for subid in self.participants)
+                delayed(self._singleparticipant_ROIRSA)(subid,**roirsa_config) for subid in self.participants)
         corr_df = pd.concat([x[0] for x in dfs_list],axis=0) 
         rdm_df = pd.concat([x[1] for x in dfs_list],axis=0) 
         return corr_df,rdm_df
@@ -318,7 +294,8 @@ class RSARunner:
         mds_df = pd.concat(dfs_list,axis=0) 
         return mds_df
     
-    def run_SearchLightRSA(self,radius:float,outputdir:str,analysis:list,njobs:int=cpu_count()-1):
+    def run_SearchLightRSA(self,radius:float,outputdir:str,njobs:int=cpu_count()-1,
+                           analyses:dict={}):
         """running searchlight analysis
 
         Parameters
@@ -327,8 +304,8 @@ class RSARunner:
             the radius of searchlight
         outputdir : str
             output directory of searchlight analysis
-        analysis : list
-            name of analysis to be performed in each searchlight sphere
+        analyses : list
+            list of dictionaries. each dict represent the arguments passed to a type of analysis
         njobs : int, optional
             number of parallel jobs, by default cpu_count()-1
         """
@@ -352,63 +329,95 @@ class RSARunner:
 
             ## compute model rdm
             modelrdm  = self.get_modelRDM(subid)
-            if self.taskname == "localizer":
-                corr_rdm_names = [x for x in modelrdm.models.keys() if not np.logical_or(x.endswith('session'),x.endswith('stimuli'))]
-                corr_rdm_names = [x for x in corr_rdm_names if not np.logical_or(x.endswith('session'),x.endswith('stimuligroup'))]
-            else:
-                corr_rdm_names = [x for x in modelrdm.models.keys() if not np.logical_or(x.endswith('session'),x.endswith('stimuli'))]
-            corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
-
-            # run search light
-            if "decoding" in analysis:
-                print('running classification decoding analysis searchlight')
-                stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
-                subRSA.run(
-                    estimator = SVMDecoder,
-                    estimator_kwargs = {"stim_dict":stim_dict,"categorical_decoder":True,"seed":None,"PCA_component":None},
-                    outputpath   = os.path.join(outputdir,'decoding_AxisLocDiscrete','first',subid), 
-                    outputregexp = 'acc_%04d.nii', 
-                    verbose      = j == 0
-                    )# only show details at the first participant
-                print('running regression decoding analysis searchlight')
-                subRSA.run(
-                    estimator = SVMDecoder,
-                    estimator_kwargs = {"stim_dict":stim_dict,"categorical_decoder":False,"seed":None,"PCA_component":None},
-                    outputpath   = os.path.join(outputdir,'decoding_AxisLocContinuous','first',subid), 
-                    outputregexp = 'rsquare_%04d.nii', 
-                    verbose      = j == 0
-                    )# only show details at the first participant
-                
-            # elif "regression" in analysis:                
-            #     print('running regression searchlight')
-            #     subRSA.run(
-            #         estimator = MultipleRDMRegression,
-            #         estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
-            #         outputpath   = os.path.join(outputdir,'regression','first',subid), 
-            #         outputregexp = 'beta_%04d.nii', 
-            #         verbose      = j == 0
-            #         ) # only show details at the first participant
             
-            elif "correlation" in analysis:
-                print('running correlation searchlight')
-                subRSA.run(
-                    estimator = PatternCorrelation,
-                    estimator_kwargs = {"modelrdms":corr_rdm_vals, "modelnames":corr_rdm_names, "type":"spearman"},
-                    outputpath   = os.path.join(outputdir,'correlation','first',subid), 
-                    outputregexp = 'rho_%04d.nii', 
-                    verbose      = j == 0
-                    )# only show details at the first participant
+            # run search light
+            for A in analyses:
+                if A["type"] == "decoding":
+                    print('running classification decoding analysis searchlight')
+                    stim_dict = {"stimid":modelrdm.stimid.flatten(), 
+                                 "stimsession":modelrdm.stimsession.flatten(), 
+                                 "stimloc":modelrdm.stimloc,
+                                 "stimfeature":modelrdm.stimfeature, 
+                                 "stimgroup":modelrdm.stimgroup.flatten()}        
+                    subRSA.run(
+                        estimator = SVMDecoder,
+                        estimator_kwargs = {"stim_dict":stim_dict,"categorical_decoder":True,"seed":None,"PCA_component":None},
+                        outputpath   = os.path.join(outputdir,'decoding_AxisLocDiscrete','first',subid), 
+                        outputregexp = 'acc_%04d.nii', 
+                        verbose      = j == 0
+                        )# only show details at the first participant
+                    print('running regression decoding analysis searchlight')
+                    subRSA.run(
+                        estimator = SVMDecoder,
+                        estimator_kwargs = {"stim_dict":stim_dict,"categorical_decoder":False,"seed":None,"PCA_component":None},
+                        outputpath   = os.path.join(outputdir,'decoding_AxisLocContinuous','first',subid), 
+                        outputregexp = 'rsquare_%04d.nii', 
+                        verbose      = j == 0
+                        )# only show details at the first participant
+                    
+                elif A["type"] == "regression":                
+                    print(f'running regression searchlight {A["name"]} - all')                    
+                    m_regs = A["regressors"]
+                    regress_models = [modelrdm.models[m] for m in m_regs]
+                    subRSA.run(
+                        estimator = MultipleRDMRegression,
+                        estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
+                        outputpath   = os.path.join(outputdir,"regression",A["name"],'first',subid), 
+                        outputregexp = 'beta_%04d.nii', 
+                        verbose      = j == 0
+                        ) # only show details at the first participant
+                    
+                    if self.nsession>1: # if multiple runs do between and within run as well
+                        print(f'running regression searchlight {A["name"]} - betweenrun')
+                        m_regs = [f'between_{x}' for x in A["regressors"]]
+                        regress_models = [modelrdm.models[m] for m in m_regs]
+                        subRSA.run(
+                            estimator = MultipleRDMRegression,
+                            estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
+                            outputpath   = os.path.join(outputdir,"regression",f'{A["name"]}_between','first',subid), 
+                            outputregexp = 'beta_%04d.nii', 
+                            verbose      = j == 0
+                            ) # only show details at the first participant
+                        
+                        print(f'running regression searchlight {A["name"]} - withinrun')
+                        m_regs = [f'within_{x}' for x in A["regressors"]]
+                        regress_models = [modelrdm.models[m] for m in m_regs]
+                        subRSA.run(
+                            estimator = MultipleRDMRegression,
+                            estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, "standardize":True},
+                            outputpath   = os.path.join(outputdir,"regression",f'{A["name"]}_within','first',subid), 
+                            outputregexp = 'beta_%04d.nii', 
+                            verbose      = j == 0
+                            ) # only show details at the first participant
+            
+                elif A["type"] == "correlation":
+                    if "modelrdms" in A.keys():
+                        corr_rdm_names = A["modelrdms"]
+                    else:
+                        corr_rdm_names = [x for x in modelrdm.models.keys() if not np.logical_or(x.endswith('session'),x.endswith('stimuli'))]
+                        if self.taskname == "localizer":
+                            corr_rdm_names = [x for x in corr_rdm_names if not np.logical_or(x.endswith('session'),x.endswith('stimuligroup'))]
+                    corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
 
-            elif "neuralvector" in analysis:
-                print('running neuralvector analysis searchlight')
-                stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
-                subRSA.run(
-                    estimator = NeuralDirectionCosineSimilarity,
-                    estimator_kwargs = {"stim_dict":stim_dict,"seed":None},
-                    outputpath   = os.path.join(outputdir,'cosinesimilarity','first',subid), 
-                    outputregexp = 'ps_%04d.nii', 
-                    verbose      = j == 0
-                    )# only show details at the first participant
+                    print('running correlation searchlight')
+                    subRSA.run(
+                        estimator = PatternCorrelation,
+                        estimator_kwargs = {"modelrdms":corr_rdm_vals, "modelnames":corr_rdm_names, "type":"spearman"},
+                        outputpath   = os.path.join(outputdir,'correlation',A["name"],'first',subid), 
+                        outputregexp = 'rho_%04d.nii', 
+                        verbose      = j == 0
+                        )# only show details at the first participant
+
+                elif A["type"] == "neuralvector":
+                    print('running neuralvector analysis searchlight')
+                    stim_dict = {"stimid":modelrdm.stimid.flatten(), "stimsession":modelrdm.stimsession.flatten(), "stimloc":modelrdm.stimloc, "stimfeature":modelrdm.stimfeature, "stimgroup":modelrdm.stimgroup.flatten()}        
+                    subRSA.run(
+                        estimator = NeuralDirectionCosineSimilarity,
+                        estimator_kwargs = {"stim_dict":stim_dict,"seed":None},
+                        outputpath   = os.path.join(outputdir,'cosinesimilarity',A["name"],'first',subid), 
+                        outputregexp = 'ps_%04d.nii', 
+                        verbose      = j == 0
+                        )# only show details at the first participant
 
         dump(sphere_vox_count,os.path.join(outputdir,'searchlight_voxcount.pkl'))
 
