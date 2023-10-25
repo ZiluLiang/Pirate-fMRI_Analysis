@@ -292,21 +292,41 @@ class ModelRDM:
                  stimgtloc:numpy.ndarray,
                  stimfeature:numpy.ndarray,
                  stimgroup:numpy.ndarray,
-                 stimwrttrainloc:numpy.ndarray,
                  stimresploc:numpy.array=None,
                  n_session:int=1,
                  randomseed:int=1,
-                 nan_identity:bool=True):
+                 nan_identity:bool=True,
+                 splitgroup:bool=False):
         
         self.n_session   = n_session
         self.n_stim      = len(stimid)       
         self.stimid      = numpy.tile(stimid,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
-        self.stimloc     = numpy.tile(stimgtloc,(n_session,1)).reshape((self.n_stim*self.n_session,-1)) ## ground-truth location
-        self.stimloc_wrttrain = numpy.tile(stimwrttrainloc,(n_session,1)).reshape((self.n_stim*self.n_session,-1)) ## stimuli location with regard to training locations
+
+        #### stimuli features
+        ## groundtruth location - 2D        
+        self.stimloc     = numpy.tile(stimgtloc,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
+        ## 'hierachical' model - 4D: quadrant (global feature) - location within each quadrant (local feature)
+        # local feature encoded using central axis as reference
+        self.stimloc_wrtcentre = numpy.concatenate(
+                                    [numpy.absolute(self.stimloc),
+                                     numpy.sign(self.stimloc)
+                                    ],axis=1) 
+        # local features are encoded as from left-right and bottom-up, centre locations are encoded as zero
+        wrtlrud_x,wrtlrud_y = self.stimloc[:,[0]],self.stimloc[:,[1]]
+        wrtlrud_x[wrtlrud_x==0]=numpy.nan
+        wrtlrud_y[wrtlrud_y==0]=numpy.nan
+        wrtlrud_x = scipy.stats.rankdata(wrtlrud_x,method="dense",axis=0,nan_policy="omit")
+        wrtlrud_y = scipy.stats.rankdata(wrtlrud_y,method="dense",axis=0,nan_policy="omit")
+        wrtlrud_x[numpy.isnan(wrtlrud_x)]=0
+        wrtlrud_y[numpy.isnan(wrtlrud_y)]=0
+        self.stimloc_wrtlrud  = numpy.concatenate([wrtlrud_x, wrtlrud_y, self.stimloc_wrtcentre[:,[2,3]]],axis=1)
+        
+        ## one-hot encoded color/shape features - 10D
         self.stimfeature = numpy.tile(stimfeature,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
         self.stimgroup   = numpy.tile(stimgroup,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
         self.stimsession = numpy.concatenate([numpy.repeat(j,len(stimid)) for j in range(self.n_session)])
-        if stimresploc is None: ## response location
+        ## response location
+        if stimresploc is None:
             gen_resprdm = False
         else:
             gen_resprdm = True
@@ -315,6 +335,7 @@ class ModelRDM:
             else:
                 self.stimresploc     = numpy.tile(stimresploc,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
         
+        #### model RDMs
         models = {"gtlocEuclidean":   compute_rdm(self.stimloc,metric="euclidean"),
                   "gtlocCityBlock":   compute_rdm(self.stimloc,metric="cityblock"),
                   "gtloc1dx":         compute_rdm(self.stimloc[:,[0]],metric="euclidean"),
@@ -324,15 +345,20 @@ class ModelRDM:
                   "feature1dy":       compute_rdm_identity(self.stimfeature[:,1]),
                   "stimuli":          compute_rdm_identity(self.stimid),
                   "stimuligroup":     compute_rdm_identity(self.stimgroup),
-                  "locwrttrain_xydistsign": compute_rdm(self.stimloc_wrttrain,metric="euclidean"),
-#                  "locwrttrain_xdistsign":  compute_rdm(self.stimloc_wrttrain[:,[0,2]],metric="euclidean"),
-#                  "locwrttrain_ydistsign":  compute_rdm(self.stimloc_wrttrain[:,[1,3]],metric="euclidean"),
-                  "locwrttrain_xdist":      compute_rdm(self.stimloc_wrttrain[:,[0]],metric="euclidean"),
-                  "locwrttrain_xsign":      compute_rdm(self.stimloc_wrttrain[:,[2]],metric="euclidean"),
-                  "locwrttrain_ydist":      compute_rdm(self.stimloc_wrttrain[:,[1]],metric="euclidean"),
-                  "locwrttrain_ysign":      compute_rdm(self.stimloc_wrttrain[:,[3]],metric="euclidean"),
-                  "locwrttrain_xysign":     compute_rdm(self.stimloc_wrttrain[:,[2,3]],metric="euclidean"),
-                  "locwrttrain_xydist":     compute_rdm(self.stimloc_wrttrain[:,[0,1]],metric="euclidean"),
+                  ## 'hierachical' models: global + local feature
+                  "global_xsign":      compute_rdm(self.stimloc_wrtcentre[:,[2]],metric="euclidean"),
+                  "global_ysign":      compute_rdm(self.stimloc_wrtcentre[:,[3]],metric="euclidean"),
+                  "global_xysign":     compute_rdm(self.stimloc_wrtcentre[:,[2,3]],metric="euclidean"),
+                  # local feature encoded using central axis as reference
+                  "locwrtcentre_localglobal": compute_rdm(self.stimloc_wrtcentre,metric="euclidean"),
+                  "locwrtcentre_localx":      compute_rdm(self.stimloc_wrtcentre[:,[0]],metric="euclidean"),
+                  "locwrtcentre_localy":      compute_rdm(self.stimloc_wrtcentre[:,[1]],metric="euclidean"),
+                  "locwrtcentre_localxy":     compute_rdm(self.stimloc_wrtcentre[:,[0,1]],metric="euclidean"),
+                  # local features are encoded as from left-right and bottom-up
+                  "locwrtlrud_localglobal":   compute_rdm(self.stimloc_wrtlrud,metric="euclidean"),
+                  "locwrtlrud_localx":      compute_rdm(self.stimloc_wrtlrud[:,[0]],metric="euclidean"),
+                  "locwrtlrud_localy":      compute_rdm(self.stimloc_wrtlrud[:,[1]],metric="euclidean"),
+                  "locwrtlrud_localxy":     compute_rdm(self.stimloc_wrtlrud[:,[0,1]],metric="euclidean"),
                   }
         models |= {
                   "shuffledloc2d": self.random(randomseed=randomseed,rdm=models["gtlocEuclidean"],mode="permuterdm"),
@@ -346,30 +372,24 @@ class ModelRDM:
                        "resploc1dx":        compute_rdm(self.stimresploc[:,[0]],metric="euclidean"),
                        "resploc1dy":        compute_rdm(self.stimresploc[:,[1]],metric="euclidean")}
 
-        # split into train/test
-        if numpy.unique(self.stimgroup).size>1:
+        # split rdm into train/test/mix pairs
+        if numpy.logical_and(splitgroup,numpy.unique(self.stimgroup).size>1):
             U,V = numpy.meshgrid(self.stimgroup,self.stimgroup)
             WTR = numpy.multiply(1.*(U == 1),1.*(V == 1))
             WTE = numpy.multiply(1.*(U == 0),1.*(V == 0))
+            MIX = 1. * ~(U==V)
             WTR[WTR==0]=numpy.nan
             WTE[WTE==0]=numpy.nan
-            if gen_resprdm:
-                split_models = ['gtlocEuclidean','feature2d',
-                                'locwrttrain_xydistsign','locwrttrain_xysign','locwrttrain_xydist',
-#                                'locwrttrain_xdistsign','locwrttrain_ydistsign',
-                                'locwrttrain_xdist', 'locwrttrain_xsign','locwrttrain_ydist','locwrttrain_ysign',
-                                'resplocEuclidean']
-            else:
-                split_models = ['gtlocEuclidean','feature2d',
-                                'locwrttrain_xydistsign','locwrttrain_xysign','locwrttrain_xydist',
-#                                'locwrttrain_xdistsign','locwrttrain_ydistsign',
-                                'locwrttrain_xdist', 'locwrttrain_xsign','locwrttrain_ydist','locwrttrain_ysign']
+            MIX[MIX==0]=numpy.nan
+            split_models = [x for x in models.keys() if x not in ["stimuli","stimuligroup"]]
             for k in split_models:
                 wtr_n = 'trainstimpairs_' + k
                 rdmwtr = numpy.multiply(models[k],WTR)
                 wte_n = 'teststimpairs_' + k
                 rdmwte = numpy.multiply(models[k],WTE)
-                models |= {wtr_n:rdmwtr,wte_n:rdmwte}
+                mix_n = 'mixedstimpairs_' + k
+                rdmmix = numpy.multiply(models[k],MIX)
+                models |= {wtr_n:rdmwtr,wte_n:rdmwte,mix_n:rdmmix}
 
         # split into sessions
         if n_session>1:
