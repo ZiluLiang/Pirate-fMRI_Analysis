@@ -305,21 +305,21 @@ class ModelRDM:
         #### stimuli features
         ## groundtruth location - 2D        
         self.stimloc     = numpy.tile(stimgtloc,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
-        ## 'hierachical' model - 4D: quadrant (global feature) - location within each quadrant (local feature)
+        ## 'hierarchical' model - 4D: quadrant (global feature) - location within each quadrant (local feature)
         # local feature encoded using central axis as reference
         self.stimloc_wrtcentre = numpy.concatenate(
                                     [numpy.absolute(self.stimloc),
                                      numpy.sign(self.stimloc)
                                     ],axis=1) 
         # local features are encoded as from left-right and bottom-up, centre locations are encoded as zero
-        wrtlrud_x,wrtlrud_y = self.stimloc[:,[0]],self.stimloc[:,[1]]
-        wrtlrud_x[wrtlrud_x==0]=numpy.nan
-        wrtlrud_y[wrtlrud_y==0]=numpy.nan
-        wrtlrud_x = scipy.stats.rankdata(wrtlrud_x,method="dense",axis=0,nan_policy="omit")
-        wrtlrud_y = scipy.stats.rankdata(wrtlrud_y,method="dense",axis=0,nan_policy="omit")
-        wrtlrud_x[numpy.isnan(wrtlrud_x)]=0
-        wrtlrud_y[numpy.isnan(wrtlrud_y)]=0
-        self.stimloc_wrtlrud  = numpy.concatenate([wrtlrud_x, wrtlrud_y, self.stimloc_wrtcentre[:,[2,3]]],axis=1)
+        wrtlrbu_x,wrtlrbu_y = self.stimloc[:,[0]],self.stimloc[:,[1]]
+        wrtlrbu_x[wrtlrbu_x==0]=numpy.nan
+        wrtlrbu_y[wrtlrbu_y==0]=numpy.nan
+        wrtlrbu_x = scipy.stats.rankdata(wrtlrbu_x,method="dense",axis=0,nan_policy="omit")
+        wrtlrbu_y = scipy.stats.rankdata(wrtlrbu_y,method="dense",axis=0,nan_policy="omit")
+        wrtlrbu_x[numpy.isnan(wrtlrbu_x)]=0
+        wrtlrbu_y[numpy.isnan(wrtlrbu_y)]=0
+        self.stimloc_wrtlrbu  = numpy.concatenate([wrtlrbu_x, wrtlrbu_y, self.stimloc_wrtcentre[:,[2,3]]],axis=1)
         
         ## one-hot encoded color/shape features - 10D
         self.stimfeature = numpy.tile(stimfeature,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
@@ -355,10 +355,10 @@ class ModelRDM:
                   "locwrtcentre_localy":      compute_rdm(self.stimloc_wrtcentre[:,[1]],metric="euclidean"),
                   "locwrtcentre_localxy":     compute_rdm(self.stimloc_wrtcentre[:,[0,1]],metric="euclidean"),
                   # local features are encoded as from left-right and bottom-up
-                  "locwrtlrud_localglobal":   compute_rdm(self.stimloc_wrtlrud,metric="euclidean"),
-                  "locwrtlrud_localx":      compute_rdm(self.stimloc_wrtlrud[:,[0]],metric="euclidean"),
-                  "locwrtlrud_localy":      compute_rdm(self.stimloc_wrtlrud[:,[1]],metric="euclidean"),
-                  "locwrtlrud_localxy":     compute_rdm(self.stimloc_wrtlrud[:,[0,1]],metric="euclidean"),
+                  "locwrtlrbu_localglobal":   compute_rdm(self.stimloc_wrtlrbu,metric="euclidean"),
+                  "locwrtlrbu_localx":      compute_rdm(self.stimloc_wrtlrbu[:,[0]],metric="euclidean"),
+                  "locwrtlrbu_localy":      compute_rdm(self.stimloc_wrtlrbu[:,[1]],metric="euclidean"),
+                  "locwrtlrbu_localxy":     compute_rdm(self.stimloc_wrtlrbu[:,[0,1]],metric="euclidean"),
                   }
         models |= {
                   "shuffledloc2d": self.random(randomseed=randomseed,rdm=models["gtlocEuclidean"],mode="permuterdm"),
