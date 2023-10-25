@@ -54,6 +54,10 @@ class RSARunner:
         the path to anatomical masks (not participant specific), by default None
     taskname : str, optional
         name of the task, by default "localizer"
+    config_modelrdm: dict, optional
+        configurations for computing model rdm
+    config_neuralrdm: dict, optional
+        configurations for computing neural rdm
     """
 
     def __init__(self,participants:list,
@@ -63,9 +67,11 @@ class RSARunner:
                  vsmask_dir:list,vsmask_fname:list,
                  pmask_dir:list=None,pmask_fname:list=None,
                  anatmasks:list=None,
-                 taskname:str="localizer") -> None:
+                 taskname:str="localizer",
+                 config_modelrdm:dict={"randomseed":None,"nan_identity":True,"splitgroup":False},
+                 config_neuralrdm:dict={"preproc":None,"distance_metric":"correlation"}) -> None:
         """
-        set up the paths to the image and calls other
+        set up the paths to the image and set up other configurations
         """	
         
         self.participants = participants # participant list
@@ -90,8 +96,8 @@ class RSARunner:
         self.nsession     = nsession
 
         # options
-        self.config_modelrdm = {"randomseed":None,"nan_identity":True}
-        self.config_neuralrdm = {"preproc":None,"distance_metric":"correlation"}
+        self.config_modelrdm  = config_modelrdm
+        self.config_neuralrdm = config_neuralrdm
 
 ############################################### PARTICIPANT-SPECIFIC DATA EXTRACTION METHODS ###################################################
     def get_imagedir(self,subid):
@@ -116,9 +122,6 @@ class RSARunner:
         new_range = 1-(-1)
         stim_loc = (new_range*(stim_locori-np.min(stim_locori))/old_range) - 1
 
-        # get location with respect to training locations
-        stim_loc_wrt_train = np.concatenate([np.absolute(stim_loc),np.sign(stim_loc)],axis=1)
-        
         # get visual features
         stim_color = np.array([x.replace('.png','').split('_')[0] for x in stim_list["stim_img"]])
         stim_shape = np.array([x.replace('.png','').split('_')[1] for x in stim_list["stim_img"]])
@@ -143,7 +146,6 @@ class RSARunner:
                         stimfeature = stimfeature,
                         stimgroup   = stimgroup,
                         stimresploc = stimresploc,
-                        stimwrttrainloc = stim_loc_wrt_train,
                         n_session   = self.nsession,
                         **self.config_modelrdm)
 
@@ -220,8 +222,9 @@ class RSARunner:
         return pd.concat(corr_df,axis=0),neuralrdmdf
     
     def _singleparticipant_ROIMDS(self, subid,
-               randomseed:int=1,
-               verbose:bool=False):
+                n_components:int=2,
+                randomseed:int=1,
+                verbose:bool=False):
         if verbose:
             sys.stderr.write(f"{subid}\r")
         
@@ -229,7 +232,7 @@ class RSARunner:
         activitypattern, _, _ = self.get_neuralRDM(subid)
         ## compute MDS
         embedding = MDS(
-                n_components=2,
+                n_components=n_components,
                 max_iter=5000,
                 n_init=100,
                 n_jobs=1,
@@ -237,6 +240,8 @@ class RSARunner:
                 random_state=randomseed,
                 )
         X_transformed = embedding.fit_transform(activitypattern)
+        axis_names = [f'axis {j}' for j in range(X_transformed.shape[1])]
+        X_df = pd.DataFrame(X_transformed,columns=axis_names)
         modelrdm  = self.get_modelRDM(subid)
         mds_df = pd.DataFrame({"stim_id":modelrdm.stimid.flatten(),
                                 "stim_x":modelrdm.stimloc[:,0],
@@ -244,13 +249,14 @@ class RSARunner:
                                 "stim_color":modelrdm.stimfeature[:,0],
                                 "stim_shape":modelrdm.stimfeature[:,1],
                                 "train_test":modelrdm.stimgroup.flatten(),
-                                "x":X_transformed[:,0],
-                                "y":X_transformed[:,1]
                                 }).assign(subid=subid)
+        mds_df = pd.concat((mds_df,X_df),axis=1)
 
         return mds_df
     
     def _singleparticipant_ROIPS(self,subid,outputdir):
+        ##TODO: it is still stuck if try to run PS with four sessions
+
         # get activity pattern matrix
         X, _, _ = self.get_neuralRDM(subid) #  X, _, _ = self.get_neuralRDM(subid,preproc="PCA")
         # get stimuli properties
@@ -287,10 +293,10 @@ class RSARunner:
         rdm_df = pd.concat([x[1] for x in dfs_list],axis=0) 
         return corr_df,rdm_df
     
-    def run_ROIMDS(self,njobs:int=1):#cpu_count()
+    def run_ROIMDS(self,njobs:int=1,mds_config={}):#cpu_count()
         with Parallel(n_jobs=njobs) as parallel:
             dfs_list = parallel(
-                delayed(self._singleparticipant_ROIMDS)(subid) for subid in self.participants)
+                delayed(self._singleparticipant_ROIMDS)(subid,**mds_config) for subid in self.participants)
         mds_df = pd.concat(dfs_list,axis=0) 
         return mds_df
     
