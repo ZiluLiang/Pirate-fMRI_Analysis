@@ -5,6 +5,9 @@
     (2) visualize: by calling estimator.visualize(), the result of RSA analysis will visualized, a figure handle will be returned
     (3) __str__: return the name of estimator class
     (4) get_details: return the details of estimator class in a dictonary, data will be serialized so that it can be written into JSON 
+
+Zilu Liang @HIPlab Oxford
+2023
 """
 
 import numpy
