@@ -334,6 +334,10 @@ class ModelRDM:
                 self.stimresploc     = stimresploc
             else:
                 self.stimresploc     = numpy.tile(stimresploc,(n_session,1)).reshape((self.n_stim*self.n_session,-1))
+            self.resploc_wrtcentre = numpy.concatenate(
+                                    [numpy.absolute(self.stimresploc),
+                                     numpy.sign(self.stimresploc)
+                                    ],axis=1)
         
         #### model RDMs
         models = {"gtlocEuclidean":   compute_rdm(self.stimloc,metric="euclidean"),
@@ -349,7 +353,7 @@ class ModelRDM:
                   "global_xsign":      compute_rdm(self.stimloc_wrtcentre[:,[2]],metric="euclidean"),
                   "global_ysign":      compute_rdm(self.stimloc_wrtcentre[:,[3]],metric="euclidean"),
                   "global_xysign":     compute_rdm(self.stimloc_wrtcentre[:,[2,3]],metric="euclidean"),
-                  # local feature encoded using central axis as reference
+                  # local feature encoded using central axis as reference - gt
                   "locwrtcentre_localglobal": compute_rdm(self.stimloc_wrtcentre,metric="euclidean"),
                   "locwrtcentre_localx":      compute_rdm(self.stimloc_wrtcentre[:,[0]],metric="euclidean"),
                   "locwrtcentre_localy":      compute_rdm(self.stimloc_wrtcentre[:,[1]],metric="euclidean"),
@@ -359,6 +363,16 @@ class ModelRDM:
                   "locwrtlrbu_localx":      compute_rdm(self.stimloc_wrtlrbu[:,[0]],metric="euclidean"),
                   "locwrtlrbu_localy":      compute_rdm(self.stimloc_wrtlrbu[:,[1]],metric="euclidean"),
                   "locwrtlrbu_localxy":     compute_rdm(self.stimloc_wrtlrbu[:,[0,1]],metric="euclidean"),
+
+                  ## 'hierachical' models: global + local feature - resp
+                  "respglobal_xsign":      compute_rdm(self.resploc_wrtcentre[:,[2]],metric="euclidean"),
+                  "respglobal_ysign":      compute_rdm(self.resploc_wrtcentre[:,[3]],metric="euclidean"),
+                  "respglobal_xysign":     compute_rdm(self.resploc_wrtcentre[:,[2,3]],metric="euclidean"),
+                  # local feature encoded using central axis as reference - resp
+                  "resplocwrtcentre_localglobal": compute_rdm(self.resploc_wrtcentre,metric="euclidean"),
+                  "resplocwrtcentre_localx":      compute_rdm(self.resploc_wrtcentre[:,[0]],metric="euclidean"),
+                  "resplocwrtcentre_localy":      compute_rdm(self.resploc_wrtcentre[:,[1]],metric="euclidean"),
+                  "resplocwrtcentre_localxy":     compute_rdm(self.resploc_wrtcentre[:,[0,1]],metric="euclidean"),
                   }
         models |= {
                   "shuffledloc2d": self.random(randomseed=randomseed,rdm=models["gtlocEuclidean"],mode="permuterdm"),
