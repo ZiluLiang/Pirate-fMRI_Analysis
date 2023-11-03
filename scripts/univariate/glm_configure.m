@@ -13,31 +13,44 @@ function glm_config = glm_configure(glm_name)
     glm_config = glms(cellfun(@(x) strcmp(glm_name,x),glm_names));
 end
 
-%% glms designs
+%% ==============================================================================================
+%                                      GLM MODEL DESIGNS
 % ==============================================================================================
-% columns in data table of navigation task:
-% 'stim_id','stim_img','stim_x','stim_y','stimattr_x','stimattr_y','resp_x','resp_y','resp_dist','respmap_x','respmap_y',...% fields in the orginal data table
-% 'onset_stimuli','duration_stimuli',... % stimuli event
-% 'onset_response','duration_response',... % response event                
-% 'onset_rstrials','duration_rstrials',...  % repetition suppression event
-% 'onset_excluders','duration_excluders',...% excluded trials in repetition suppression
-% 'dist2d','dist2d_resp',... % parametric modulators for repetition suppression:groundtruth distance/recontructed distance from participant response between current stimulus and previous stimulus 
-% 'onset_training','duration_training',... % training event   
-% 'onset_test','duration_test',... % test event 
-% 'onset_stimxx','duration_stimxx', % event for each stimuli
-% ==============================================================================================
-% columns in data table of localizer task:
-% 'stim_id','stim_img','stim_x','stim_y','stimattr_x','stimattr_y','response','acc',...% fields in the orginal data table
-% 'dist2d','excluders','rstrials',...% fields in the orginal data table
-% 'onset_stimuli',  'duration_stimuli',... % stimuli event
-% 'onset_response',... % response event, no duration of response, will be set as stick function in glm                
-% 'onset_rstrials', 'duration_rstrials',...  % repetition suppression event
-% 'onset_excluders','duration_excluders'
-% 'onset_stimxx','duration_stimxx', % event for each stimuli
+%  This section is a gallery of GLM configurations for univariate analysis
+%  including the ones used to estimate beta series for MVPA.
+%  The configurations specify which data columns in the data table should be
+%  used as event onsets, event durations and parametric modulators. Weight 
+%  vectors and names of contrasts are also specified in the configurations.
+%
+%  ##
+%  Columns in data table of navigation task:
+%  'stim_id','stim_img','stim_x','stim_y','stimattr_x','stimattr_y','resp_x','resp_y','resp_dist','respmap_x','respmap_y',...% fields in the orginal data table
+%  'onset_stimuli','duration_stimuli',... % stimuli event
+%  'onset_response','duration_response',... % response event                
+%  'onset_rstrials','duration_rstrials',...  % repetition suppression event
+%  'onset_excluders','duration_excluders',...% excluded trials in repetition suppression
+%  'dist2d','dist2d_resp',... % parametric modulators for repetition suppression:groundtruth distance/recontructed distance from participant response between current stimulus and previous stimulus 
+%  'onset_training','duration_training',... % training event   
+%  'onset_test','duration_test',... % test event 
+%  'onset_stimxx','duration_stimxx', % event for each stimuli
+%
+% ##
+% Columns in data table of localizer task:
+%  'stim_id','stim_img','stim_x','stim_y','stimattr_x','stimattr_y','response','acc',...% fields in the orginal data table
+%  'dist2d','excluders','rstrials',...% fields in the orginal data table
+%  'onset_stimuli',  'duration_stimuli',... % stimuli event
+%  'onset_response',... % response event, no duration of response, will be set as stick function in glm                
+%  'onset_rstrials', 'duration_rstrials',...  % repetition suppression event
+%  'onset_excluders','duration_excluders'
+%  'onset_stimxx','duration_stimxx', % event for each stimuli
 % ==============================================================================================
 
 function glms = glm_gallery
-    glms = struct('name',{},'filepattern',{},'conditions',{},'modelopt',{},'contrasts',{});
+    glms = struct('name',{}, ...
+                  'filepattern',{}, ...
+                  'conditions',{}, ...
+                  'modelopt',{}, ...
+                  'contrasts',{});
     
 % ==============================================================================================
 % SANITY CHECK MODELS
@@ -63,7 +76,7 @@ function glms = glm_gallery
     glms(2).contrasts(2).wvec = struct('stimuli',{0},'response',{1});% this is equivalant to: glms(2).contrasts(2).wvec = [0,1]; 
 
 % ==============================================================================================
-% Repetition Suppression MODELS
+% Repetition Suppression MODELS based on Cartesian coordinates 
 % ==============================================================================================
     glms(3).name        = 'rs_loc2d_navigation';
     glms(3).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
@@ -206,58 +219,58 @@ function glms = glm_gallery
                                              arrayfun(@(x) sprintf('stim%02d',x),exp.allstim,'uni',0));
 
 % ==============================================================================================
-% FEATURE-BASED Repetition Suppression MODELS
-% ==============================================================================================
-    glms(15).name        = 'rs_feacture2d_navigation';
-    glms(15).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
-    glms(15).conditions  = {'rstrials','response','excluders'};
-    glms(15).modelopt    = struct('use_stick', {false,false,false});
-    glms(15).pmods       = {{'featuredist'}};
-    glms(15).contrasts(1).name = 'feature-based distance';
-    glms(15).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
-
-% ==============================================================================================
 % Difference between train/test
 % ==============================================================================================    
-    glms(16).name = 'traintest_navigation_wvsworesp';
-    glms(16).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
-    glms(16).conditions  = {'training_resp','test_resp','training_noresp','test_noresp','response'};
-    glms(16).modelopt    = struct('use_stick', {true,true,true,true,false});
-    glms(16).contrasts   = struct('name',{},'type',{},'wvec',{});
-    glms(16).contrasts(1).name = 'test_minus_train';
-    glms(16).contrasts(1).wvec = [-1,1,-1,1,0];% weight vector for task regressors
-    glms(16).contrasts(2).name = 'resp_minus_noresp';
-    glms(16).contrasts(2).wvec = [1,1,-1,-1,0];
-    glms(16).contrasts(3).name = 'test_minus_train_resp';
-    glms(16).contrasts(3).wvec = [-1,1,0,0,0];
-    glms(16).contrasts(4).name = 'test_minus_train_noresp';
-    glms(16).contrasts(4).wvec = [0,0,-1,1,0];
-    glms(16).contrasts(5).name = 'testvstrain_respvsnoresp_interaction';
-    glms(16).contrasts(5).wvec = [-1,1,1,-1,0];
-    glms(16).contrasts(6).name = 'resp_minus_noresp_run1';
-    glms(16).contrasts(6).wvec = struct('Sn_1_training_resp',{1}, ...
+    glms(15).name = 'traintest_navigation_wvsworesp';
+    glms(15).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(15).conditions  = {'training_resp','test_resp','training_noresp','test_noresp','response'};
+    glms(15).modelopt    = struct('use_stick', {true,true,true,true,false});
+    glms(15).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(15).contrasts(1).name = 'test_minus_train';
+    glms(15).contrasts(1).wvec = [-1,1,-1,1,0];% weight vector for task regressors
+    glms(15).contrasts(2).name = 'resp_minus_noresp';
+    glms(15).contrasts(2).wvec = [1,1,-1,-1,0];
+    glms(15).contrasts(3).name = 'test_minus_train_resp';
+    glms(15).contrasts(3).wvec = [-1,1,0,0,0];
+    glms(15).contrasts(4).name = 'test_minus_train_noresp';
+    glms(15).contrasts(4).wvec = [0,0,-1,1,0];
+    glms(15).contrasts(5).name = 'testvstrain_respvsnoresp_interaction';
+    glms(15).contrasts(5).wvec = [-1,1,1,-1,0];
+    glms(15).contrasts(6).name = 'resp_minus_noresp_run1';
+    glms(15).contrasts(6).wvec = struct('Sn_1_training_resp',{1}, ...
                                         'Sn_1_test_resp',{1}, ...
                                         'Sn_1_training_noresp',{-1}, ...
                                         'Sn_1_test_noresp',{-1});
-    glms(16).contrasts(7).name = 'resp_minus_noresp_run2';
-    glms(16).contrasts(7).wvec = struct('Sn_2_training_resp',{1}, ...
+    glms(15).contrasts(7).name = 'resp_minus_noresp_run2';
+    glms(15).contrasts(7).wvec = struct('Sn_2_training_resp',{1}, ...
                                         'Sn_2_test_resp',{1}, ...
                                         'Sn_2_training_noresp',{-1}, ...
                                         'Sn_2_test_noresp',{-1});
-    glms(16).contrasts(8).name = 'resp_minus_noresp_run3';
-    glms(16).contrasts(8).wvec = struct('Sn_3_training_resp',{1}, ...
+    glms(15).contrasts(8).name = 'resp_minus_noresp_run3';
+    glms(15).contrasts(8).wvec = struct('Sn_3_training_resp',{1}, ...
                                         'Sn_3_test_resp',{1}, ...
                                         'Sn_3_training_noresp',{-1}, ...
                                         'Sn_3_test_noresp',{-1});
-    glms(16).contrasts(9).name = 'resp_minus_noresp_run4';
-    glms(16).contrasts(9).wvec = struct('Sn_4_training_resp',{1}, ...
+    glms(15).contrasts(9).name = 'resp_minus_noresp_run4';
+    glms(15).contrasts(9).wvec = struct('Sn_4_training_resp',{1}, ...
                                         'Sn_4_test_resp',{1}, ...
                                         'Sn_4_training_noresp',{-1}, ...
                                         'Sn_4_test_noresp',{-1});
     
+
 % ==============================================================================================
-% Repetition Suppression MODELS - Feature Based
+% Repetition Suppression MODELS - Based on features
 % ==============================================================================================
+    glms(16).name        = 'rs_feacture1d_navigation';
+    glms(16).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(16).conditions  = {'rstrials','response','excluders'};
+    glms(16).modelopt    = struct('use_stick', {true,false,true});
+    glms(16).pmods       = {{'colordist','shapedist'}};
+    glms(16).contrasts(1).name = 'same vs diff color';
+    glms(16).contrasts(1).wvec = [0,1,0,0,0];
+    glms(16).contrasts(2).name = 'same vs diff shape';
+    glms(16).contrasts(2).wvec = [0,0,1,0,0];
+
     glms(17).name        = 'rs_feature2d_navigation';
     glms(17).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
     glms(17).conditions  = {'rstrials','response','excluders'};
@@ -365,6 +378,7 @@ function glms = glm_gallery
         glms(23).contrasts(j+curr_ccount).name = sprintf('stim%02dbefore',exp.allstim(j));
         glms(23).contrasts(j+curr_ccount).wvec = struct(sprintf('stim%02dbefore',exp.allstim(j)),{1});
     end
+
 % ==============================================================================================
 % before/after response - LSA glm for extracting beta series - concatenated
 % ==============================================================================================  
@@ -383,6 +397,7 @@ function glms = glm_gallery
         glms(24).contrasts(j+curr_ccount).name = sprintf('stim%02dbefore',exp.allstim(j));
         glms(24).contrasts(j+curr_ccount).wvec = struct(sprintf('stim%02dbefore',exp.allstim(j)),{1});
     end
+    
 % ==============================================================================================
 % Neural axis for x/y with resepct to training location
 % ==============================================================================================  
@@ -431,12 +446,62 @@ function glms = glm_gallery
     glms(27).contrasts(1).wvec = [0,1,0,0,0];
     glms(27).contrasts(2).name = 'dist - quadrants';
     glms(27).contrasts(2).wvec = [0,0,1,0,0];
-    % 
-    % glms(28).name        = 'rs_hrchydist_navigation';
-    % glms(28).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
-    % glms(28).conditions  = {'rstrials','response','excluders'};
-    % glms(28).modelopt    = struct('use_stick', {true,false,true});
-    % glms(28).pmods       = {{'hrchydist_ucord'}};
-    % glms(28).contrasts(1).name = 'same vs diff color';
-    % glms(28).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
+
+    glms(28).name        = 'rs_hrchydistucord_navigation';
+    glms(28).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(28).conditions  = {'rstrials','response','excluders'};
+    glms(28).modelopt    = struct('use_stick', {true,false,true});
+    glms(28).pmods       = {{'hrchydist_ucord'}};
+    glms(28).contrasts(1).name = 'dist - unsigned coordinates';
+    glms(28).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
+
+    glms(29).name        = 'rs_hrchydistquadr_navigation';
+    glms(29).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(29).conditions  = {'rstrials','response','excluders'};
+    glms(29).modelopt    = struct('use_stick', {true,false,true});
+    glms(29).pmods       = {{'hrchydist_quadr'}};
+    glms(29).contrasts(1).name = 'dist - unsigned coordinates';
+    glms(29).contrasts(1).wvec = [0,1,0,0];% weight vector for task regressors
+   
+ % ==============================================================================================
+% Neural axis for x/y with resepct to centre for train and test separately
+% ==============================================================================================  
+    glms(30).name = 'dist2train_navigation_traintest'; % location based on ground truth
+    glms(30).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(30).conditions  = {'training','test','response'};
+    glms(30).modelopt    = struct('use_stick', {false,false,false});
+    glms(30).pmods       = {{'x_sign','x_dist','y_sign','y_dist'},{'x_sign','x_dist','y_sign','y_dist'}};
+    glms(30).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(30).contrasts(1).name = 'x_sign_training';
+    glms(30).contrasts(1).wvec = [0,1,0,0,0, 0,0,0,0,0, 0];
+    glms(30).contrasts(2).name = 'x_dist_training';
+    glms(30).contrasts(2).wvec = [0,0,1,0,0, 0,0,0,0,0, 0];
+    glms(30).contrasts(3).name = 'y_sign_training';
+    glms(30).contrasts(3).wvec = [0,0,0,1,0, 0,0,0,0,0, 0];
+    glms(30).contrasts(4).name = 'y_dist_training';
+    glms(30).contrasts(4).wvec = [0,0,0,0,1, 0,0,0,0,0, 0];
+    glms(30).contrasts(5).name = 'x_sign_test';
+    glms(30).contrasts(5).wvec = [0,0,0,0,0, 0,1,0,0,0, 0];
+    glms(30).contrasts(6).name = 'x_dist_test';
+    glms(30).contrasts(6).wvec = [0,0,0,0,0, 0,0,1,0,0, 0];
+    glms(30).contrasts(7).name = 'y_sign_test';
+    glms(30).contrasts(7).wvec = [0,0,0,0,0, 0,0,0,1,0, 0];
+    glms(30).contrasts(8).name = 'y_dist_test';
+    glms(30).contrasts(8).wvec = [0,0,0,0,0, 0,0,0,0,1, 0];
+
+
+    glms(31).name = 'axis_resploc_navigation_traintest'; % location based on ground truth
+    glms(31).filepattern = 'sub-.*_task-piratenavigation_run-[1-4]';
+    glms(31).conditions  = {'training','test','response'};
+    glms(31).modelopt    = struct('use_stick', {false,false,false});
+    glms(31).pmods       = {{'respmap_x','respmap_y'},{'respmap_x','respmap_y'}};
+    glms(31).contrasts   = struct('name',{},'type',{},'wvec',{});
+    glms(31).contrasts(1).name = 'respmap_x_training';
+    glms(31).contrasts(1).wvec = [0,1,0, 0,0,0, 0];% weight vector for task regressors
+    glms(31).contrasts(2).name = 'respmap_y_training';
+    glms(31).contrasts(2).wvec = [0,0,1, 0,0,0, 0];% weight vector for task regressors
+    glms(31).contrasts(3).name = 'respmap_x_test';
+    glms(31).contrasts(3).wvec = [0,0,0, 0,1,0, 0];% weight vector for task regressors
+    glms(31).contrasts(4).name = 'respmap_y_test';
+    glms(31).contrasts(4).wvec = [0,0,0, 0,0,1, 0];% weight vector for task regressors
 end
