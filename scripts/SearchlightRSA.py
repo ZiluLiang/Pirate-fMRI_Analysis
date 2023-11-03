@@ -25,31 +25,107 @@ preprocess = ["unsmoothedLSA","smoothed5mmLSA"]
 
 analyses_localizer = [
                  {"type":"regression",
-                 "name":"gtloc_xy",
+                 "name":"cartesian",
                  "regressors":["gtloc1dx", "gtloc1dy"]},
+
+                 {"type":"regression",
+                 "name":"feature-based",
+                 "regressors":["feature1dx","feature1dy"]},
+
+                 {"type":"regression",
+                 "name":"hierarchical-wrtcentre_separatexy",
+                 "regressors":["global_xsign","global_ysign","locwrtcentre_localx","locwrtcentre_localy"]},
+
+                 {"type":"regression",
+                 "name":"hierarchical-wrtlrbu_separatexy",
+                 "regressors":["global_xsign","global_ysign","locwrtlrbu_localx","locwrtlrbu_localy"]},
+
+                 {"type":"regression",
+                 "name":"hierarchical-wrtcentre_combinexy",
+                 "regressors":["global_xysign","locwrtcentre_localxy"]},
+
+                 {"type":"regression",
+                 "name":"hierarchical-wrtlrbu_combinexy",
+                 "regressors":["global_xysign","locwrtlrbu_localxy"]},
                  
                  {"type":"correlation",
                   "name":"all"}#"modelrdms":None                  
             ]
+
 analyses_navigation = [
+    ############################# test for each model  ###########################################
                 {"type":"regression",
-                 "name":"loc_wrt_train_4pred",
-                 "regressors":["locwrttrain_xdist", "locwrttrain_xsign","locwrttrain_ydist","locwrttrain_ysign"]},
-                 
-                 {"type":"regression",
-                 "name":"loc_wrt_train_2pred",
-                 "regressors":["locwrttrain_xydist", "locwrttrain_xysign"]},
+                 "name":"feature-based",
+                 "regressors":["feature1dx","feature1dy"]},
 
                  {"type":"regression",
-                 "name":"gtloc_xy",
-                 "regressors":["gtloc1dx", "gtloc1dy"]},
+                 "name":"hierarchical-wrtcentre_separatexy",
+                 "regressors":["global_xsign","global_ysign","locwrtcentre_localx","locwrtcentre_localy"]},
+
+                 {"type":"regression",
+                 "name":"hierarchical-wrtlrbu_separatexy",
+                 "regressors":["global_xsign","global_ysign","locwrtlrbu_localx","locwrtlrbu_localy"]},
+
+                 {"type":"regression",
+                 "name":"hierarchical-wrtcentre_combinexy",
+                 "regressors":["global_xysign","locwrtcentre_localxy"]},
+
+                 {"type":"regression",
+                 "name":"hierarchical-wrtlrbu_combinexy",
+                 "regressors":["global_xysign","locwrtlrbu_localxy"]},
 
                  {"type":"regression",
                  "name":"resploc_xy",
                  "regressors":["resploc1dx", "resploc1dy"]},
-                 
+
+                 {"type":"regression",
+                 "name":"resp-hierarchical-wrtcentre_combinexy",
+                 "regressors":["respglobal_xysign","resplocwrtcentre_localxy"]},
+
+                 {"type":"regression",
+                 "name":"resp-hierarchical-wrtcentre_separatexy",
+                 "regressors":["respglobal_xsign","respglobal_ysign","resplocwrtcentre_localx","resplocwrtcentre_localy"]},
+    ############################# test for competition between models  ###########################################
+                 {"type":"regression",
+                 "name":"compete_featurecartesian_combinexy",
+                 "regressors":["feature2d","gtlocEuclidean"]},
+
+                 {"type":"regression",
+                 "name":"compete_featurecartesian_separatexy",
+                 "regressors":["feature1dx","feature1dy","gtloc1dx", "gtloc1dy"]},
+
+                 {"type":"regression",
+                 "name":"compete_hierarchical_combinexy",
+                 "regressors":["global_xysign","locwrtcentre_localxy","locwrtlrbu_localxy"]},
+
+                 {"type":"regression",
+                 "name":"compete_hierarchical_separatexy",
+                 "regressors":["global_xsign","global_ysign","locwrtlrbu_localx","locwrtlrbu_localy","locwrtlrbu_localx","locwrtlrbu_localy"]},
+
+                 {"type":"regression",
+                 "name":"compete_locwrtcetrefeature_combinexy",
+                 "regressors":["global_xysign","locwrtcentre_localxy","feature2d"]},
+
+                 {"type":"regression",
+                 "name":"compete_locwrtcetrefeature_separatexy",
+                 "regressors":["global_xsign","global_ysign","locwrtlrbu_localx","locwrtlrbu_localy","feature1dx","feature1dy"]},
+
+                 {"type":"regression",
+                 "name":"resp-compete_locwrtcetrefeature_combinexy",
+                 "regressors":["respglobal_xysign","resplocwrtcentre_localxy","feature2d"]},
+
+                 {"type":"regression",
+                 "name":"resp-compete_locwrtcetrefeature_separatexy",
+                 "regressors":["respglobal_xsign","respglobal_ysign","resplocwrtcentre_localx","resplocwrtcentre_localy","feature1dx","feature1dy"]},
+
+    ######################### correlation ##################################             
                  {"type":"correlation",
-                  "name":"all"}
+                  "name":"all"},
+
+                  {"type":"correlation",
+                  "name":"resp-hierarchical",
+                  "modelrdms":["resplocwrtcentre_localglobal","resplocwrtcentre_localx","resplocwrtcentre_localy","resplocwrtcentre_localxy"]
+                  }
             ]
 
 n_sess = {
@@ -84,9 +160,9 @@ for p in preprocess[:1]:
                          'stimuli_even.nii']
         }
     vs_dir = {
-#        "no_selection":[],
-        "reliability_ths0":[os.path.join(fmridata_dir,p,'reliability_concat')],
-        "perm_rmask":[os.path.join(fmridata_dir,p,'reliability_concat')]
+        "no_selection":[],
+#        "reliability_ths0":[os.path.join(fmridata_dir,p,'reliability_concat')],
+#        "perm_rmask":[os.path.join(fmridata_dir,p,'reliability_concat')]
         }
     for ds_name,ds in beta_dir.items():
         for vselect,vdir in vs_dir.items():
