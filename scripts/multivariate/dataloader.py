@@ -1,3 +1,10 @@
+"""
+Dataloader class, currently only used in reliability mask generation
+
+Zilu Liang @HIPlab Oxford
+2023
+"""
+
 import os
 import numpy
 import nibabel as nib

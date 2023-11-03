@@ -8,6 +8,9 @@ This creates two 25*nvoxel matrix, one for odd and one for even. For each voxel,
 from odd and even runs. The correlation coefficient was used to build a reliability_map.nii saved in the first level directory.
 We then use a threshold of r>0 to binarize it into a reliability mask and save to first level directory.
 Meanwhile, a permuted version of reliability mask is created. This mask includes the same number of voxels as the reliability mask, but the masking location is randomly permuted from the reliability mask.
+
+Zilu Liang @HIPlab Oxford
+2023
 """	
 import os
 import sys

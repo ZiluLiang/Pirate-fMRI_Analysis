@@ -1,6 +1,9 @@
 """
 This module contains class that wraps up RSA analysis in ROI or whole brain into a pipeline.
 The runner class is dependent on the file structure as specified in `FILESTRUCTURE.md`
+
+Zilu Liang @HIPlab Oxford
+2023
 """
 
 import itertools
@@ -22,7 +25,8 @@ from sklearn.decomposition import PCA
 project_path = r'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis'
 sys.path.append(os.path.join(project_path,'scripts'))
 from multivariate.dataloader import ActivityPatternDataLoader
-from multivariate.helper import ModelRDM, compute_rdm, checkdir, scale_feature
+from multivariate.helper import compute_rdm, checkdir, scale_feature
+from multivariate.modelrdms import ModelRDM
 from multivariate.rsa_searchlight import RSASearchLight
 from multivariate.rsa_estimator import PatternCorrelation,MultipleRDMRegression,NeuralDirectionCosineSimilarity,SVMDecoder
 
