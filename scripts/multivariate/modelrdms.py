@@ -12,7 +12,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
 
-from helper import compute_rdm, compute_rdm_nomial, compute_rdm_identity, lower_tri, upper_tri
+from multivariate.helper import compute_rdm, compute_rdm_nomial, compute_rdm_identity, lower_tri, upper_tri
 
 class ModelRDM:
     """ set up the model rdms based on stimuli properties in pirate exp
@@ -101,9 +101,9 @@ class ModelRDM:
         #concatenate into a df for convenience ## TODO: maybe use a structured numpy array? which is more efficient?
         self.stimdf = pandas.DataFrame(
             {
-                "stim_id":self.stimid,
-                "stim_group":self.stimgroup,
-                "stim_session":self.stimsession,
+                "stim_id":self.stimid[:,0],
+                "stim_group":self.stimgroup[:,0],
+                "stim_session":self.stimsession[:,0],
                 "stim_x":self.stimloc[:,0],
                 "stim_y":self.stimloc[:,1],
                 "stim_xsign":self.stimloc_wrtcentre[:,2],
@@ -116,7 +116,7 @@ class ModelRDM:
                 "resp_ysign":self.resploc_wrtcentre[:,3],
                 "resp_xdist":self.resploc_wrtcentre[:,0],            
                 "resp_ydist":self.resploc_wrtcentre[:,1]
-            }                
+            },                
         )
         
         #### model RDMs
