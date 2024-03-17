@@ -1,0 +1,213 @@
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+
+result_dir = file.path(project_dir, "results","LLR_check", fsep="/")
+
+
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+```
+
+
+## LLR
+
+### model distribution df
+```{r}
+unique_xys = seq(from = -1,to = 1,length.out = 5)
+uniqueloc_GRID = meshgrid(unique_xys)
+unique_stimloc =  data.frame(x = c(uniqueloc_GRID$X),y = c(uniqueloc_GRID$Y))%>%
+                 arrange(x,y)%>%
+                  mutate(loc_id = row_number())
+# load function for generating distribution
+source(file.path(llr_dir,"genModelDistribution.R",fsep="/"), local = knitr::knit_global())
+
+#get parameters of the arena to calculate probability distribution
+##### when x/y range is -3.4~3.4, radius is five; now rescale radius to x/y range is -1,1
+arena_radius_rescale = 5*(2/6.8) 
+granularity = round(arena_radius_rescale*100)
+base = seq(from = -arena_radius_rescale,to = arena_radius_rescale,length.out = granularity+1)
+cart_GRID = meshgrid((base[1:length(base)-1]+base[2:length(base)])/2)
+##calculate the sd of the distribution based on display parameters in the task
+## because the error tolerance range (reward radius) for giving participant feedback is 60/53
+## according to the 3sigma rule, mu-3*sd to mu+3*sd should cover 99.8% of correct response
+## in other words, 3*sd should be roughly equal to error tolerance
+## hence sd ~ rescaled_errortolorence/3
+err_tol = 60/53
+step_size = 0.2
+dist_sd = (err_tol+ step_size)*(2/6.8)/3 #+ (96*0.6/53/2)*(2/range_xy[1])
+
+tryCatch(
+  expr = {
+    load(file = file.path(llr_dir,"probDF_data_compo.RData"))
+  },
+  error = function(e){
+    
+    tic()
+    source(file.path(llr_dir,"genProbDF.R",fsep="/"), local = knitr::knit_global())
+    toc()
+    
+  }
+)
+```
+
+### plot sample df to check
+```{r}
+check_sample_probdf = prob_df_list[[4]]%>%
+  pivot_longer(cols = c("binorm_compo","binorm","uniform"),
+               names_to = "pfunc",values_to = "prob")%>%
+  mutate(pfunc = factor(pfunc,
+                        levels = c("uniform", "binorm","binorm_compo"),
+                        labels = c("uniform random",
+                                   "binormal - bivariate",
+                                   "binormal - multiply univariate")))
+
+max_p_all = round(max(check_sample_probdf$prob,na.rm = T),5)
+prob_breaks = unique(c(round(sapply(group_split(check_sample_probdf,pfunc) , function(df){max(df$prob,na.rm = T)}),5),
+                       max_p_all))
+prob_labels = sapply(prob_breaks,function(x){sprintf("%.3f%s",x*100,"%")})
+
+(p.modeldist = check_sample_probdf%>%
+  ggplot(aes(x = x,y=y, color = prob)) +
+      facet_grid(cols = vars(pfunc))+
+        geom_point() + 
+        scale_colour_viridis_c(na.value = "grey",
+                           limits = c(0,max_p_all),
+                           breaks = prob_breaks,
+                           labels = prob_labels,
+                           option = "inferno",
+                           trans = "sqrt")+
+        guides(color = guide_colorbar(title = "probability"))+
+        
+        theme(axis.text = element_blank(),axis.title = element_blank(),
+              axis.ticks = element_blank(),axis.line = element_blank()))
+
+
+ggsave(file.path(result_dir,paste0('modeldistribution','.png')),plot = p.modeldist,device = 'png',width = 12,height = 4)
+```
+
+
+
+```{r}
+lapse_rate = 0.01
+for(k in seq(1,nrow(unique_stimloc),1)){
+  #add lapse
+  prob_df_list[[k]] = prob_df_list[[k]]%>%
+    # Univariate-Normal-Distribution(UND)
+    # Bivariate-Normal-Distribution(BND)
+    # unNormalized(unN)
+    mutate(UND_x_lap_unN = pnorm_x_normalized*(1-lapse_rate) + uniform*lapse_rate, 
+           UND_y_lap_unN = pnorm_y_normalized*(1-lapse_rate) + uniform*lapse_rate,
+           BND_compo_lap_unN = binorm_compo*(1-lapse_rate) + uniform*lapse_rate,
+           BND_lap_unN = binorm*(1-lapse_rate) + uniform*lapse_rate
+           )
+  #calculate sum  
+  sum_UND_x_lap_unN = sum(prob_df_list[[k]]$UND_x_lap_unN,na.rm = T)
+  sum_UND_y_lap_unN = sum(prob_df_list[[k]]$UND_y_lap_unN,na.rm = T)
+  sum_BND_compo_lap_unN = sum(prob_df_list[[k]]$BND_compo_lap_unN,na.rm = T)
+  sum_BND_lap_unN = sum(prob_df_list[[k]]$BND_lap_unN,na.rm = T)
+  
+  #normalize
+  prob_df_list[[k]] = prob_df_list[[k]]%>%
+    mutate(UND_x_lap = UND_x_lap_unN/sum_UND_x_lap_unN,
+           UND_y_lap = UND_y_lap_unN/sum_UND_y_lap_unN,
+           BND_compo_lap = BND_compo_lap_unN/sum_BND_compo_lap_unN,
+           BND_lap = BND_lap_unN/sum_BND_lap_unN)
+}
+save(prob_df_list, unique_stimloc, cart_GRID, base, file = file.path(llr_dir,"probDF_data_compo_withlapse.RData"))
+```
+
+
+```{r}
+for(k in seq(1,nrow(unique_stimloc),1)){
+  plot_name = sprintf("loc%02d",unique_stimloc[k,]$ind)
+  plot_title = sprintf("location %02d\n x=%.1f  y=%.1f",unique_stimloc[k,]$ind, unique_stimloc[k,]$x,unique_stimloc[k,]$y)
+  check_sample_probdf = prob_df_list[[k]]%>%
+    pivot_longer(cols = c("UND_x_lap","UND_y_lap","BND_compo_lap","uniform"),
+                 names_to = "pfunc",values_to = "prob")%>%
+    mutate(pfunc = factor(pfunc,
+                          levels = c("uniform", "UND_x_lap","UND_y_lap","BND_compo_lap"),
+                          labels = c("uniform random",
+                                     "univariate normal (x-axis) with lapse",
+                                     "univariate normal (y-axis) with lapse",
+                                     "bivariate normal with lapse")))
+  # p.modeldist.lapse = check_sample_probdf %>% group_by(pfunc) %>% 
+  #   do(gg = {ggplot(., aes(x, y, color = prob)) + 
+  #       geom_point() + facet_grid(~pfunc) + 
+  #       guides(color = guide_colorbar(title = "probability"),title.position = "top")+
+  #       scale_colour_viridis_c(na.value = "grey",
+  #                              limits = c(0,max(.$prob,na.rm = T)),
+  #                              breaks = c(0,max(.$prob,na.rm = T)),
+  #                              labels = c("low","high"),
+  #                              option = "inferno",
+  #                              trans = "identity")+
+  #       theme(axis.text = element_blank(),axis.title = element_blank(),
+  #             axis.ticks = element_blank(),axis.line = element_blank(),
+  #             legend.position = "top")}) %>% 
+  #   .$gg %>% arrangeGrob(grobs = ., nrow = 1) %>% grid.arrange()
+
+  max_p_all = round(max(check_sample_probdf$prob,na.rm = T),5)
+  prob_breaks = unique(c(round(sapply(group_split(check_sample_probdf,pfunc) , function(df){max(df$prob,na.rm = T)}),5),
+                         max_p_all))
+  prob_labels = sapply(prob_breaks,function(x){sprintf("%.3f%s",x*100,"%")})
+  
+  (p.modeldist.lapse = check_sample_probdf%>%
+    ggplot(aes(x = x,y=y, color = prob)) +
+        facet_grid(cols = vars(pfunc))+
+          geom_point() + 
+          scale_colour_viridis_c(na.value = "grey",
+                             limits = c(0,max_p_all),
+                             breaks = prob_breaks,
+                             labels = prob_labels,
+                             option = "inferno",
+                             trans = "sqrt")+
+          guides(color = guide_colorbar(title = "probability"))+
+          theme(axis.text = element_blank(),axis.title = element_blank(),
+                axis.ticks = element_blank(),axis.line = element_blank(),
+                plot.title = element_text(face="bold"))+
+          labs(title=plot_title))
+  ggsave(file.path(result_dir,'modeldistribution_withlapse',paste0(plot_name,'.png')),plot = p.modeldist.lapse,device = 'png',width = 15,height = 5)
+}
+```
+
+```{r}
+check_sample_probdf = prob_df_list[[12]]%>%
+    pivot_longer(cols = c("UND_x_lap","UND_y_lap","BND_compo_lap","uniform"),
+                 names_to = "pfunc",values_to = "prob")%>%
+    mutate(pfunc = factor(pfunc,
+                          levels = c("uniform", "UND_x_lap","UND_y_lap","BND_compo_lap"),
+                          labels = c("uniform random",
+                                     "univariate normal (x-axis) with lapse",
+                                     "univariate normal (y-axis) with lapse",
+                                     "bivariate normal with lapse")))%>%
+  filter(pfunc %in% c("uniform random","bivariate normal with lapse"))
+   
+
+max_p_all = round(max(check_sample_probdf$prob,na.rm = T),5)
+prob_breaks = unique(c(round(sapply(group_split(check_sample_probdf,pfunc) , function(df){max(df$prob,na.rm = T)}),5),
+                       max_p_all))
+prob_labels = sapply(prob_breaks,function(x){sprintf("%.3f%s",x*100,"%")})
+
+(p.modeldist = check_sample_probdf%>%
+   ggplot(aes(x = x,y=y, color = prob)) +
+        facet_grid(cols = vars(pfunc))+
+        geom_point() + 
+        scale_colour_viridis_c(na.value = "grey",
+                           limits = c(0,max_p_all),
+                           breaks = prob_breaks,
+                           labels = prob_labels,
+                           option = "inferno",
+                           trans = "sqrt")+
+        guides(color = guide_colorbar(title = "probability"))+
+        theme(axis.text = element_blank(),axis.title = element_blank(),
+            axis.ticks = element_blank(),axis.line = element_blank(),
+            legend.position = "right"))
+
+ggsave(file.path(result_dir,paste0('modeldistribution_randombinormal','.png')),plot = p.modeldist,device = 'png',width = 8,height = 3.5)
+```
