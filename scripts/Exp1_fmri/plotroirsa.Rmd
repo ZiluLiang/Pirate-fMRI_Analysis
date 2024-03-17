@@ -1,0 +1,613 @@
+---
+title: "testROIRSA"
+output: html_document
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE)
+
+rm(list = ls())
+wk_dir = rstudioapi::getActiveProject();
+generic_dir = file.path(wk_dir, "scripts/generic", fsep="/")
+
+spec_dir = file.path(wk_dir, "scripts/behavior", fsep="/")
+data_dir = file.path(wk_dir, "data", fsep="/")
+save_dir = file.path(wk_dir, "plot", fsep="/")
+prob_df_dir =  file.path(wk_dir, "probdf", fsep="/")
+  
+
+source(file.path(generic_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(generic_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(generic_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+library(ggpubr)
+```
+
+##
+```{r}
+nonlearnerids     = c('sub010','sub012','sub013','sub027','sub017')
+nongeneralizerids = c('sub010','sub012','sub013','sub004','sub023','sub002','sub014','sub021','sub017')
+    
+```
+
+## ROIRSA - python Correlation
+```{r}
+roicorr_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\locwrttraining_testtest'
+res_path = file.path(roicorr_dir,'roicorr_nocentering.csv')
+roirsa_df = read.csv(res_path,header = TRUE)
+
+id_cols = c("subid","roi","laterality","voxselect","ds","preprocess","analysis")
+```
+
+```{r}
+locName=c('locwrttrain_xydistsign',
+ 'locwrttrain_xdist',
+ 'locwrttrain_xsign',
+ 'locwrttrain_ydist',
+ 'locwrttrain_ysign',
+ 'locwrttrain_xysign',
+ 'locwrttrain_xydist',
+ 'gtlocEuclidean',
+'feature2d')
+sel_cols = c(locName,paste0('between_teststimpairs_',locName))
+#sel_cols = paste0('between_teststimpairs_',locName)
+#sel_cols = c('resplocEuclidean','trainstimpairs_resplocEuclidean','teststimpairs_resplocEuclidean')
+
+
+locnewName=c('signed dist xy',
+ 'dist x',
+ 'sign x',
+ 'dist y',
+ 'sign y',
+ 'sign xy',
+ 'dist xy',
+ 'gtloc',
+ 'features')
+newname_cols =  c(locnewName,paste0('between_',locnewName))
+#newname_cols = paste0('betweenrun teststimpairs',locnewName)
+
+curr_df = roirsa_df%>%
+  dplyr::select(c(sel_cols,
+                  id_cols))%>%
+  change_cols_name(oldnames=sel_cols,
+                   newnames = newname_cols)
+curr_df_longall = curr_df%>%
+    pivot_longer(cols = all_of(newname_cols),names_to ="modelrdms",values_to = "corrcoef")%>%
+#  filter(roi!="parietal")%>%
+    mutate(roi = factor(roi,levels = c("ofc","frontal","hippocampus","parahippocampus","parietal")),
+           modelrdms  = factor(modelrdms,level=newname_cols))%>%
+  filter(!subid %in% nongeneralizerids)
+unique_ds = unique(curr_df_longall$ds)
+for (mn in newname_cols){
+  for (curr_ds in unique_ds){
+    curr_df_long = curr_df_longall%>%
+    filter(
+             preprocess == "unsmoothedLSA"&
+             ds==curr_ds&
+             modelrdms==mn&
+             laterality=="bilateral"&
+             analysis=="spearman"
+             )%>%
+        mutate(z_corrcoef = atanh(corrcoef))
+  
+    g_cols = c("roi","laterality","voxselect","ds","preprocess","analysis","modelrdms")
+    sum_df = aggregate_data(curr_df_long,groupbyvars = g_cols,yvars = "z_corrcoef",stats = c("mu","se"))
+    
+    pval_df = curr_df_long %>%
+      group_by_at(g_cols) %>%
+      wilcox_test(z_corrcoef ~ 1, mu=0,detailed =TRUE,alternative = "greater") %>%
+      adjust_pvalue(method = "none") %>%
+      add_significance("p.adj")%>%
+      ungroup()%>%
+      mutate(siglab = if_else(p.adj.signif=='ns','',if_else(p.adj<0.001,"***",p.adj.signif)))
+    
+    (p = curr_df_long%>%
+      ggplot(aes(x=modelrdms,color=voxselect))+
+  #    facet_nested(cols=vars(roi),rows=vars(ds))+
+      facet_wrap(vars(roi),nrow = 1)+
+      geom_boxplot(aes(y=corrcoef),position = position_dodge(1),outlier.alpha = 0,alpha=0.8)+
+      #geom_violin(aes(y=z_corrcoef),position = position_dodge(1))+
+      #geom_col(data = sum_df,aes(y=mu_z_corrcoef),
+      #         position = position_dodge(1),
+      #         fill=NA)+
+      #geom_errorbar(data = sum_df,aes(ymin=mu_z_corrcoef-se_z_corrcoef,
+      #                                ymax=mu_z_corrcoef+se_z_corrcoef),
+      #              position = position_dodge(1),
+      #              width=0.5)+
+      geom_point(aes(y=corrcoef),position = position_jitterdodge(dodge.width=1,jitter.width = 0.1),alpha=0.8,size=0.5)+
+      geom_text(data = pval_df,aes(y=max(curr_df_long$corrcoef),label=siglab),position = position_dodge(1))+
+      theme(aspect.ratio = 1, axis.text.x = element_text(angle=0),legend.position = "top")+
+      labs(y = "spearman's rank correlation coefficient",
+           title = paste(curr_ds,mn,sep = ": "),
+        caption = "asterisks indicate one-sample t test results: *** p<0.001, ** p<0.01, * p<0.05 not corrected"))
+  
+    ggsave(
+    #file.path(roicorr_dir,str_c('corrcoef_',curr_roi,'.png')),
+    file.path(roicorr_dir,str_c('unsmoothed_spearman_bilateralrois_',curr_ds,'_',mn,'.png')),
+    plot = p,
+    device = "png",
+    scale = 1,
+    width = 16,
+    height = 9,
+    dpi = 300)
+  }
+  }
+```
+
+
+
+
+```{r}
+sel_cols = c('between_loc2d','between_trainstimpairs_loc2d','between_teststimpairs_loc2d')
+newname_cols = c("all","train-train","test-test")
+
+curr_df = roirsa_df%>%
+  dplyr::select(c(sel_cols,
+                  id_cols))%>%
+  change_cols_name(oldnames=sel_cols,
+                   newnames = newname_cols)
+
+curr_df = filter(curr_df,ds %in% c("fourruns","fourrunsRESP"))
+curr_df_longall = curr_df%>%
+    pivot_longer(cols = all_of(newname_cols),names_to ="modelrdms",values_to = "corrcoef")%>%
+#  filter(roi!="parietal")%>%
+    mutate(roi = factor(roi,levels = c("ofc","frontal","hippocampus","parahippocampus","parietal")),
+           modelrdms  = factor(modelrdms,level=newname_cols))%>%
+  filter(!subid %in% nongeneralizerids)
+unique_ds = unique(curr_df_longall$ds)
+for (curr_ds in unique_ds){
+  curr_df_long = curr_df_longall%>%
+  filter(
+           preprocess == "unsmoothedLSA"&
+           ds==curr_ds&
+           laterality=="bilateral"&analysis=="spearman")%>%
+      mutate(z_corrcoef = atanh(corrcoef))
+
+  g_cols = c("roi","laterality","voxselect","ds","preprocess","analysis","modelrdms")
+  sum_df = aggregate_data(curr_df_long,groupbyvars = g_cols,yvars = "z_corrcoef",stats = c("mu","se"))
+  
+  pval_df = curr_df_long %>%
+    group_by_at(g_cols) %>%
+    wilcox_test(z_corrcoef ~ 1, mu=0,detailed =TRUE,alternative = "greater") %>%
+    adjust_pvalue(method = "none") %>%
+    add_significance("p.adj")%>%
+    ungroup()%>%
+    mutate(siglab = if_else(p.adj.signif=='ns','',if_else(p.adj.signif<0.001,"***",p.adj.signif)))
+  
+  (p = curr_df_long%>%
+    ggplot(aes(x=modelrdms,color=voxselect))+
+#    facet_nested(cols=vars(roi),rows=vars(ds))+
+    facet_wrap(vars(roi),nrow = 1)+
+    geom_boxplot(aes(y=corrcoef),position = position_dodge(1),outlier.alpha = 0,alpha=0.8)+
+    #geom_violin(aes(y=z_corrcoef),position = position_dodge(1))+
+    #geom_col(data = sum_df,aes(y=mu_z_corrcoef),
+    #         position = position_dodge(1),
+    #         fill=NA)+
+    #geom_errorbar(data = sum_df,aes(ymin=mu_z_corrcoef-se_z_corrcoef,
+    #                                ymax=mu_z_corrcoef+se_z_corrcoef),
+    #              position = position_dodge(1),
+    #              width=0.5)+
+    geom_point(aes(y=corrcoef),position = position_jitterdodge(dodge.width=1,jitter.width = 0.1),alpha=0.8,size=0.5)+
+    geom_text(data = pval_df,aes(y=max(curr_df_long$corrcoef),label=siglab),position = position_dodge(1))+
+    theme(aspect.ratio = 1, axis.text.x = element_text(angle=0),legend.position = "top")+
+    labs(y = "spearman's rank correlation coefficient",
+         title = paste(curr_ds,'between location 2d',sep = ": "),
+      caption = "asterisks indicate one-sample t test results: *** p<0.001, ** p<0.01, * p<0.05 not corrected"))
+
+  ggsave(
+  #file.path(roicorr_dir,str_c('corrcoef_',curr_roi,'.png')),
+  file.path(roicorr_dir,str_c('unsmoothed_spearman_bilateralrois_',curr_ds,'between.png')),
+  plot = p,
+  device = "png",
+  scale = 1,
+  width = 16,
+  height = 9,
+  dpi = 300)
+  }
+```
+
+## ROIRSA - LME
+```{r}
+roirdm_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\\resptrials\\'
+for (p in c("unsmoothedLSA")){
+  for (d in c("concatall_no_selection","concatallRESP")){
+    for (vs in c("noselection")){
+      roirdm_path = file.path(roirdm_dir,str_c('roirdm_centering_',paste(p,d,vs,sep="_"),'.csv'))
+      roirdm_df = read.csv(roirdm_path,header = TRUE)
+      subdf_list = roirdm_df%>%
+        group_split(roi,laterality)
+      groupkeys = group_keys(roirdm_df%>%group_by(roi,laterality))
+      mlist = lapply(subdf_list,function(df){
+        df %>%
+          #filter(runA!=runB)%>%
+        mutate(dissimilarity = scale(dissimilarity, center = TRUE, scale = TRUE),
+               feature1dx    = scale(feature1dx, center = TRUE, scale = TRUE),
+               feature1dy    = scale(feature1dy, center = TRUE, scale = TRUE),
+               stimuligroup  = scale(stimuligroup, center = TRUE, scale = TRUE),
+               loc2d         = scale(loc2d, center = TRUE, scale = TRUE),
+               stim_pair     = paste(stimidA,stimidB,sep="_"))
+        m = lmer(dissimilarity~loc2d+feature1dx+feature1dy+stimuligroup+(1|subid)+(loc2d|subid),
+           data=df)
+        m = lmer(dissimilarity~loc2d+feature1dx+feature1dy+stimuligroup+(1|subid)+(loc2d|subid),
+           data=df)
+        return(m)
+      })
+      
+      sumdf_list = lapply(seq(1,nrow(groupkeys)),function(j){
+                m = mlist[[j]]
+                sumdf = data.frame(summary(m)[["coefficients"]])%>%
+                  change_cols_name(oldnames = c("Std..Error","t.value","Pr...t.."),
+                                   newnames = c("se","t","p"))
+                sumdf$regressor = row.names(sumdf)
+                row.names(sumdf) = NULL
+                df = cbind(groupkeys[rep(j,nrow(sumdf)),],
+                           sumdf)%>%
+                  mutate(sigif=case_when(p<0.001~"***",
+                                          p>=0.001&p<0.01~"**",
+                                          p>=0.01&p<0.05~"*",
+                                          p>0.05~""))
+                return(df)
+      })
+      sumdf = do.call(rbind,sumdf_list)
+      plt = sumdf%>%
+        filter(regressor!="(Intercept)")%>%
+        mutate(regressor=factor(regressor,
+                                levels = c("stimuligroup","feature1dx","feature1dy","loc2d"),
+                                labels = c("train/test","color","shape","loc2d")))%>%
+        ggplot(aes(y = regressor)) + 
+        facet_nested(cols=vars(roi),rows=vars(laterality))+
+        geom_point(aes(x=Estimate))+
+        geom_errorbarh(aes(xmin=Estimate-se,xmax=Estimate+se),height=0.5)+
+        geom_text(aes(label=sigif,x=Estimate+se+0.005),angle=90,size=6)+
+        labs(title=paste(p,d,vs,sep=" "))
+      #show(plt)
+      ggsave(
+        file.path(roirdm_dir,'LME',str_c(paste(p,d,vs,sep="_"),'.png')),
+        plot = plt,
+        device = "png",
+        scale = 1,
+        width = 16,
+        height = 9,
+        dpi = 300)
+    }
+  }
+}
+```
+
+## ROIRSA - python
+```{r}
+rsa_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation\\'
+res_path = file.path(rsa_dir,'roirsa_centering.csv')
+roirsa_df = read.csv(res_path,header = TRUE)
+analysis = list(## stimuli based
+                sc_betweens_stimuli = c("between_stimuli"),
+                sc_alls_stimuli = c("stimuli"),
+                ## feature based
+                sc_withins_feature1d = c("within_feature1dx","within_feature1dy"),
+                sc_betweens_feature1d = c("between_feature1dx","between_feature1dy"),
+                sc_alls_feature1d = c("feature1dx","feature1dy"),
+                # ## training test based
+                # tt_withins_stimuligroup = c('within_stimuligroup'),
+                # tt_betweens_stimuligroup = c('between_stimuligroup'),
+                # tt_alls_stimuligroup = c('stimuligroup'),
+                ## map based
+                betweens_loc2d = c("between_loc2d"),
+                withins_loc2d = c("within_loc2d"),
+                alls_loc2d = c("loc2d"),
+                betweens_loc1d = c("between_loc1dx","between_loc1dy"),
+                withins_loc1d = c("within_loc1dx","within_loc1dy"),
+                alls_loc1d = c("loc1dx","loc1dy"),
+                # map-based plus control
+                betweens_loc2d_c =  c("between_stimuligroup",'between_feature1dx','between_feature1dy',"between_loc2d"),
+                withins_loc2d_c =   c("within_stimuligroup",'within_feature1dx','within_feature1dy',"within_loc2d"),
+                alls_loc2d_c =      c("stimuligroup",'feature1dx','feature1dy',"loc2d")
+                # betweens_loc1d_c =  c("between_stimuligroup","between_loc1dx","between_loc1dy"),
+                # withins_loc1d_c =   c("within_stimuligroup","within_loc1dx","within_loc1dy"),
+                # alls_loc1d_c =      c("stimuligroup","loc1dx","loc1dy")
+        )
+id_cols = c("subid","roi","laterality","voxselect","ds","preprocess")
+```
+
+```{r}
+pval_list = list()
+for (a_name in names(analysis)){
+  curr_df = roirsa_df%>%
+    filter(analysis == a_name)%>%
+    dplyr::select(all_of(c(id_cols,analysis[[a_name]])))
+  curr_df_long = curr_df%>%
+    pivot_longer(cols = analysis[[a_name]],names_to ="regressors",values_to = "estimates")%>%
+    mutate(roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")),
+           preprocess = factor(preprocess,levels = c("unsmoothedLSA","smoothed5mmLSA")))
+  g_cols = c("roi","laterality","voxselect","ds","preprocess","regressors")
+  sum_df = aggregate_data(curr_df_long,groupbyvars = g_cols,yvars = "estimates")
+  
+  pval_list[[a_name]] = curr_df_long %>%
+    group_by_at(g_cols) %>%
+    t_test(data =., estimates ~ 1, mu=0,detailed =TRUE) %>%
+    adjust_pvalue(method = "bonferroni") %>%
+    add_significance("p.adj")%>%
+    ungroup()%>%
+    mutate(siglab = if_else(p.adj.signif=='ns','',p.adj.signif))
+  
+  p = curr_df_long%>%
+    ggplot(aes(x=roi,color=preprocess))+
+    facet_nested(cols=vars(ds,laterality),rows = vars(voxselect,regressors))+
+    geom_point(aes(y=estimates),position = position_dodge(1),alpha=0.8,size=0.5)+
+    geom_col(data = sum_df,aes(y=mu_estimates),position = position_dodge(1),fill=NA)+
+    geom_errorbar(data = sum_df,
+                  aes(ymin=mu_estimates-se_estimates,ymax=mu_estimates+se_estimates),
+                  position = position_dodge(1),width = 0.5)+
+    geom_text(data = pval_list[[a_name]],aes(y=max(curr_df_long$estimates)+0.02,label=siglab),position = position_dodge(1))+
+    theme(aspect.ratio = 1/2, axis.text.x = element_text(angle=15),legend.position = "top")+
+    labs(caption = "asterisks indicate one-sample t test results: *** p<0.001, ** p<0.01, * p<0.05 bonferroni corrected")
+
+  ggsave(
+  file.path(rsa_dir,str_c('centered_',a_name,'.png')),
+  plot = p,
+  device = "png",
+  scale = 1,
+  width = 16,
+  height = 9,
+  dpi = 300)
+}
+```
+
+## to show in meeting
+```{r}
+# only use the unsmoothed 4 runs veresion
+pval_list = list()
+for (a_name in names(analysis)){
+  curr_df = roirsa_df%>%
+    filter(analysis == a_name&ds == "fourruns"&preprocess=="unsmoothedLSA")%>%
+    dplyr::select(all_of(c(id_cols,analysis[[a_name]])))
+  curr_df_long = curr_df%>%
+    pivot_longer(cols = analysis[[a_name]],names_to ="regressors",values_to = "estimates")%>%
+    mutate(roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus"))
+           )
+  g_cols = c("roi","laterality","voxselect","ds","preprocess","regressors")
+  sum_df = aggregate_data(curr_df_long,groupbyvars = g_cols,yvars = "estimates")
+  
+  pval_list[[a_name]] = curr_df_long %>%
+    group_by_at(g_cols) %>%
+    t_test(data =., estimates ~ 1, mu=0,detailed =TRUE) %>%
+    adjust_pvalue(method = "bonferroni") %>%
+    add_significance("p.adj")%>%
+    ungroup()%>%
+    mutate(siglab = if_else(p.adj.signif=='ns','',p.adj.signif))
+  
+  p = curr_df_long%>%
+    ggplot(aes(x=roi,color=laterality))+
+    facet_nested(cols=vars(regressors),rows = vars(voxselect))+
+    geom_point(aes(y=estimates),position = position_dodge(1),alpha=0.8,size=0.5)+
+    geom_col(data = sum_df,aes(y=mu_estimates),position = position_dodge(1),fill=NA)+
+    geom_errorbar(data = sum_df,
+                  aes(ymin=mu_estimates-se_estimates,ymax=mu_estimates+se_estimates),
+                  position = position_dodge(1),width = 0.5)+
+    geom_text(data = pval_list[[a_name]],aes(y=max(curr_df_long$estimates)+0.02,label=siglab),
+              size = 8,position = position_dodge(1))+
+    theme(aspect.ratio = 1/2, axis.text.x = element_text(size=10),legend.position = "top")+
+    labs(caption = "asterisks indicate one-sample t test results: *** p<0.001, ** p<0.01, * p<0.05 bonferroni corrected")
+
+  ggsave(
+  file.path(rsa_dir,'unsmoothedonly',str_c('centered_',a_name,'.png')),
+  plot = p,
+  device = "png",
+  scale = 1,
+  width = 16,
+  height = 9,
+  dpi = 300)
+}
+```
+
+## ROIMDS
+```{r}
+mds_path = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean\\roimds.csv'
+roimds_df = read.csv(mds_path,header = TRUE)
+id_cols = c("subid","roi","laterality","voxselect","ds","preprocess")
+```
+
+```{r}
+save_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean'
+sg_list = list("training"='white',"test"='grey')
+for (sid in unique(roimds_df[["subid"]])){
+  curr_df = roimds_df%>%
+    filter(subid == sid)%>%
+    mutate(stimgroup = factor(training,levels = c(0,1),labels=c("test","training")),
+           roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")))
+
+  for (sg in names(sg_list)){
+    (p = curr_df%>%
+       filter(stimgroup == sg)%>%
+       ggplot(aes(x=x,y=y,color=color,shape=shape))+
+        facet_nested(cols=vars(roi,laterality),rows = vars(preprocess,voxselect))+
+        geom_point(size=2,fill=sg_list[[sg]])+
+        # scale_fill_manual(values =c("training"='white',"test"='grey'))+
+        scale_shape_manual(values =c("circle filled","square filled","diamond filled","triangle filled","triangle down filled"))+
+        theme(legend.position = "top")
+    )
+    
+    ggsave(
+      file.path(save_dir,str_c(sid,'_',sg,'.png')),
+      plot = p,
+      device = "png",
+      scale = 1,
+      width = 16,
+      height = 9,
+      dpi = 300
+      )
+  }
+}
+```
+## group ROI MDS
+```{r}
+mds_path = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean\\groupWBmds.csv'
+roimds_df = read.csv(mds_path,header = TRUE)
+save_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean'
+sg_list = list("training"='white',"test"='grey')
+col_name_by_nc = list("2" = c("x","y"),
+                      "3" = c("x","y","z"),
+                      "4" = c("x","y","u","v"))
+
+```
+
+### mds 2-4 COMPONENTS WB
+```{r}
+for (nc in unique(roimds_df$ncomponents)){
+  curr_df = roimds_df%>%
+    filter(ncomponents == nc)%>%
+    mutate(stimgroup = factor(training,levels = c(1,0),labels=c("training","test")),
+           roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")),
+           subgroup = factor(subgroup,levels = c("all","learner","generalizer")))
+  
+  axes_comb = combs(col_name_by_nc[[paste(nc)]],m=2)
+  if (is.null(dim(axes_comb))){
+    axes_comb = matrix(axes_comb,ncol=2)
+  }
+  
+  apply(axes_comb, 1, function(axes){
+    (p = curr_df%>%
+         filter(roi=="ofc" & laterality == "left")%>%
+       ggplot(aes(x=.data[[axes[1]]],y=.data[[axes[2]]],color=color,fill=color,shape=shape))+
+        facet_nested(cols=vars(stimgroup,subgroup),rows=vars(preprocess,voxselect))+
+        geom_point(size=2)+
+        scale_shape_manual(values =c("circle filled","square filled","diamond filled","triangle filled","triangle down filled"))+
+        theme(legend.position = "top",
+              panel.spacing = unit(0.2, "lines"),
+              panel.background = element_rect(fill=NULL,linewidth=1,linetype ="solid",color ="black"))+
+        labs(title=paste0(nc,"D ",axes[1],axes[2]))
+    )
+    ggsave(
+      file.path(save_dir,paste0("MDS",nc,'_',axes[1],axes[2],'_WB.png')),
+      plot = p, 
+      device = "png",
+      scale = 1,
+      width = 16,
+      height = 9,
+      dpi = 300
+      )
+  })
+}
+
+```
+
+### mds 2-4 COMPONENTS ROI
+```{r}
+save_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean'
+sg_list = list("training"='white',"test"='grey')
+col_name_by_nc = list("2" = c("x","y"),
+                      "3" = c("x","y","z"),
+                      "4" = c("x","y","u","v"))
+
+mds_path = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean\\grouproimds.csv'
+roimds_df = read.csv(mds_path,header = TRUE)
+for (ROI in unique(roimds_df$roi)){
+  for (nc in unique(roimds_df$ncomponents)){
+    curr_df = roimds_df%>%
+      filter(ncomponents == nc)%>%
+      mutate(stimgroup = factor(training,levels = c(1,0),labels=c("training","test")),
+             roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")),
+             subgroup = factor(subgroup,levels = c("all","learner","generalizer")))
+    
+    axes_comb = combs(col_name_by_nc[[paste(nc)]],m=2)
+    if (is.null(dim(axes_comb))){
+      axes_comb = matrix(axes_comb,ncol=2)
+    }
+    
+    apply(axes_comb, 1, function(axes){
+      (p = curr_df%>%
+           filter(roi==ROI)%>%
+         ggplot(aes(x=.data[[axes[1]]],y=.data[[axes[2]]],color=color,fill=color,shape=shape))+
+          facet_nested(rows=vars(stimgroup,subgroup),cols=vars(laterality,preprocess,voxselect))+
+          geom_point(size=2)+
+          scale_shape_manual(values =c("circle filled","square filled","diamond filled","triangle filled","triangle down filled"))+
+          theme(legend.position = "top",
+                panel.spacing = unit(0.2, "lines"),
+                panel.background = element_rect(fill=NULL,linewidth=1,linetype ="solid",color ="black"))+
+          labs(title=paste0(nc," D ",ROI,axes[1],axes[2]))
+      )
+      ggsave(
+        file.path(save_dir,paste0("MDS",nc,'_',ROI,'_',axes[1],axes[2],'.png')),
+        plot = p, 
+        device = "png",
+        scale = 1,
+        width = 16,
+        height = 9,
+        dpi = 300
+        )
+    })  
+}
+
+}
+
+```
+
+#### to show in meeting
+```{r}
+# only use the unsmoothed 4 runs veresion
+save_dir = 'D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\ROIRSA\\LSA_stimuli_navigation_mean'
+sg_list = list("training"='white',"test"='grey')
+col_name_by_nc = list("2" = c("x","y"),
+                      "3" = c("x","y","z"),
+                      "4" = c("x","y","u","v"))
+
+mds_path = file.path(save_dir,'grouproimds.csv')
+roimds_df = read.csv(mds_path,header = TRUE)
+
+# library(emojifont)
+# ```
+# 
+# ```{r}
+# for (x in c("crab","dog","elephant","duck","whale")){
+#   p = ggplot() + geom_emoji(search_emoji(x)[1], color='steelblue') + theme_void()
+#   show(p)
+# }
+# shape_mapping = list(crab=search_emoji("crab")[1],
+#                      giraffe=search_emoji("dog")[1],
+#                      elephant = search_emoji("elephant")[1],
+#                      duck = search_emoji("duck")[1],
+#                      whale = search_emoji("whale")[1])
+```
+
+```{r}
+for (ROI in unique(roimds_df$roi)){
+  for (nc in unique(roimds_df$ncomponents)){
+    curr_df = roimds_df%>%
+      filter(ncomponents == nc&preprocess=="unsmoothedLSA"&voxselect=="reliability_ths0")%>%
+            mutate(stimgroup = factor(training,levels = c(1,0),labels=c("training","test")),
+             roi = factor(roi,levels = c("occipital","ofc","hippocampus","parahippocampus")),
+             subgroup = factor(subgroup,levels = c("all","learner","generalizer")),
+             attrx = factor(attrx),
+             attry = factor(attry))
+    
+    axes_comb = combs(col_name_by_nc[[paste(nc)]],m=2)
+    if (is.null(dim(axes_comb))){
+      axes_comb = matrix(axes_comb,ncol=2)
+    }
+    
+    apply(axes_comb, 1, function(axes){
+      (p = curr_df%>%
+           filter(roi==ROI)%>%
+         ggplot(aes(x=.data[[axes[1]]],y=.data[[axes[2]]],color=attrx,fill=attrx,
+                    shape=attry))+
+          facet_nested(cols=vars(stimgroup,subgroup),rows=vars(laterality))+
+          geom_point(size=3)+
+          scale_shape_manual(values =c("circle filled","square filled","diamond filled","triangle filled","triangle down filled"))+
+         theme(legend.position = "top",
+                panel.spacing = unit(0.2, "lines"),
+                panel.background = element_rect(fill=NULL,linewidth=1,linetype ="solid",color ="black"))+
+          labs(title=paste0(nc," D ",ROI,axes[1],axes[2]))
+      )
+      ggsave(
+        file.path(save_dir,'unsmoothedonly',paste0("MDS",nc,'_',ROI,'_',axes[1],axes[2],'.png')),
+        plot = p, 
+        device = "png",
+        scale = 1,
+        width = 16,
+        height = 9,
+        dpi = 300
+        )
+    })  
+}
+
+}
+
+```
