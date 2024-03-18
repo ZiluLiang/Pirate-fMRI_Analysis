@@ -7,7 +7,7 @@
 clear;clc
 
 [directory,participants,filepattern]  = get_pirate_defaults(false,'directory','participants','filepattern');
-masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\anat','.*.nii'));
+masks = cellstr(spm_select('FPList','E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\masks\anat','.*.nii'));
 err_tracker   = struct(); %#ok<*UNRCH>
 
 %% run Repetition Supression and train-test GLMs

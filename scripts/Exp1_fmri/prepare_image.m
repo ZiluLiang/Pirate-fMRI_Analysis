@@ -19,11 +19,15 @@ clear;clc
 
 %% Set up
 %----------------- Change the following basic configuration ----------------- 
-wk_dir         = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis';
+wk_dir  = 'E:\pirate_fmri\Analysis';
+src_dir = fullfile(wk_dir,'src');
+
 raw_data_dir   = 'F:\MRI_Granada\CHRIS\ZILU';
-script_dir     = fullfile(wk_dir,'scripts');
-data_dir       = fullfile(wk_dir,'data','fmri_image');
-renamer_fn     = fullfile(wk_dir,'data','renamer.json');
+
+study_data_dir   = fullfile(wk_dir,'data','Exp1_fmri');
+study_script_dir = fullfile(wk_dir,'scripts','Exp1_fmri');
+data_dir       = fullfile(study_data_dir,'fmri');
+renamer_fn     = fullfile(study_data_dir,'renamer.json');
 
 dcm2niix_path  = 'C:\MRIcroGL_windows\MRIcroGL\Resources\dcm2niix.exe';
 SPM12_dir      = 'C:\Program Files\MATLAB\matlab toolbox\spm12';
@@ -44,7 +48,8 @@ renamed_dir        = fullfile(data_dir,'renamed');   % directory of renamed file
 preprocess_dir     = fullfile(data_dir,'preprocess');% directory of files ready for preprocessing, files are copied from renamed_dir
 checkimg_output_fn = 'imagenumercheck.txt';
 
-add_path(script_dir,1)
+add_path(src_dir,1)
+add_path(study_script_dir,1)
 add_path(SPM12_dir,0)
 
 %% Read subject list

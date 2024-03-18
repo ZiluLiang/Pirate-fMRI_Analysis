@@ -9,7 +9,7 @@
 %% Configurations
 clear;clc
 [directory,participants,filepattern] = get_pirate_defaults(false,'directory','participants','filepattern');                                                         
-qc_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\qualitycheck';
+qc_dir = 'E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\qualitycheck';
 
 
 
@@ -102,7 +102,7 @@ for isub = 1:participants.nsub
 end
 
 %% --------------  Calculate tSNR for each run of each participants  -------------- 
-mask_dir = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks';
+mask_dir = 'E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\masks\anat';
 masks_names = cellstr(spm_select('List',mask_dir,'.*.nii'));
 masks = cell2struct(fullfile(mask_dir,masks_names),cellfun(@(x) strrep(x,'.nii',''),masks_names,'uni',0));
 mean_tsnr = nan(numel(participants.ids)*5,numel(masks_names));

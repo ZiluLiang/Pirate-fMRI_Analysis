@@ -6,17 +6,19 @@
 		"marsbar":"C:\\Program Files\\MATLAB\\matlab toolbox\\jsonlab-master",
 		"SPM12OldNorm":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\toolbox\\OldNorm",
 		"SPM12batch":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\matlabbatch",
-		"scripts":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\__pycache__;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\behavior;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\generic;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\generic\\png;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\multivariate;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\multivariate\\__pycache__;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\preprocessing;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\qualitycheck;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\resultvisualization;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\spm_utils;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\tidydata;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\univariate;D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\utils;"
+		"src":"E:\\pirate_fmri\\Analysis\\src;E:\\pirate_fmri\\Analysis\\src\\LLR;E:\\pirate_fmri\\Analysis\\src\\LLR\\probdf_nolapse_csv;E:\\pirate_fmri\\Analysis\\src\\R;E:\\pirate_fmri\\Analysis\\src\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\multivariate;E:\\pirate_fmri\\Analysis\\src\\multivariate\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\preprocessing;E:\\pirate_fmri\\Analysis\\src\\qualitycheck;E:\\pirate_fmri\\Analysis\\src\\spm_utils;E:\\pirate_fmri\\Analysis\\src\\tidydata;E:\\pirate_fmri\\Analysis\\src\\univariate;E:\\pirate_fmri\\Analysis\\src\\utils;",
+		"scripts":"E:\\pirate_fmri\\Analysis\\scripts\\Exp1_fmri"
 	},
 	"directory":{
-		"projectdir":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\",
-		"pm_default":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\scripts\\preprocessing\\pm_defaults_Prisma_CIMCYC.m",
+		"projectdir":"E:\\pirate_fmri\\Analysis",
+		"studydir":"E:\\pirate_fmri\\Analysis\\data\\Exp1_fmri",
+		"pm_default":"E:\\pirate_fmri\\Analysis\\src\\preprocessing\\pm_defaults_Prisma_CIMCYC.m",
 		"mni_template":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\canonical\\avg152T1.nii",
-		"fmri_data":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri",
-		"fmribehavior":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\beh",
-		"preprocess":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\preprocess",
-		"unsmoothed":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\unsmoothed",
-		"smoothed":"D:\\OneDrive - Nexus365\\Project\\pirate_fmri\\Analysis\\data\\fmri\\smoothed"
+		"fmri_data":"E:\\pirate_fmri\\Analysis\\data\\Exp1_fmri\\fmri",
+		"fmribehavior":"E:\\pirate_fmri\\Analysis\\data\\Exp1_fmri\\fmri\\beh",
+		"preprocess":"E:\\pirate_fmri\\Analysis\\data\\Exp1_fmri\\fmri\\preprocess",
+		"unsmoothed":"E:\\pirate_fmri\\Analysis\\data\\Exp1_fmri\\fmri\\unsmoothed",
+		"smoothed":"E:\\pirate_fmri\\Analysis\\data\\Exp1_fmri\\fmri\\smoothed"
 	},
 	"participants":{
 		"ids":[
