@@ -6,7 +6,7 @@
 clear;clc
 
 [directory,participants,filepattern,exp]  = get_pirate_defaults(false,'directory','participants','filepattern','exp');
-masks = cellstr(spm_select('FPList','D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks\anat','.*_bilateral.nii'));
+masks = cellstr(spm_select('FPList','E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\masks\anat','.*_bilateral.nii'));
 
 %% run LSA beta series extrator GLMs (unconcatenated)
 LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer'};

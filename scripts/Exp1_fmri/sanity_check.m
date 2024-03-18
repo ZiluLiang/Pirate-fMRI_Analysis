@@ -25,8 +25,8 @@ if flag_runGLM
 end
 
 %% examine sanity check results - extract stats
-masks = {fullfile('D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks','occipital_bilateral.nii'),...
-         fullfile('D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\masks','HMAT_Motor.nii')};
+masks = {fullfile('E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\masks\anat','occipital_bilateral.nii'),...
+         fullfile('E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\masks','HMAT_Motor.nii')};
 if flag_getStat
     rangeCon = struct();
     meanResMS = struct();

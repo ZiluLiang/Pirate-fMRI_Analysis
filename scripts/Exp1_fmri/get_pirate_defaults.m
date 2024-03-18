@@ -55,7 +55,7 @@ function pirate_defaults = setdefaults
 
     
     %% --------------  Specify dependencies --------------  
-    wk_dir  = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\';
+    wk_dir  = 'E:\pirate_fmri\Analysis';
     % packages that do not need to add with subfolders
     pirate_defaults.packages.SPM12        = 'C:\Program Files\MATLAB\matlab toolbox\spm12';
     pirate_defaults.packages.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
@@ -64,23 +64,26 @@ function pirate_defaults = setdefaults
     pirate_defaults.packages.SPM12OldNorm = fullfile(pirate_defaults.packages.SPM12,'toolbox','OldNorm'); % this is so that auto reorientation runs
     pirate_defaults.packages.SPM12batch   = fullfile(pirate_defaults.packages.SPM12,'matlabbatch');         % this is so that batch management runs
     % packages that need to add with subfolders
-    pirate_defaults.packages.scripts      = genpath(fullfile(wk_dir,'scripts'));
+    pirate_defaults.packages.src          = genpath(fullfile(wk_dir,'src'));
+    pirate_defaults.packages.scripts      = fullfile(wk_dir,'scripts','Exp1_fmri');
     % add path to packages
     structfun(@(pkg_path) addpath(pkg_path),rmfield(pirate_defaults.packages,'MRIcroGL'))
     
     %% --------------  Specify directory  -------------- 
     pirate_defaults.directory.projectdir   = wk_dir;
-    pirate_defaults.directory.pm_default   = fullfile(wk_dir,'scripts','preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
+    pirate_defaults.directory.studydir     = fullfile(wk_dir,'data','Exp1_fmri');
+
+    pirate_defaults.directory.pm_default   = fullfile(wk_dir,'src','preprocessing','pm_defaults_Prisma_CIMCYC.m');  % specifics for fieldmap 
     pirate_defaults.directory.mni_template = fullfile(spm('dir'),'canonical','avg152T1.nii'); % mni template used for visualization and estimate parameters for auto-reorientation
-    pirate_defaults.directory.fmri_data    = fullfile(wk_dir,'data','fmri');
-    pirate_defaults.directory.fmribehavior = fullfile(wk_dir,'data','fmri','beh');
-    pirate_defaults.directory.preprocess   = fullfile(wk_dir,'data','fmri','preprocess'); % directory to images created during preprocessing
-    pirate_defaults.directory.unsmoothed   = fullfile(wk_dir,'data','fmri','unsmoothed'); % directory to preprossesed images without smoothing
-    pirate_defaults.directory.smoothed     = fullfile(wk_dir,'data','fmri','smoothed');   % directory to preprossesed images after smoothing
+    pirate_defaults.directory.fmri_data    = fullfile(pirate_defaults.directory.studydir,'fmri');
+    pirate_defaults.directory.fmribehavior = fullfile(pirate_defaults.directory.studydir,'fmri','beh');
+    pirate_defaults.directory.preprocess   = fullfile(pirate_defaults.directory.studydir,'fmri','preprocess'); % directory to images created during preprocessing
+    pirate_defaults.directory.unsmoothed   = fullfile(pirate_defaults.directory.studydir,'fmri','unsmoothed'); % directory to preprossesed images without smoothing
+    pirate_defaults.directory.smoothed     = fullfile(pirate_defaults.directory.studydir,'fmri','smoothed');   % directory to preprossesed images after smoothing
     
 
     %% --------------  Read subject list -------------- 
-    renamer_fn = fullfile(wk_dir,'data','renamer.json');
+    renamer_fn = fullfile(pirate_defaults.directory.studydir,'renamer.json');
     renamer    = loadjson(renamer_fn);
     
     pirate_defaults.participants.ids     = fieldnames(renamer);
@@ -142,5 +145,5 @@ function pirate_defaults = setdefaults
 
     %% --------------  saving to json file for python reading  ------------------
     %pirate_defaults.participants = rmfield(pirate_defaults.participants,{'ids','nsub'});
-    savejson('',pirate_defaults,'FileName',fullfile(wk_dir,'scripts','pirate_defaults.json'),'SingletCell',0,'ForceRootName',0);
+    savejson('',pirate_defaults,'FileName',fullfile(pirate_defaults.packages.scripts,'pirate_defaults.json'),'SingletCell',0,'ForceRootName',0);
 end
