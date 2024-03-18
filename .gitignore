@@ -1,6 +1,7 @@
 data
 otherscode
 results
+probdf
 
 **/*.RData
 **/*.Rhistory
@@ -13,13 +14,10 @@ results
 **/bspmview**.mat
 **/test*
 
+plotroirsa.Rmd
 scripts/prepare_image.m
 scripts/behavior
 scripts/generic
 scripts/tidydata
 scripts/behavior.Rmd
-
 .Rproj.user
-.code-workspace
-.RData
-.Rhistory
