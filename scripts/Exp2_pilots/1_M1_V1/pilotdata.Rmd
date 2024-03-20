@@ -1,5 +1,5 @@
 ---
-title: "pilotdata"
+title: "Data from Pilot M1V1"
 output: html_document
 date: "2024-03-12"
 ---
@@ -7,7 +7,7 @@ date: "2024-03-12"
 ```{r setup, include=FALSE}
 
 rm(list = ls())
-knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE,fig.height = 9)
 
 rm(list = ls())
 project_dir = rstudioapi::getActiveProject();
@@ -26,7 +26,7 @@ source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_globa
 # Attention Check
 Plot attention check results and see if any need to be excluded from analyses
 ```{r}
-pilot_data = read.csv(file.path(data_dir,"pilot_data.csv",fsep="/"))
+pilot_data = read.csv(file.path(data_dir,"task_data.csv",fsep="/"))
 attention_check_data = pilot_data%>%
   filter(ctrl_ept==0)
 attention_check_sum = attention_check_data%>%
@@ -53,7 +53,7 @@ ggplot(data=attention_check_sum,aes(x=subid,y=accuracy,fill=session_str))+
 filter(attention_check_sum,accuracy==min(attention_check_sum$accuracy))$subid
 ```
 
-Subid "lKo186FW3Hk0" attention check accuracy is too low, so removed
+Subid "lKo186FW3Hk0" attention check accuracy is too low, so removed from analysis
 ```{r}
 remove_sub = c("lKo186FW3Hk0")
 pilot_data = pilot_data%>%
@@ -106,14 +106,13 @@ data = left_join(data,re_Assign_block)
 
 ```
 
-
-## load model distribution df
-```{r}
+## calculate llr for each participant and classify learner/generalizer
+```{r load model distribution df}
 load(file.path(llr_dir,"probDF_data_compo_withlapse.RData"))
 ```
 
-### calculate llr for each participant
-```{r}
+
+```{r calculate llr for each participant}
 tryCatch(
   expr = {
     data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
@@ -171,9 +170,8 @@ data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RD
 ```
 
 
-## classify learner
 
-```{r}
+```{r classify learner}
 data_with_prob = data_with_prob%>%
   mutate(error_x = abs(stim_x - resp_x),
          error_y = abs(stim_y - resp_y))%>%
@@ -213,41 +211,21 @@ generalizerids = unique(filter(dividesub,expt_session==1&stim_group=="validation
 
 data_with_prob = data_with_prob%>%
   mutate(islearner = ifelse(subid%in%learnerids,1,0),
-         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))
-
-sub_LLR_data = sub_LLR_data%>%
-  mutate(islearner = ifelse(subid%in%learnerids,1,0),
-         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))
-```
-
-## Plot average learner/nonlearner, generalizer/nongeneralizer data
-```{r}
-blockdata_sub = aggregate_data(data_with_prob,
-                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
-                           groupbyvars = c("subid","stim_group","expt_session","blocknumber_withinsess"),
-                           stats = c("mu"),
-                           additionalvars = c("islearner","isgeneralizer","session_str"))%>%
-  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
-                                "mu_resp_dist","mu_error_x","mu_error_y"),
-                   newnames = c("LLR","LLR_x","LLR_y",
-                                "distance","errorx","errory"))%>%
+         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))%>%
   mutate(islearner = factor(islearner,levels = c(0,1),labels = c("non-learner","learner")),
          isgeneralizer = factor(isgeneralizer,levels = c(0,1),labels = c("non-generalizer","generalizer")))
 
-
-blockdata_sum = aggregate_data(blockdata_sub,
-                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory"),
-                           groupbyvars = c("islearner","isgeneralizer","stim_group",
-                                           "expt_session","blocknumber_withinsess"),
-                           stats = c("mu","se","n"),
-                           additionalvars = c("session_str"))
+sub_LLR_data = sub_LLR_data%>%
+  mutate(islearner = ifelse(subid%in%learnerids,1,0),
+         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))%>%
+  mutate(islearner = factor(islearner,levels = c(0,1),labels = c("non-learner","learner")),
+         isgeneralizer = factor(isgeneralizer,levels = c(0,1),labels = c("non-generalizer","generalizer")))
 ```
-
-```{r}
+```{r count participant type}
 nlearners = length(learnerids)
 ngeneralizers = length(generalizerids)
 nsub = length(unique(sub_LLR_data$subid))
-participant_count = blockdata_sub%>%
+participant_count = sub_LLR_data%>%
   distinct(subid,islearner,isgeneralizer)%>%
   group_by(islearner,isgeneralizer)%>%
   summarise(n = n())
@@ -261,8 +239,32 @@ labelling_func = function(row){
 }
 ```
 
-### plot rescaled distance to goal of learned participants
-```{r}
+
+## Behavioural performance of learner/generalizer in treasure hunt task{.tabset}
+```{r treasurehunt block average}
+blockdata_sub = aggregate_data(data_with_prob,
+                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
+                           groupbyvars = c("subid","stim_group","expt_session","blocknumber_withinsess"),
+                           stats = c("mu"),
+                           additionalvars = c("islearner","isgeneralizer","session_str"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
+                                "mu_resp_dist","mu_error_x","mu_error_y"),
+                   newnames = c("LLR","LLR_x","LLR_y",
+                                "distance","errorx","errory"))
+
+
+blockdata_sum = aggregate_data(blockdata_sub,
+                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory"),
+                           groupbyvars = c("islearner","isgeneralizer","stim_group",
+                                           "expt_session","blocknumber_withinsess"),
+                           stats = c("mu","se","n"),
+                           additionalvars = c("session_str"))
+```
+
+
+
+### rescaled distance to goal
+```{r rescaled distance to goal}
 # with data count
 blockdata_sub$generalizer_label =
 apply(blockdata_sub[ , c("islearner","isgeneralizer")], 1, labelling_func)
@@ -291,8 +293,8 @@ apply(blockdata_sum[ , c("islearner","isgeneralizer")], 1, labelling_func)
 ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot = p,device = 'png',width = 15,height = 8)
 ```
 
-### plot mean LLR of learned participants
-```{r, out.height=150%}
+### mean LLR
+```{r}
 #withdatacount
 (p = blockdata_sub%>%
   ggplot(aes(x=blocknumber_withinsess,y=LLR,fill=stim_group,color=stim_group))+
@@ -317,47 +319,46 @@ ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot 
 ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = 'png',width = 15,height = 8)
 ```
 
-## Plot individual response map
-### with label
-```{r}
-for (pid in unique(data_with_prob$subid)){
-  current_data = filter(data_with_prob,subid == pid)
-  plot_name = paste0(pid,"\n",
-                    ifelse(pid %in% learnerids,"learner","nonlearner"),
-                    " - ",
-                    ifelse(pid %in% generalizerids,"generalizer","nongeneralizer"))
+### Individual response map
+<!-- ### with label -->
+<!-- ```{r} -->
+<!-- for (pid in unique(data_with_prob$subid)){ -->
+<!--   current_data = filter(data_with_prob,subid == pid) -->
+<!--   plot_name = paste0(pid,"\n", -->
+<!--                     ifelse(pid %in% learnerids,"learner","nonlearner"), -->
+<!--                     " - ", -->
+<!--                     ifelse(pid %in% generalizerids,"generalizer","nongeneralizer")) -->
 
-  n_refresher=6
-  n_trainingcycle=12
-  nb_percyc = 3
-  n_test = 4
-  layoutmat = matrix(c(## first three rows are training cycles
-                       seq(1,n_trainingcycle*nb_percyc,by=nb_percyc),
-                       seq(2,n_trainingcycle*nb_percyc,by=nb_percyc),
-                       seq(3,n_trainingcycle*nb_percyc,by=nb_percyc),
-                       ## refresher
-                       seq(n_trainingcycle*nb_percyc+1,n_trainingcycle*nb_percyc+n_refresher,by=1), NA,NA,
-                       ## test
-                       seq(n_trainingcycle*nb_percyc+n_refresher+2,
-                           n_trainingcycle*nb_percyc+n_refresher+n_test+1), 
-                       rep(NA,n_trainingcycle-n_test-n_refresher-2)
-                       ),
-                     4, n_trainingcycle, byrow = TRUE)
-  (p = current_data%>%
-    ggplot(aes(x=resp_x, y = resp_y, color = stim_attrx,fill = stim_attrx))+
-    facet_manual(vars(session_str,blocknumber_withinsess),design = layoutmat,strip = strip_nested())+
-    geom_point(aes(shape = stim_attry),size=3.5,alpha=0.6)+
-    scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+
-    scale_shape_manual(values = x_shapes)+
-    guides(fill = "none")+
-    labs(title = plot_name,color = "true x",shape = "true y", x = "response x", y = "response y")+
-    theme(legend.position = "top",aspect.ratio = 1))
-  ggsave(file.path(result_dir,'individualmaps',"participant_map_rescaled",paste0(pid,'.png')),plot = p,device = 'png',width = 15,height = 9)
-}
-```
+<!--   n_refresher=6 -->
+<!--   n_trainingcycle=12 -->
+<!--   nb_percyc = 3 -->
+<!--   n_test = 4 -->
+<!--   layoutmat = matrix(c(## first three rows are training cycles -->
+<!--                        seq(1,n_trainingcycle*nb_percyc,by=nb_percyc), -->
+<!--                        seq(2,n_trainingcycle*nb_percyc,by=nb_percyc), -->
+<!--                        seq(3,n_trainingcycle*nb_percyc,by=nb_percyc), -->
+<!--                        ## refresher -->
+<!--                        seq(n_trainingcycle*nb_percyc+1,n_trainingcycle*nb_percyc+n_refresher,by=1), NA,NA, -->
+<!--                        ## test -->
+<!--                        seq(n_trainingcycle*nb_percyc+n_refresher+2, -->
+<!--                            n_trainingcycle*nb_percyc+n_refresher+n_test+1),  -->
+<!--                        rep(NA,n_trainingcycle-n_test-n_refresher-2) -->
+<!--                        ), -->
+<!--                      4, n_trainingcycle, byrow = TRUE) -->
+<!--   (p = current_data%>% -->
+<!--     ggplot(aes(x=resp_x, y = resp_y, color = stim_attrx,fill = stim_attrx))+ -->
+<!--     facet_manual(vars(session_str,blocknumber_withinsess),design = layoutmat,strip = strip_nested())+ -->
+<!--     geom_point(aes(shape = stim_attry),size=3.5,alpha=0.6)+ -->
+<!--     scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+ -->
+<!--     scale_shape_manual(values = x_shapes)+ -->
+<!--     guides(fill = "none")+ -->
+<!--     labs(title = plot_name,color = "true x",shape = "true y", x = "response x", y = "response y")+ -->
+<!--     theme(legend.position = "top",aspect.ratio = 1)) -->
+<!--   ggsave(file.path(result_dir,'individualmaps',"participant_map_rescaled",paste0(pid,'.png')),plot = p,device = 'png',width = 15,height = 9) -->
+<!-- } -->
+<!-- ``` -->
 
-### 2D + 1D LLR
-```{r}
+```{r 2D + 1D LLR}
 for (pid in unique(filter(data_with_prob)$subid)){
   current_data = filter(data_with_prob,subid == pid)%>%
     mutate(stim_attrx = factor(stim_attrx),
@@ -408,7 +409,7 @@ for (pid in unique(filter(data_with_prob)$subid)){
     scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+
     scale_shape_manual(values = x_shapes)+
     guides(fill = "none")+
-    labs(title = psub.title,
+    labs(title = plot_name,
          color = "x feature",shape = "y feature", x = "x", y = "y")+
     theme(legend.position = "top"))
   ggsave(file.path(result_dir,'individualmaps',"participant_map_with1dLLR",paste0(pid,'.png')),plot = p,width = 16,height = 9)
@@ -474,9 +475,9 @@ for (j in c(0,1)){
 
 
 
-# 2AFC task
+# 2AFC task{.tabset}
 
-```{r }
+```{r filter 2AFC task data}
 fc_df_all = pilot_data%>%
   filter(expt_task==1)%>%
   mutate(distractor_dist = sqrt((distractor_x-stim_x)^2+(distractor_y-stim_y)^2),
@@ -502,10 +503,28 @@ fc_df_all = fc_df_all%>%
          istraining = factor(istraining,level=c(1,0),labels=c("training","validation+test")),
          choosen_x = if_else(resp_correct==1,stim_x,distractor_x),
          choosen_y = if_else(resp_correct==1,stim_y,distractor_y))
-fc_df_all$stim_locid=sapply(seq(1,nrow(fc_df_all)),
-                        function(j){filter(unique_stimloc,x == fc_df_all$stim_x[j] & y == fc_df_all$stim_y[j])$ind})
-fc_df_all$distractor_locid=sapply(seq(1,nrow(fc_df_all)),
-                           function(j){filter(unique_stimloc,x == fc_df_all$distractor_x[j] & y == fc_df_all$distractor_y[j])$ind})
+
+
+## assign location id to each stimuli
+find_loc_id = function(datax,datay){
+  filter(unique_stimloc,x == datax & y == datay)$ind
+}
+cl<- makeCluster(detectCores())
+clusterExport(cl=cl,
+              varlist = c("fc_df_all","unique_stimloc","find_loc_id"),
+              envir=environment())
+stim_locid <- pblapply(cl = cl,X = seq(1,nrow(fc_df_all)),
+                     FUN = function(j){ 
+                       library(dplyr)
+                       return (find_loc_id(fc_df_all$stim_x[j],fc_df_all$stim_y[j]))}
+                     )
+distractor_locid <- pblapply(cl = cl,X = seq(1,nrow(fc_df_all)),
+                     FUN = function(j){ 
+                       library(dplyr)
+                       return (find_loc_id(fc_df_all$distractor_x[j],fc_df_all$distractor_y[j]))}
+                     )
+fc_df_all$stim_locid=stim_locid
+fc_df_all$distractor_locid=distractor_locid
 
 
 ```
@@ -544,10 +563,16 @@ fc_df_missedtrial_sumexp = fc_df_missedtrial_sub%>%
   aggregate_data(yvars = c("missed"),
                  groupbyvars = c("islearner","isgeneralizer","subid","stim_group"),
                            stats = c("mu"))
+
+average_missed_percentage = sum(is.na(fc_df_all$resp_correct))/nrow(fc_df_all)
 ggplot(data=fc_df_missedtrial_sumexp,aes(x=subid,y=mu_missed,fill=stim_group,color=stim_group))+
   geom_col(position=position_dodge2(1))+
   #facet_nested(cols = vars(islearner,isgeneralizer))+
-  geom_hline(yintercept=sum(is.na(fc_df_all$resp_correct))/nrow(fc_df_all),show.legend=TRUE)+
+  geom_hline(yintercept=average_missed_percentage,show.legend=FALSE)+
+  geom_text(aes(color=NULL,fill=NULL,
+                x=3.5, y= 0.2,
+                label = sprintf("Average missed:  %.1f%s",average_missed_percentage*100,"%")),
+            show.legend = FALSE)+
   scale_y_continuous(labels = function(x){sprintf("%.1f%s",x*100,"%")})+
   labs(y="percentage of missed trials in total (%)")+
   theme(axis.text.x = element_text(angle=90))
@@ -557,7 +582,7 @@ fc_df = filter(fc_df_all,missed==0)
 ```
 
 
-## Plot average learner/nonlearner, generalizer/nongeneralizer choice data
+## Choice Accuracy and RT
 ```{r}
 blockfcdata_sub = aggregate_data(fc_df,
                            yvars = c("resp_correct","resp_rt","distractor_dist"),
@@ -574,14 +599,9 @@ blockfcdata_sum = aggregate_data(blockfcdata_sub,
                            groupbyvars = c("expt_session","islearner","isgeneralizer","stim_group","expt_block"),
                            additionalvars = c("session_str","blocknumber_withinsess"),
                            stats = c("mu","se"))
-#blockdata_sub$generalizer_label =
-#apply(blockdata_sub[ , c("islearner","isgeneralizer")], 1, labelling_func)
-#blockdata_sum$generalizer_label =
-#apply(blockdata_sum[ , c("islearner","isgeneralizer")], 1, labelling_func)
 ```
 
-
-
+### Accuracy
 ```{r}
 (p=
    ggplot(data = blockfcdata_sum,
@@ -589,9 +609,13 @@ blockfcdata_sum = aggregate_data(blockfcdata_sub,
   facet_nested(rows=vars(islearner,isgeneralizer),scales = "free_x",space = "free_x")+
   geom_errorbar(aes(ymin = mu_blockacc - se_blockacc,
                     ymax = mu_blockacc + se_blockacc),
-                width=0.4)+
-   geom_line()+
-  geom_point(data=blockfcdata_sub,aes(x=blocknumber_withinsess,y=blockacc,group=subid),alpha = 0.3,size = 2,stroke=0)+
+                width=0.4,
+                position = position_dodge(width=0.5))+
+  geom_point(position = position_dodge(width=0.5))+ 
+  geom_line(position = position_dodge(width=0.5))+
+  geom_point(data=blockfcdata_sub,aes(x=blocknumber_withinsess,y=blockacc),
+             alpha = 0.3,size = 2,stroke=0,
+             position = position_dodge(width=0.5))+
   labs(x="block number",y="block acc",color = "stim group",
        title = "Choice Accuracy")+
   guides(fill = "none")+
@@ -599,7 +623,22 @@ blockfcdata_sum = aggregate_data(blockfcdata_sub,
 
 ggsave(file.path(result_dir,paste0('blockacc_withsess','.png')),plot = p,device = 'png',width = 15,height = 7)
 ```
+```{r}
+# set test as reference level for stim group
+fc_df <- within(fc_df, stim_group <- relevel(stim_group, ref = "test"))
+# set test as reference level for isgeneralizer
+fc_df$isgeneralizer = factor(fc_df$isgeneralizer,levels=c(0,1),labels=c("nonGeneralizer","Generalizer"))
+fc_df <- within(fc_df, isgeneralizer <- relevel(isgeneralizer, ref = "nonGeneralizer"))
+```
 
+
+```{r}
+model = glmer(resp_correct~isgeneralizer*distractor_dist+isgeneralizer*stim_group+blocknumber_withinsess + (1 |subid),
+              data=fc_df,family = binomial)
+export_summs(model,error_format = "[{conf.low}, {conf.high}]")
+```
+
+### RT
 
 ```{r}
 (p=
@@ -608,10 +647,15 @@ ggsave(file.path(result_dir,paste0('blockacc_withsess','.png')),plot = p,device 
   facet_nested(rows=vars(islearner,isgeneralizer),scales = "free_x",space = "free_x")+
   geom_errorbar(aes(ymin = mu_blockrt - se_blockrt,
                     ymax = mu_blockrt + se_blockrt),
-                width=0.4)+
-   geom_line()+
-  geom_point(data=blockfcdata_sub,aes(x=blocknumber_withinsess,y=blockrt,group=subid),alpha = 0.3,size = 2,stroke=0)+
-  labs(x="block number",y="block rt",color = "stim group",
+                width=0.4,
+                position = position_dodge(width=0.5))+
+  geom_point(position = position_dodge(width=0.5))+ 
+  geom_line(position = position_dodge(width=0.5))+
+  geom_point(data=blockfcdata_sub,aes(x=blocknumber_withinsess,y=blockrt,group=subid),
+             alpha = 0.3,size = 2,stroke=0,
+             position = position_dodge(width=0.5))+
+  scale_y_continuous(breaks=c(0,200,400,600,800,1000))+
+  labs(x="block number",y="block rt (ms)",color = "stim group",
        title = "Choice RT")+
    guides(fill = "none")+
   theme(aspect.ratio = 5,legend.position = "top"))
@@ -626,9 +670,13 @@ ggsave(file.path(result_dir,paste0('blockrt_withsess','.png')),plot = p,device =
   facet_nested(rows=vars(islearner,isgeneralizer),scales = "free_x",space = "free_x")+
   geom_errorbar(aes(ymin = mu_blockdist - se_blockdist,
                     ymax = mu_blockdist + se_blockdist),
-                width=0.4)+
-   geom_line()+
-  geom_point(data=blockfcdata_sub,aes(x=blocknumber_withinsess,y=blockdist,group=subid),alpha = 0.3,size = 2,stroke=0)+
+                width=0.4,
+                position = position_dodge(width=0.5))+
+  geom_point(position = position_dodge(width=0.5))+ 
+  geom_line(position = position_dodge(width=0.5))+
+  geom_point(data=blockfcdata_sub,aes(x=blocknumber_withinsess,y=blockdist,group=subid),
+             alpha = 0.3,size = 2,stroke=0,
+             position = position_dodge(width=0.5))+
   labs(x="block number",y="block dist",color = "stim group",
        title = "Block difficulty level (average distractor distance to goal)")+
    guides(fill = "none")+
@@ -856,10 +904,126 @@ ggplot(data=fcdf_quaderr_sum,aes(x=distractor_samequadrant,fill=distractor_sameq
 
 
 
-### some stats
+# debrief
 
 ```{r}
-model = glmer("resp_correct~isgeneralizer*distractor_dist+isgeneralizer*stim_group+(1|subid)",data=fc_df,family = binomial)
-summary(model)
+debrief_data = read.csv(file.path(data_dir,"debrief_data.csv",fsep="/"))
+cluster_data = read.csv(file.path(data_dir,"cluster_data.csv",fsep="/"))
+debrief_cluster_data = left_join(cluster_data,debrief_data,by=c("prolificid","subid"))%>%
+  filter(!(subid %in% remove_sub))%>%
+  mutate(islearner = subid %in% learnerids,
+         isgeneralizer = subid %in% generalizerids,
+         symbol_side = if_else(floor(symID/5)==0,"L","R"),
+         symbol_axisloc = mod(symID,5)-2)%>%
+  mutate(islearner = factor(islearner,levels = c(FALSE,TRUE),labels = c("non-learner","learner")),
+         isgeneralizer = factor(isgeneralizer,levels = c(FALSE,TRUE),labels = c("non-generalizer","generalizer")))
+```
+
+
+```{r}
+generalizer_mat = list()
+nongeneralizer_mat = list()
+for (pid in unique(debrief_cluster_data$subid)){
+  curr_data = filter(debrief_cluster_data,subid==pid)%>%
+    dplyr::select(-c(ends_with("sx"),ends_with("sy"),"init_x","init_y","X.x","X.y"))
+  curr_data = arrange(curr_data,symID)
+  sym_info = curr_data[,c("symID","symbol_side","symbol_axisloc")]
+  sym_info_1 = change_cols_name(sym_info,oldnames = colnames(sym_info),newnames = paste0(colnames(sym_info),"_1"))
+  sym_info_2 = change_cols_name(sym_info,oldnames = colnames(sym_info),newnames = paste0(colnames(sym_info),"_2"))
+
+  sym_loc_mat = as.matrix(curr_data[,c("final_x","final_y")])
+  dist_mat = pdist(sym_loc_mat)
+  diag(dist_mat)=NaN
+  
+  if (pid %in% generalizerids){
+    generalizer_mat = append(generalizer_mat,list(dist_mat))
+  } else{
+    nongeneralizer_mat = append(nongeneralizer_mat,list(dist_mat))
+  }
+  
+  dist_df = data.frame(reshape::melt.array(dist_mat))
+  colnames(dist_df) = c("symID_1","symID_2","distance")
+  dist_df = dist_df%>%
+    mutate(symID_1=symID_1-1,
+           symID_2=symID_2-1,
+           )
+  dist_df = left_join(left_join(dist_df,sym_info_1,by="symID_1"),sym_info_2,by="symID_2")
+  
+  plot_name = paste(pid,"\n",unique(curr_data$islearner),unique(curr_data$isgeneralizer))
+  (p2 = ggplot(data=dist_df,aes(x=symID_1,y=symID_2))+
+      geom_tile(aes(fill=distance))+
+      scale_x_continuous(breaks=unique(dist_df$symID_1),
+                         labels=paste(sym_info$symbol_side,sym_info$symbol_axisloc,sep="_"))+
+      scale_y_continuous(breaks=unique(dist_df$symID_2),
+                         labels=paste(sym_info$symbol_side,sym_info$symbol_axisloc,sep="_"),
+                         trans="reverse")+
+      scale_fill_distiller(aesthetics = c("fill"),palette = "YlOrRd",na.value = "white")+
+      labs(subtitle = "RDM from Arrangements",
+           x="symbol",y="symbol",
+           )+
+      theme(legend.position = "top",
+            aspect.ratio = 1,
+            axis.line = element_blank(),
+            legend.key.width = unit(dev.size()[1] / 10, "inches"))
+    )
+  (p1=ggplot(data=curr_data,aes(x=final_x,y=final_y))+
+      geom_text(aes(label=paste(symbol_side,symbol_axisloc,sep="_"),
+                    color=symbol_side,fontface="bold"))+
+      labs(x="x",y="y",subtitle="Arrangement")+
+      theme(legend.position = "top",legend.direction = "horizontal")
+      )
+  p3 = ggplot()+
+    geom_textbox(aes(x=0,y=0),
+                 width = unit(0.5, "npc"),
+                 label=paste0("debrief: ", unique(curr_data$clusterRationale)),
+                 size=4)+
+    theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          axis.title = element_blank())
+      
+  p=grid.arrange(p1,p2,p3,nrow=1,widths=c(1,1,0.5),
+                 top=grid::textGrob(plot_name,
+                              gp = grid::gpar(fontface = "bold", fontsize = 20)))
+  ggsave(file.path(result_dir,'individualmaps',"participant_clustertask",paste0(pid,'.png')),plot = p,width = 16,height = 9)  
+}
+```
+
+```{r}
+
+mean_rdm_g = Reduce("+", generalizer_mat) / length(generalizer_mat)
+mean_rdm_ng = Reduce("+", nongeneralizer_mat) / length(nongeneralizer_mat)
+
+dist_df_g = data.frame(reshape::melt.array(mean_rdm_g))
+colnames(dist_df_g) = c("symID_1","symID_2","distance")
+dist_df_g = dist_df_g%>%
+  mutate(symID_1=symID_1-1,
+         symID_2=symID_2-1,
+         group = "Generalizers"
+         )
+dist_df_ng = data.frame(reshape::melt.array(mean_rdm_ng))
+colnames(dist_df_ng) = c("symID_1","symID_2","distance")
+dist_df_ng = dist_df_ng%>%
+  mutate(symID_1=symID_1-1,
+         symID_2=symID_2-1,
+         group = "nonGeneralizers"
+         )
+sym_info
+dist_df = rbind(dist_df_g,dist_df_ng)
+(p = ggplot(data=dist_df,aes(x=symID_1,y=symID_2))+
+      facet_grid(cols=vars(group))+
+      geom_tile(aes(fill=distance))+
+      scale_x_continuous(breaks=unique(dist_df$symID_1),
+                         labels=paste(sym_info$symbol_side,sym_info$symbol_axisloc,sep="_"))+
+      scale_y_continuous(breaks=unique(dist_df$symID_2),
+                         labels=paste(sym_info$symbol_side,sym_info$symbol_axisloc,sep="_"),
+                         trans="reverse")+
+      scale_fill_distiller(aesthetics = c("fill"),palette = "YlOrRd",na.value = "white")+
+      labs(x="symbol",y="symbol")+
+      theme(legend.position = "top",
+            aspect.ratio = 1,
+            axis.line = element_blank()
+            )
+    )
 ```
 
