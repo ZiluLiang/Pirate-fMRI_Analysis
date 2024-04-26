@@ -11,7 +11,7 @@ masks = cellstr(spm_select('FPList','E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri
 %% run LSA beta series extrator GLMs (unconcatenated)
 LSAglm_names = {'LSA_stimuli_navigation','LSA_stimuli_localizer'};
 flag_runGLM  = true;
-lsa_dir      = {'unsmoothedLSA','smoothed5mmLSA'};
+lsa_dir      = {'unsmoothedLSA_hpf_','smoothed5mmLSA'};
 preproc_dir  = {directory.unsmoothed,directory.smoothed};
 steps        = struct('first', {{'specify','estimate','contrast'}});
 for jdir = 1:numel(lsa_dir)     
@@ -57,14 +57,15 @@ for jdir = 1:numel(lsa_dir)
         firstlvl_dir = fullfile(glm_dir,'first',participants.validids{isub});
         subSPM = load(fullfile(firstlvl_dir,'SPM.mat'),'SPM').SPM;
         [contrast_img1,contrast_imgo,contrast_imge] = deal(cell(numel(exp.allstim),1));
+        [Tstat_img1,Tstat_imgo,Tstat_imge] = deal(cell(numel(exp.allstim),1));
         reg_img = cell(numel(exp.allstim),4);
         for k = 1:numel(exp.allstim)
             % find contrast image group 1
-            [~,contrast_img1{k},~] = find_contrast_idx(subSPM,regexpPattern(sprintf('^stim%02d$',exp.allstim(k))));
+            [~,contrast_img1{k},Tstat_img1{k}] = find_contrast_idx(subSPM,regexpPattern(sprintf('^stim%02d$',exp.allstim(k))));
             
             % find contrast image group 2
-            [~,contrast_imgo{k},~] = find_contrast_idx(subSPM,sprintf('stim%02d_odd',exp.allstim(k)));
-            [~,contrast_imge{k},~] = find_contrast_idx(subSPM,sprintf('stim%02d_even',exp.allstim(k)));
+            [~,contrast_imgo{k},Tstat_imgo{k}] = find_contrast_idx(subSPM,sprintf('stim%02d_odd',exp.allstim(k)));
+            [~,contrast_imge{k},Tstat_imge{k}] = find_contrast_idx(subSPM,sprintf('stim%02d_even',exp.allstim(k)));
             
             % find the index of regressor
             [~,reg_img(k,:)] = arrayfun(@(runid) find_regressor_idx(subSPM,sprintf('Sn(%d) stim%02d',runid,exp.allstim(k))),1:numel(subSPM.Sess));
@@ -73,16 +74,19 @@ for jdir = 1:numel(lsa_dir)
         
         if ~any(cellfun(@isempty,[contrast_img1;contrast_imgo;contrast_imge;reshape(reg_img,[],1)]))
             % ordered by stim00 -- stim24
-            spm_file_merge(char(fullfile(firstlvl_dir,contrast_img1)),fullfile(firstlvl_dir,'stimuli_all.nii'));
+            %spm_file_merge(char(fullfile(firstlvl_dir,contrast_img1)),fullfile(firstlvl_dir,'stimuli_all.nii'));
+            spm_file_merge(char(fullfile(firstlvl_dir,Tstat_img1)),fullfile(firstlvl_dir,'stimuliT_all.nii'));
             
             % ordered by stim00odd -- stim24odd/stim00even -- stim24even
-            spm_file_merge(char(fullfile(firstlvl_dir,contrast_imgo)),fullfile(firstlvl_dir,'stimuli_odd.nii'));
-            spm_file_merge(char(fullfile(firstlvl_dir,contrast_imge)),fullfile(firstlvl_dir,'stimuli_even.nii'));
+            %spm_file_merge(char(fullfile(firstlvl_dir,contrast_imgo)),fullfile(firstlvl_dir,'stimuli_odd.nii'));
+            %spm_file_merge(char(fullfile(firstlvl_dir,contrast_imge)),fullfile(firstlvl_dir,'stimuli_even.nii'));
+            spm_file_merge(char(fullfile(firstlvl_dir,Tstat_imgo)),fullfile(firstlvl_dir,'stimuliT_odd.nii'));
+            spm_file_merge(char(fullfile(firstlvl_dir,Tstat_imge)),fullfile(firstlvl_dir,'stimuliT_even.nii'));
 
             % ordered by stim00r1 -- stim24r1 -- stim00r2 -- stim24r2 ...        
-            tmp = permute(reg_img,[1,2]);
-            reg_img = vertcat(tmp(:));
-            spm_file_merge(char(fullfile(firstlvl_dir,reg_img)),fullfile(firstlvl_dir,'stimuli_4r.nii'));
+            %tmp = permute(reg_img,[1,2]);
+            %reg_img = vertcat(tmp(:));
+            %spm_file_merge(char(fullfile(firstlvl_dir,reg_img)),fullfile(firstlvl_dir,'stimuli_4r.nii'));
             fprintf('Completed concatenating 4D activity pattern images for %s\n',participants.validids{isub})
         else            
             error('failed to find enough file to concatenate:\n %s - contrast_img1: %d/25, contrast_img2: %d/50, reg_img: %d/100\n',...
@@ -94,6 +98,7 @@ for jdir = 1:numel(lsa_dir)
         clear firstlvl_dir subSPM contrast_img1 contrast_imgo contrast_imge reg_img tmp
     end
 end
+
 
 %% concatenate into 4D series - unconcatenated glms localizer task
 % 9 regressors one for each training stimuli

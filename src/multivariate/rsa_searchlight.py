@@ -1,5 +1,5 @@
 """
-This module contains classes for running searchlight RSA analysis.
+This module contains classes for running searchlight analysis.
 The code is adapted from nilearn.decoding.searchlight module @ https://github.com/nilearn/nilearn/blob/321494420/nilearn/decoding/searchlight.py
 """
 import os
@@ -7,7 +7,7 @@ import sys
 import time
 import json
 import warnings
-import numpy as np
+import numpy
 import contextlib
 from copy import deepcopy
 
@@ -15,7 +15,11 @@ import nibabel as nib
 import nibabel.processing
 from joblib import Parallel, delayed, cpu_count
 from scipy.sparse import vstack, find
-from multivariate.helper import compute_rdm,checkdir,scale_feature
+
+from zpyhelper.filesys import checkdir
+from zpyhelper.MVPA.rdm import compute_rdm
+from zpyhelper.MVPA.preprocessors import scale_feature,chain_steps
+
 from multivariate.dataloader import _check_and_load_images
 
 import nilearn
@@ -29,11 +33,11 @@ from sklearn import neighbors
 
 
 def _apply_mask_and_get_affinity(seeds,
-                                 niimg,
+                                 niimgs,
                                  radius:float=5,
                                  mask_img=None,
                                  empty_policy:str="ignore",
-                                 n_vox:int=1,
+                                 n_vox:int=2,
                                  allow_overlap:bool=True,
                                  n_jobs:int=cpu_count()):
     """
@@ -56,6 +60,7 @@ def _apply_mask_and_get_affinity(seeds,
 
     2. add parallelization to speed up the process
 
+    3. extract from multiple nii img. This will be handy when estimating whitening matrix for each sphere from residual images of the first level GLM.
     
     Parameters
     ----------
@@ -63,7 +68,7 @@ def _apply_mask_and_get_affinity(seeds,
         Seed definitions. List of coordinates of the seeds in the same space
         as target_affine.
 
-    niimg : 3D/4D Niimg-like object
+    niimgs : a list of or one 3D/4D Niimg-like object
         See :ref:`extracting_data`.
         Images to process.
         If a 3D niimg is provided, a singleton dimension will be added to
@@ -81,7 +86,7 @@ def _apply_mask_and_get_affinity(seeds,
         how to deal with empty spheres
 
     n_vox : int, optional
-        minimum number of voxel in each searchlight sphere. By default `1`.
+        minimum number of voxels in each searchlight sphere. By default `2`.
 
     allow_overlap : boolean
         If False, a ValueError is raised if VOIs overlap. By default `True`.
@@ -103,39 +108,50 @@ def _apply_mask_and_get_affinity(seeds,
     seeds = list(seeds)
 
     # Compute world coordinates of all in-mask voxels.
-    if niimg is None:
+    if niimgs is None:
         mask, affine = masking._load_mask_img(mask_img)
         # Get coordinate for all voxels inside of mask
-        mask_coords = np.asarray(np.nonzero(mask)).T.tolist()
+        mask_coords = numpy.asarray(numpy.nonzero(mask)).T.tolist()
         X = None
 
     elif mask_img is not None:
-        affine = niimg.affine
-        mask_img = check_niimg_3d(mask_img)
-        mask_img = image.resample_img(
-            mask_img,
-            target_affine=affine,
-            target_shape=niimg.shape[:3],
-            interpolation='nearest',
-        )
-        mask, _ = masking._load_mask_img(mask_img)
-        mask_coords = list(zip(*np.where(mask != 0)))
-
-        X = masking._apply_mask_fmri(niimg, mask_img)
-
-    else:
-        affine = niimg.affine
-        if np.isnan(np.sum(_safe_get_data(niimg))):
-            warnings.warn(
-                'The imgs you have fed into fit_transform() contains NaN '
-                'values which will be converted to zeroes.'
+        niimgs = [niimgs] if not isinstance(niimgs,list) else niimgs
+        Xs = []
+        for niimg in niimgs:
+            affine = niimg.affine
+            mask_img = check_niimg_3d(mask_img)
+            mask_img = image.resample_img(
+                mask_img,
+                target_affine=affine,
+                target_shape=niimg.shape[:3],
+                interpolation='nearest',
             )
-            X = _safe_get_data(niimg, True).reshape([-1, niimg.shape[3]]).T
-        else:
-            X = _safe_get_data(niimg).reshape([-1, niimg.shape[3]]).T
+            mask, _ = masking._load_mask_img(mask_img)
+            mask_coords = list(zip(*numpy.where(mask != 0)))
 
-        mask_coords = list(np.ndindex(niimg.shape[:3]))
-    
+            X = masking._apply_mask_fmri(niimg, mask_img)
+            Xs.append(X)
+
+    elif niimgs is not None:
+        niimgs = [niimgs] if not isinstance(niimgs,list) else niimgs
+        Xs = []
+        for niimg in niimgs:
+            affine = niimg.affine
+            if numpy.isnan(numpy.sum(_safe_get_data(niimg))):
+                warnings.warn(
+                    'The imgs you have fed into fit_transform() contains NaN '
+                    'values which will be converted to zeroes.'
+                )
+                X = _safe_get_data(niimg, True).reshape([-1, niimg.shape[3]]).T
+            else:
+                X = _safe_get_data(niimg).reshape([-1, niimg.shape[3]]).T
+            Xs.append(X)
+
+            mask_coords = list(numpy.ndindex(niimg.shape[:3]))
+    else:
+        raise ValueError("Either a list of or one niimg or a mask_img must be provided.")
+    t1 = time.time()
+
     # For each seed, get coordinates of nearest voxel
     def find_ind(m_coords, nearest):
         try:
@@ -144,24 +160,24 @@ def _apply_mask_and_get_affinity(seeds,
             return None
 
     def search_nearest_for_seedschunk(m_coords,seedschunk,aff):
-        tmp_nearests = np.round(image.resampling.coord_transform(
-            np.array(seedschunk)[:,0], np.array(seedschunk)[:,1], np.array(seedschunk)[:,2], np.linalg.inv(aff)
+        tmp_nearests = numpy.round(image.resampling.coord_transform(
+            numpy.array(seedschunk)[:,0], numpy.array(seedschunk)[:,1], numpy.array(seedschunk)[:,2], numpy.linalg.inv(aff)
         )).T.astype(int)
         nearest_ = [find_ind(m_coords,tuple(nearest)) for nearest in tmp_nearests]
         return nearest_
     
     with Parallel(n_jobs=n_jobs) as parallel:
         n_splits = n_jobs
-        split_idx = np.array_split(np.arange(len(seeds)), n_splits)
-        seed_chunks = [np.array(seeds)[idx] for idx in split_idx]
+        split_idx = numpy.array_split(numpy.arange(len(seeds)), n_splits)
+        seed_chunks = [numpy.array(seeds)[idx] for idx in split_idx]
         nearests = parallel(delayed(search_nearest_for_seedschunk)(mask_coords,sc,affine) for sc in seed_chunks)
     nearests = sum(nearests,[])
     
-    mask_coords = np.asarray(list(zip(*mask_coords)))
+    mask_coords = numpy.asarray(list(zip(*mask_coords)))
     mask_coords = image.resampling.coord_transform(
         mask_coords[0], mask_coords[1], mask_coords[2], affine
     )
-    mask_coords = np.asarray(mask_coords).T
+    mask_coords = numpy.asarray(mask_coords).T
 
     clf = neighbors.NearestNeighbors(radius=radius)
     A = clf.fit(mask_coords).radius_neighbors_graph(seeds)
@@ -178,8 +194,8 @@ def _apply_mask_and_get_affinity(seeds,
             A[i, mask_coords.index(list(map(int, seed)))] = True
 
     # Check for empty/insufficient voxel number spheres    
-    sphere_sizes = np.asarray(A.tocsr().sum(axis=1)).ravel()
-    redo_spheres = np.nonzero(sphere_sizes < n_vox)[0]
+    sphere_sizes = numpy.asarray(A.tocsr().sum(axis=1)).ravel()
+    redo_spheres = numpy.nonzero(sphere_sizes < n_vox)[0]
     
     j = 0
     if empty_policy == "raise":
@@ -190,8 +206,8 @@ def _apply_mask_and_get_affinity(seeds,
         #expand radius if doesn't meet voxel count criteria
         while len(redo_spheres)>0:
             j+=1
-            redo_seeds = list(np.array(seeds)[redo_spheres])
-            redo_nearests = list(np.array(nearests)[redo_spheres])
+            redo_seeds = list(numpy.array(seeds)[redo_spheres])
+            redo_nearests = list(numpy.array(nearests)[redo_spheres])
             radius += 0.5
             redo_A = neighbors.NearestNeighbors(radius=radius).fit(mask_coords).radius_neighbors_graph(redo_seeds)
             redo_A = redo_A.tolil()
@@ -203,21 +219,23 @@ def _apply_mask_and_get_affinity(seeds,
                 with contextlib.suppress(ValueError):
                     redo_A[i, mask_coords.index(list(map(int, seed)))] = True
             A[redo_spheres, :] = redo_A
-            sphere_sizes = np.asarray(A.tocsr().sum(axis=1)).ravel()
-            redo_spheres = np.nonzero(sphere_sizes < n_vox)[0]
+            sphere_sizes = numpy.asarray(A.tocsr().sum(axis=1)).ravel()
+            redo_spheres = numpy.nonzero(sphere_sizes < n_vox)[0]
         
-    if (not allow_overlap) and np.any(A.sum(axis=0) >= 2):
+    if (not allow_overlap) and numpy.any(A.sum(axis=0) >= 2):
         raise ValueError('Overlap detected between spheres')
     
-    print(f'neibourhood specification took: {time.time()-t0} seconds, redo iterations = {j},  max radius = {radius}')
-    return X, A
+    print(f'reading nii took: {t1-t0} seconds, neibourhood specification took: {time.time()-t1} seconds, redo iterations = {j},  max radius = {radius}')
+    return Xs, A
 
 class RSASearchLight:
     def __init__(self,
                  patternimg_paths,
                  mask_img_path:str,
+                 residimg_paths:list=[],
                  process_mask_img_path:str=None,
                  radius:float=12.5,
+                 preproc_steps:dict={},
                  njobs:int=1):
         """_summary_
 
@@ -227,27 +245,65 @@ class RSASearchLight:
             path to the activity pattern images. It can be path to a 4D image or paths to multiple 3D images.
         mask_img_path : str
             path to the mask image. The mask image is a boolean image specifying voxels whose signals should be included into computation (of neural rdm etc)
+        residimg_paths : str or list
+            path to the residual images. It can be path to a 4D image or paths to multiple 3D images. It will be used if multivariate noise normalization is required
         process_mask_img_path : str, optional
             path to the process mask image. The process mask image is a boolean image specifying voxels on which searchlight analysis is performed. If None, will use the mask_img_path by default None
         radius : float, optional
             the radius of the searchlight sphere, by default 12.5
+        preproc_steps:dict, optional
+            preprocesss steps applied to the activity pattern matrix before calling estimator
+            for example: 
+            preproc_steps = {
+                "MVNN": [normalise_multivariate_noise,
+                         {"ap_groups":apgroup,"resid_groups":rsgroup}
+                        ],
+                "PCA": [extract_pc,{"n_components":3}],
+                "AOE": [average_odd_even_session,{"session":session}],
+                }
+
         njobs : int, optional
             number of parallel jobs, by default 1
         """
         self.pattern_img      = _check_and_load_images(patternimg_paths,mode="concatenate")
+        if len(residimg_paths)>1:
+            self.resid_img    = _check_and_load_images(residimg_paths,mode="concatenate")
+        else:
+            self.resid_img    = None
         self.mask_img         = _check_and_load_images(mask_img_path,mode="intersect")
         self.process_mask_img = self.mask_img if process_mask_img_path is None else _check_and_load_images(process_mask_img_path,mode="intersect")
         self.radius           = radius
         self.njobs            = njobs
+
+        # get preproc steps
+        self.preproc_steps    = preproc_steps
+        preproc_summary = {} if len(preproc_steps)>0 else "None"
+        for j, (step_name,stepcfg) in enumerate(preproc_steps.items()):
+            func_param = {}
+            for k,v in stepcfg[1].items():
+                func_param[k] = v
+                if isinstance(v,numpy.ndarray):
+                    func_param[k] = v.tolist()
+                    
+            preproc_summary[f"step{j}-{step_name}"] = {
+                "function":stepcfg[0].__name__,
+                "function_param": func_param
+            }
+
         # get search light spheres
-        self.X, self.A, self.neighbour_idx_lists = self.genPatches()
+        if self.resid_img is not None:
+            [self.X, self.R], self.A, self.neighbour_idx_lists = self.genPatches()
+        else:
+            [self.X], self.A, self.neighbour_idx_lists = self.genPatches()
+            self.R = None
         print(f"total number of voxels to perform searchlight: {len(self.neighbour_idx_lists)}")
 
         ## create a searchlight summary
         self.config ={"mask":mask_img_path,
                       "radius":radius,
                       "scans":patternimg_paths,
-                      "njobs":njobs}
+                      "njobs":njobs,
+                      "preproc":preproc_summary}
 
     def run(self,estimator,estimator_kwargs:dict,outputpath:str,outputregexp:str="beta_%04d.nii",verbose:bool=True):
         """run searchlight analysis and save results.  
@@ -287,7 +343,7 @@ class RSASearchLight:
                 for thread_id, list_i in enumerate(group_iter)
             )
 
-        result = np.vstack([x[0] for x in results])
+        result = numpy.vstack([x[0] for x in results])
         estimator_details = results[0][1]
         sys.stderr.write((f" completed searchlight on {len(self.neighbour_idx_lists)} voxels in {time.time()-t0} seconds. \n"))
         self.write(result,estimator_details,outputpath,outputregexp)
@@ -299,8 +355,8 @@ class RSASearchLight:
         checkdir(outputpath)
         mean_img = nilearn.image.mean_img(self.pattern_img)
         maskdata, _ = nilearn.masking._load_mask_img(self.process_mask_img)
-        for k in np.arange(np.shape(result)[1]):
-            result_3D = np.full(self.process_mask_img.shape,np.nan)
+        for k in numpy.arange(numpy.shape(result)[1]):
+            result_3D = numpy.full(self.process_mask_img.shape,numpy.nan)
             result_3D[maskdata] = result[:,k]
             if not ensure_finite:
                 result_3D = result_3D.astype('float64') # make sure nan is saved as nan
@@ -331,7 +387,7 @@ class RSASearchLight:
 
         Returns
         -------
-        result: np.array
+        result: numpy.array
             searchlight results for the list of voxels 
         estimator_details: dict
             details of estimator returned by the estimator class. values in the dictionary should be serialized and ready to be written in to json format.
@@ -342,10 +398,15 @@ class RSASearchLight:
             if neighbour_idx.size==0:
                 voxel_results.append([])
             else:
-                patternmatrix = self.X[:,neighbour_idx]
+                # create preproc function
+                ####find the step of mvnn and pass the residual matrix as input
+                if "MVNN" in self.preproc_steps.keys():
+                    self.preproc_steps["MVNN"][1]["residualmatrix"] = self.R[:,neighbour_idx]
+                preproc_func = chain_steps(*list(self.preproc_steps.values()))
+                preproc_X = preproc_func(self.X[:,neighbour_idx])
                 # instantiate estimator for current voxel
                 curr_estimator =  self.estimator(
-                    patternmatrix,
+                    preproc_X,
                     **estimator_kwargs)
                 # perform estimation
                 voxel_results.append(curr_estimator.fit().result)
@@ -363,7 +424,7 @@ class RSASearchLight:
         
         #double check if results are of same length (except for empty voxels)
         voxresult_count = [len(x) for x in voxel_results if len(x)!=0]
-        if np.all([x == voxresult_count[0] for x in voxresult_count]):
+        if numpy.all([x == voxresult_count[0] for x in voxresult_count]):
             voxresult_count = voxresult_count[0]
         else:
             raise ValueError("shape of voxel-wise searchlight results mismatch!")
@@ -371,12 +432,12 @@ class RSASearchLight:
         #find empty voxel and fill with nans
         empty_vox = [j for j,x in enumerate(voxel_results) if len(x)==0]
         for k in empty_vox:
-            voxel_results[k] = np.full_like(voxresult_count,fill_value=np.nan)
+            voxel_results[k] = numpy.full_like(voxresult_count,fill_value=numpy.nan)
         
         #get estimator information to write into json file
         estimator_details = curr_estimator.get_details()
         sys.stderr.write(f"job {thread_id}, processed {len(neighbour_idx_list)} voxels in {time.time()-t0} seconds\n")
-        return np.asarray(voxel_results),estimator_details
+        return numpy.asarray(voxel_results),estimator_details
 
     def genPatches(self):
         """
@@ -386,8 +447,8 @@ class RSASearchLight:
         t0 = time.time()
         ## voxels to perform searchlight on
         process_mask_data = self.process_mask_img.get_fdata()
-        process_coords = np.where(process_mask_data!=0)
-        process_coords = np.asarray(
+        process_coords = numpy.where(process_mask_data!=0)
+        process_coords = numpy.asarray(
             nilearn.image.coord_transform(
                 process_coords[0],
                 process_coords[1],
@@ -396,9 +457,10 @@ class RSASearchLight:
                 )
             ).T
 
-        X,A = _apply_mask_and_get_affinity(
+        niimgs = [self.pattern_img,self.resid_img] if self.resid_img is not None else self.pattern_img
+        Xs,A = _apply_mask_and_get_affinity(
                 seeds    = process_coords,
-                niimg    = self.pattern_img,
+                niimgs    = niimgs,
                 radius   = self.radius,
                 mask_img = self.mask_img,# only include voxel in the mask
                 empty_policy = "ignore",
@@ -413,4 +475,4 @@ class RSASearchLight:
             _, vidx, _ = find(row)
             voxel_neighbours.append(vidx) 
     
-        return X, A, voxel_neighbours
+        return Xs, A, voxel_neighbours

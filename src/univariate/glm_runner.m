@@ -9,7 +9,7 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
 %                       'second',{{'specify','estimate','contrast','result'}});
 % - glm_dir: output directory for the glm model results
 % - preproc_img_dir: directory for preprocessed fmri data
-% - subidlist: list of participants to be included in the analysis
+% - subidlist: list of participants to be incuded in the analysis
 % - groupglm_pref: prefix added to second level (group level) glm names
 % - groupglm_cov: covariate for group level glm. should be like:
 %                   struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}) or
@@ -92,7 +92,7 @@ function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,s
             end
         end
 
-        if ismember('estimate',steps), glm_estimate(output_dir);  end
+        if ismember('estimate',steps), glm_estimate(output_dir,true);  end
         
         if ismember('contrast',steps)        
             if ~isempty(glm_config.contrasts)

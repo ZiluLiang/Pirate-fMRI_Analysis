@@ -1,4 +1,4 @@
-function smooth(subimg_dir)
+function smooth(subimg_dir,varargin)
 % smooth the normlised images using a kernel that equals to twice the voxel size,
 % INPUT:
 %  - subimg_dir: directory to participant's preprocessing fmri images
@@ -10,7 +10,12 @@ function smooth(subimg_dir)
 
 
     [fmri,filepattern] = get_pirate_defaults(false,'fmri','filepattern'); 
-    func_imgs = cellstr(spm_select('FPList', subimg_dir, [filepattern.preprocess.normalise,'.*\.nii']));
+    if nargin == 1
+        func_imgs = cellstr(spm_select('FPList', subimg_dir, [filepattern.preprocess.normalise,'.*\.nii']));        
+    else
+        fp = varargin{1};
+        func_imgs = cellstr(spm_select('FPList', subimg_dir, fp));
+    end
     func_imgs = cellfun(@(fn) cellstr(spm_select('expand',fn)),func_imgs,'uni',0);
     func_imgs = cat(1,func_imgs{:});
 
@@ -18,7 +23,7 @@ function smooth(subimg_dir)
     matlabbatch{1}.spm.spatial.smooth.data   = func_imgs;
     matlabbatch{1}.spm.spatial.smooth.fwhm   = fmri.voxelsize*2*ones(1,3); %  changed to match 2 times the voxel size
     matlabbatch{1}.spm.spatial.smooth.dtype  = 0;
-    matlabbatch{1}.spm.spatial.smooth.im     = 0;
+    matlabbatch{1}.spm.spatial.smooth.im     = 1;
     matlabbatch{1}.spm.spatial.smooth.prefix = 's';
     
     save(fullfile(subimg_dir,'smooth.mat'),'matlabbatch')
