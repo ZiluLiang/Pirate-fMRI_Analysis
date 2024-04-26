@@ -82,29 +82,27 @@
 				"sub024",
 				"sub025",
 				"sub026",
-				"sub027",
 				"sub028",
 				"sub029",
 				"sub030"
 		],
-		"nvalidsub":30,
+		"nvalidsub":29,
 		"nonlearnerids":[
 				"sub010",
 				"sub012",
 				"sub013",
-				"sub027",
 				"sub017"
 		],
 		"nongeneralizerids":[
 				"sub010",
 				"sub012",
 				"sub013",
-				"sub027",
 				"sub004",
 				"sub023",
 				"sub002",
 				"sub014",
-				"sub021"
+				"sub021",
+				"sub017"
 		],
 		"learnerids":[
 				"sub001",
@@ -144,7 +142,6 @@
 				"sub011",
 				"sub015",
 				"sub016",
-				"sub017",
 				"sub018",
 				"sub019",
 				"sub020",

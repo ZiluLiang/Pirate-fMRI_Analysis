@@ -5,7 +5,7 @@
 % Author: Zilu Liang
 
 directory = get_pirate_defaults(false,'directory');
-mask_dir  = fullfile(directory.projectdir,'data','fmri','masks');   
+mask_dir  = fullfile(directory.fmri_data,'masks');   
 marsbar_aal3 = fullfile(mask_dir,'marsbarAAL3');
 
 %% generate marsbar compatible aal3 rois
@@ -14,8 +14,8 @@ AAL3_path = fullfile(mask_dir,'AAL3'); % the downloaded and unzipped AAL3v1 parc
 gen_marsbar_AAL(AAL3_path,marsbar_aal3,'ROI_MNI_V7_1mm')
 
 %% combine anatomical rois and output to  the same space as participants first level mask
-ref_img = 'D:\OneDrive - Nexus365\Project\pirate_fmri\Analysis\data\fmri\smoothed5mmLSA\LSA_stimuli_localizer\first\sub001\mask.nii';
-anat_masks = loadjson(fullfile(directory.projectdir,'scripts','anatomical_masks.json'));
+ref_img =  fullfile(directory.fmri_data,'unsmoothedLSA','LSA_stimuli_localizer','first','sub001','mask.nii');
+anat_masks = loadjson(fullfile(directory.projectdir,'src','anatomical_masks.json'));
 outputdir  = fullfile(mask_dir,'anat');
 checkdir(outputdir);
 cellfun(@(x) generate_anatomical_masks(marsbar_aal3,anat_masks.(x),x,outputdir,ref_img),fieldnames(anat_masks))
