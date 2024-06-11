@@ -25,69 +25,79 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     fmridata_dir = pirate_defaults['directory']['fmri_data']
 
 analyses_localizer = [
-                 {"type":"regression",
-                 "name":"compete_featurecartesian_combinexy",
-                 "regressors":["feature2d","gtlocEuclidean"]},
+    {"type":"regression",
+    "name":"compete_featurecartesian_combinexy",
+    "regressors":["feature2d","gtlocEuclidean"]},
 
-                 {"type":"regression",
-                 "name":"compete_featurecartesian_separatexy",
-                 "regressors":["feature2d","gtloc1dx","gtloc1dy"]},
+    {"type":"regression",
+    "name":"compete_featurecartesian_separatexy",
+    "regressors":["feature2d","gtloc1dx","gtloc1dy"]},
 
-                 {"type":"correlation",
-                  "name":"all",
-                  "modelrdms":["gtlocEuclidean","feature2d","gtloc1dx","gtloc1dy"]}                  
+    {"type":"correlation",
+    "name":"all",
+    "modelrdms":["gtlocEuclidean","feature2d","gtloc1dx","gtloc1dy"]}                  
             ]
 
 analyses_navigation = [
     ############################# test for competition between models  ###########################################
-                 {"type":"regression",
-                 "name":"compete_featurecartesian_combinexy",
-                 "regressors":["feature2d","gtlocEuclidean"]},
+    {"type":"regression",
+    "name":"compete_featurecartesian_combinexy",
+    "regressors":["feature2d","gtlocEuclidean"]},
 
-                {"type":"regression",
-                 "name":"compete_featurecartesian_combinexy_teststim",
-                 "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean"]},
+    {"type":"regression",
+        "name":"compete_featurecartesian_combinexy_teststim",
+        "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean"]},
 
-                {"type":"regression",
-                 "name":"compete_featurecartesian_separatexy_teststim",
-                 "regressors":["teststimpairs_feature2d","teststimpairs_gtloc1dx","teststimpairs_gtloc1dy"]},
+    {"type":"regression",
+        "name":"compete_featurecartesian_separatexy_teststim",
+        "regressors":["teststimpairs_feature2d","teststimpairs_gtloc1dx","teststimpairs_gtloc1dy"]},
 
-                {"type":"regression",
-                 "name":"compete_featurecartesian_separatexy_withsg",
-                 "regressors":["feature2d","gtloc1dx","gtloc1dy","stimuligroup"]},
+    {"type":"regression",
+        "name":"compete_featurecartesian_separatexy_withsg",
+        "regressors":["feature2d","gtloc1dx","gtloc1dy","stimuligroup"]},
 
-                {"type":"regression",
-                 "name":"compete_featurecartesian_combinexy_withsg",
-                 "regressors":["feature2d","gtlocEuclidean","stimuligroup"]},
+    {"type":"regression",
+        "name":"compete_featurecartesian_combinexy_withsg",
+        "regressors":["feature2d","gtlocEuclidean","stimuligroup"]},
 
-                {"type":"regression",
-                 "name":"resp-compete_featurecartesian_combinexy_teststim",
-                 "regressors":["teststimpairs_feature2d","teststimpairs_resplocEuclidean"]},
+    {"type":"regression",
+        "name":"resp-compete_featurecartesian_combinexy_teststim",
+        "regressors":["teststimpairs_feature2d","teststimpairs_resplocEuclidean"]},
 
-                {"type":"regression",
-                 "name":"resp-compete_featurecartesian_combinexy_withsg",
-                 "regressors":["feature2d","resplocEuclidean","stimuligroup"]},
+    {"type":"regression",
+        "name":"resp-compete_featurecartesian_combinexy_withsg",
+        "regressors":["feature2d","resplocEuclidean","stimuligroup"]},
 
     ############################# test for hierarchical model  ###########################################
 
-                {"type":"regression",
-                 "name":"compete_hierarchical_combinexy",
-                 "regressors":["feature2d","stimuligroup","global_xysign","locwrtcentre_localxy","locwrtlrbu_localxy"]},
+    # {"type":"regression",
+    #     "name":"compete_hierarchical_combinexy",
+    #     "regressors":["feature2d","stimuligroup","global_xysign","locwrtcentre_localxy","locwrtlrbu_localxy"]},
 
-                {"type":"regression",
-                 "name":"compete_hierarchical_combinexy_teststim",
-                 "regressors":["teststimpairs_feature2d","teststimpairs_global_xysign","teststimpairs_locwrtcentre_localxy","teststimpairs_locwrtlrbu_localxy"]},
+    # {"type":"regression",
+    #     "name":"compete_hierarchical_combinexy_teststim",
+    #     "regressors":["teststimpairs_feature2d","teststimpairs_global_xysign","teststimpairs_locwrtcentre_localxy","teststimpairs_locwrtlrbu_localxy"]},
 
+    {"type":"regression",
+        "name":"compete_hierarchicalcartesian_combinexy",
+        "regressors":["feature2d","stimuligroup","gtlocEuclidean","locwrtcentre_localxy","locwrtlrbu_localxy"]},
+
+    {"type":"regression",
+        "name":"compete_hierarchicalcartesian_combinexy_teststim",
+        "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean","teststimpairs_locwrtcentre_localxy","teststimpairs_locwrtlrbu_localxy"]},
+
+    {"type":"regression",
+        "name":"compete_hierarchicalcartesian_combinexy",
+        "regressors":["feature2d","stimuligroup","gtlocEuclidean","hierachical_wrtcentre","hierachical_wrtlrbu"]},
+
+    {"type":"regression",
+        "name":"compete_hierarchicalcartesian_combinexy_teststim",
+        "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean","teststimpairs_hierachical_wrtcentre","teststimpairs_hierachical_wrtlrbu"]}
             ]
 
 
 fmridata_preprocess = "unsmoothedLSA"
-beta_preproc_steps_withmvnn= {
-                "MVNN": [normalise_multivariate_noise,{}
-                        ],
-                "AOE": [average_odd_even_session,{}]
-                }
-
+beta_preproc_steps_withmvnn= {"MVNN": [None]*2, "AOE": [None]*2}
 config_neuralrdm= {
     "mvnn_aoe": {"preproc":beta_preproc_steps_withmvnn, "distance_metric":"correlation"},
 }
@@ -107,7 +117,7 @@ beta_fname = {
     "fourruns":['stimuli_4r.nii'],
     }
 
-run_ds = ["fourruns"]#,"localizer"]
+run_ds = ["fourruns"]
 for nconfig_name,nconfig in config_neuralrdm.items():
     for ds_name in run_ds:
         ds = beta_dir[ds_name]
@@ -128,14 +138,13 @@ for nconfig_name,nconfig in config_neuralrdm.items():
 
                         anatmasks=[],
 #                        anatmasks=[os.path.join(maskdir,'hippocampus_left.nii')],
-                        nsession=n_sess[ds_name],
                         taskname=taskname,
                         config_modelrdm = config_modelrdm_,
                         config_neuralrdm = nconfig)
         
-        RSA.run_SearchLightRSA(radius = 10,
-                                outputdir = os.path.join(fmridata_dir,fmridata_preprocess,'rsa_searchlight',f'{ds_name}_noselection_{nconfig_name}'),
-                                analyses = analyses_list,
-                                njobs = cpu_count()-4)
+        RSA.run_SearchLight(radius = 10,
+                            outputdir = os.path.join(fmridata_dir,fmridata_preprocess,'rsa_searchlight',f'{ds_name}_noselection_{nconfig_name}'),
+                            analyses = analyses_list,
+                            njobs = cpu_count()-4)
         
         

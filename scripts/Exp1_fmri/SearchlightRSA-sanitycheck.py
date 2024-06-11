@@ -28,13 +28,8 @@ analyses_navigation = [
     ######################### sanity check correlation ##################################             
                   {"type":"correlation",
                   "name":"rsa_sanity_check",
-                  "modelrdms":["stimuli","feature1d_color","feature1d_shape","stimuligroup"]
-                  },
-    ######################### stability ##################################    
-                  {"type":"representation_stability",
-                   "name":"betweenrun_rdm_corr"                      
+                  "modelrdms":["stimuli","feature1d_color","feature1d_shape"]
                   }
-
             ]
 
 
@@ -50,7 +45,7 @@ beta_preproc_steps_nomvnn= {
 
 config_neuralrdm= {
     "mvnn_aoe": {"preproc":beta_preproc_steps_withmvnn, "distance_metric":"correlation"},
-    "raw_aoe":  {"preproc":beta_preproc_steps_nomvnn,   "distance_metric":"correlation"}
+    #"raw_aoe":  {"preproc":beta_preproc_steps_nomvnn,   "distance_metric":"correlation"}
 }
 config_modelrdm_ = {"nan_identity":False, "splitgroup":False}
 
@@ -89,12 +84,11 @@ for nconfig_name,nconfig in config_neuralrdm.items():
 
                         anatmasks=[],
 #                        anatmasks=[os.path.join(maskdir,'hippocampus_left.nii')],
-                        nsession=n_sess[ds_name],
                         taskname=taskname,
                         config_modelrdm = config_modelrdm_,
                         config_neuralrdm = nconfig)
         
-        RSA.run_SearchLightRSA(radius = 10,
+        RSA.run_SearchLight(radius = 10,
                                 outputdir = os.path.join(fmridata_dir,fmridata_preprocess,'rsa_searchlight',f'{ds_name}_noselection_{nconfig_name}'),
                                 analyses = analyses_list,
                                 njobs = cpu_count()-1)
