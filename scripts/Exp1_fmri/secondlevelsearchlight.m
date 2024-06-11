@@ -16,7 +16,7 @@ for x = 1:numel(par_dirs)
         rsa_folders = {dir(fullfile(searchlight_rsa_dir,analysis{j_analysis})).name};
         rsa_folders = rsa_folders(cellfun(@(x) ~contains(x,'.'),rsa_folders));
         rsa_dirs = fullfile(searchlight_rsa_dir,analysis{j_analysis},rsa_folders);
-        for j_rsadir = 5:6%1:numel(rsa_dirs)
+        for j_rsadir = 5:8%1:numel(rsa_dirs)
             rsa_dir = rsa_dirs{j_rsadir};
             switch analysis{j_analysis}
                 case "correlation"
@@ -74,8 +74,8 @@ for x = 1:numel(par_dirs)
                 end
 
                 %smooth first level images
-                all_sub_dirs = fullfile(rsa_dir,'first',participants.validids);
-                cellfun(@(subimg_dir) smooth(subimg_dir,get_new_imgname(metric_imgname)), all_sub_dirs);
+                %all_sub_dirs = fullfile(rsa_dir,'first',participants.validids);
+                %cellfun(@(subimg_dir) smooth(subimg_dir,get_new_imgname(metric_imgname)), all_sub_dirs);
                 
                 %perform second level analysis
                 scans = cellstr(fullfile(rsa_dir,'first',participants.validids,strcat("s",get_new_imgname(metric_imgname) )));
@@ -86,17 +86,17 @@ for x = 1:numel(par_dirs)
                 glm_estimate(fullfile(outputdir,'allparticipants'));
                 glm_contrast(fullfile(outputdir,'allparticipants'),cellstr(curr_metric),{[1]});
                 
-                % glm_grouplevel(fullfile(outputdir,'g_vs_ng'),'t2',{scans_g,scans_ng},{curr_metric});
-                % glm_estimate(fullfile(outputdir,'g_vs_ng'));
-                % glm_contrast(fullfile(outputdir,'g_vs_ng'), ...
-                %             {strcat('G>NG: ',curr_metric),strcat('G:',curr_metric),strcat('NG:',curr_metric)}, ...
-                %             {[1,-1],[1,0],[0,1]});
-                % %glm_results(fullfile(outputdir,'generalizer_vs_nongeneralizer'),1,struct('type','none','val',0.001,'extent',0),{'csv'});
+                glm_grouplevel(fullfile(outputdir,'g_vs_ng'),'t2',{scans_g,scans_ng},{curr_metric});
+                glm_estimate(fullfile(outputdir,'g_vs_ng'));
+                glm_contrast(fullfile(outputdir,'g_vs_ng'), ...
+                            {strcat('G>NG: ',curr_metric),strcat('G:',curr_metric),strcat('NG:',curr_metric)}, ...
+                            {[1,-1],[1,0],[0,1]});
+                %glm_results(fullfile(outputdir,'generalizer_vs_nongeneralizer'),1,struct('type','none','val',0.001,'extent',0),{'csv'});
                 
                 glm_grouplevel(fullfile(outputdir,'generalizer_only'),'t1',{scans_g},{curr_metric});
                 glm_estimate(fullfile(outputdir,'generalizer_only'));
                 glm_contrast(fullfile(outputdir,'generalizer_only'),cellstr(curr_metric),{[1]});
-    
+                % 
             end
         end
     end
