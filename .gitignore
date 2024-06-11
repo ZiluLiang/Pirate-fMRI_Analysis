@@ -15,4 +15,13 @@ probdf
 **/test*
 
 scripts/resultvisualization
+scripts/Exp1_fmri/Exp1_fmri_mvnn_effect
+scripts/Exp1_fmri/*.ipynb
+scripts/LLR_bysub
+src/CanlabCore-master.zip
+src/High_pass_filter_analysis.png
+src/LLR/genParticipantSpecificProbDF.R
+src/Variance_Inflation.png
+
+
 .Rproj.user
