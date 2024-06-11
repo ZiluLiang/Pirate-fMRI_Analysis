@@ -1,8 +1,10 @@
+This file is an overview of the analyses explored in the current dataset and their caveats. The specific analyses for different hypotheses is recorded in the [AnalysisPlanNoteBook](/docs/AnalysisPlanNoteBook.md)
+
 # Preparation for RSA analysis
 ## Activity pattern
 To run multivariate analysis, we need to get the activity pattern matrix. To achieve that, we adopted the ['LS-A' approach](https://doi.org/10.1016/j.neuroimage.2011.08.076).
 ### 1. the LS-A approach
-For each participant, we build first level GLMs with 25 regressors (one for each stimuli) in each session (run), this yields a total of 25*4 = 100 condition regressors. Response stage was modeled with a boxcar function with a duration corresponding to participant's actual navigation time in the task. Realignment parameters and their first derivatives are included as nuisance regressors (see [Univariate Analysis Pipeline](/scripts/univariate/UnivariateAnalysisPipeline.md)).  
+For each participant, we build first level GLMs with 25 regressors (one for each stimuli) in each session (run), this yields a total of 25*4 = 100 condition regressors. Response stage was modeled with a boxcar function with a duration corresponding to participant's actual navigation time in the task. Realignment parameters and their first derivatives are included as nuisance regressors (see [Univariate Analysis Pipeline](/src/univariate/UnivariateAnalysisPipeline.md)).  
 Then we build the following contrasts:  
 (1) a contrast for each of the stimuli, this yields 25 contrasts  
 We extracted the 25 stimuli contrast to constructs a $N_{stimuli}\times N_{voxels}$ activity pattern matrix for visualization.
@@ -19,23 +21,71 @@ stim00odd, stim01odd, ..., stim24odd, stim00even, stim01even, ...  stim24even
 (3) a `stimuli_mu.nii` file created from 25 con_\*\*\*\*.nii files, each representing the contrast estimates of one stimulus across all runs. In the combined 4D nii file, the volumes are ordered according to:  
 stim00, stim01, ..., stim24
 
-### 3. Reliability Map calculation
-Using a [split-half approach](https://doi.org/10.1016/j.neuroimage.2019.116350), we calculate the reliability map for each participant.
+## Preprocessing of Activity Pattern Matrix
+In MVPA of fMRI data, there are a wealth of methods to increase the signal-to-noise ratio of the data. Following are two that were considered during the data analyses process, but only the second one is adopted. It is important to keep in mind that there are researcher's degree of freedom when making these choice. To avoid post-hoc decisions and cherry-picking, we use split-half stability as our metric to inform our choice. This metric is independent of the specific hypothesis we are trying to test. 
+
+### 1. Reliability-based Voxel Selection
+Using a [split-half approach by Tarhan & Konkle](https://doi.org/10.1016/j.neuroimage.2019.116350), we calculate the reliability map for each participant.
 Let $M1$ and $M2$ be the $N_{stimuli}\times N_{voxels}$ activity pattern matrices for the odd and even runs respectively. Then $M1_{i}$ and $M2_{i}$ (column $i$ in $M1$ and $M2$) defines the response profile of voxel $i$ in odd and even runs. Reliability is defined as the stability of the response profile, i.e., the reliability of a given voxel $i$ is computed by  
 $$R_{i} = Spearman's r(M1_{i},M2_{i})$$ 
 A nifti file of the reliability map is saved in the first level directory of the participants. Then a threshold of 0 is applied to binarize the map into a reliability mask which specifies the reliable voxels.
-This is implemented in the [`create_reliability_mask.py`](/scripts/multivariate/create_reliability_mask.py)
+This is implemented in the [`generate_reliability_mask.py`](/scripts/Exp1_fmri/generate_reliability_mask.py)
 
-# Different types of RSA Analysis
-Several types of RSA analysis are designed to test the representation geometry. Analyses are performed via different class of [`Estimators`](/scripts/multivariate/rsa_estimator.py)
+This approach is not adopted in the current pipeline.
+
+### 2. Multivariate Noise Normalisation
+Multivariate noise normalisation is also known as whitening of the activity pattern matrix. It tries to remove the noise correlation between voxels. It uses the first-level residual information in univariate glm to estimate the covariance matrix of voxels. Then the inverse of this covariance matrix is calculated and applied to the activity pattern matrix. 
+
+#### python implementation
+Here we follow the description from [Walther et al., 2016](https://doi.org/10.1016/j.neuroimage.2015.12.012). The implementation is a python version of [the MATLAB script by Ritchie et al](https://osf.io/3k759) accompanying their [2021 Neuroimage paper](https://doi.org/10.1016/j.neuroimage.2021.118686). The python function for running MVNN is incorporated in the [`preprocessor` module of `zpyhelper`](https://github.com/ZiluLiang/zpyhelper)
+
+1. saving residual files during first-level glm for [LS-A](#1-the-ls-a-approach)
+   Our implementation first saves the first-level residual files generated by SPM in a compressed format. The $T$ residual files for one participant in one run (with $T$ being the number of scans in one run) is compressed to a `resid_runk.nii.gz` (with `k` being the run id) file using the script [`compress_residualnii.py`](/scripts/Exp1_fmri/compress_residualnii.py)  
+2. OAS from sklearn is used to estimate the covariance matrix from residual. eigenvalue decomposition from numpy is used to calculate the inverse of the covariance matrix
+  
+
+
+### 3. Centering
+Some literature argue that there is a benefit of centering before running analyses. There are two ways of centering:  
+   - **cocktail blank removal**:   
+    subtract mean activity pattern, centering is performed for each voxel (each column of the activity pattern matrix) separately.
+   - **demean**:   
+    subtract mean activity value, centering is performed for each condition (each row of the activity pattern matrix) separately.  
+
+But in general, centering may change the way we interpret the neural geometry (see [Walther et al., 2016](https://doi.org/10.1016/j.neuroimage.2015.12.012)). Some distance metrix is sensitive to the centering performed. Hence we did not perform any centering for the neural activity pattern matrix.  
+
+
+
+# Different types of MVPA
+Several types of MVP analysis are designed to test the representation geometry. Analyses are performed via different class of [`Estimators`](https://github.com/ZiluLiang/zpyhelper/blob/main/zpyhelper/MVPA/estimators.py). There are also [Estimators defined specifically for this project](/src/multivariate/MVPA_estimator.py)
+
+## Correlation / Regression Analysis on neural and model RDM
+This is implemented by the `PatternCorrelation` and `MultipleRDMRegression` esimator in zpyhelper
+### Neural RDM
+activity pattern within each mask/sphere is extracted to compute the neural RDM. If voxel selection is performed, then the spherical region will only include the selected voxels to compute neural RDM.   
+Some choices need to be made before calculating neural RDM: 
+1) Distance metrics
+   - Euclidean
+   - Correlation: this is the one we are currently using
+   - Mahalanobis distance 
+ 
+### Quantifying similarity between neural RDM and model RDM
+Only the lower triangular part of the model RDMs and neural RDMs (excluding diagonals) are extracted for the analysis  
+**(1) regression**  
+regression uses one or a set of model RDMs to predict neural RDM. Dependent variable and predictors are standardized (separately) before entering the regression analysis.  
+**(2) correlation**  
+Spearman's rank correlation is computed between the neural RDM and one model RDM. the correlation coefficient is Fisher z-transformed before entering second level analysis.  
+
+
 ## Neural Vector Analysis
+**Note this a legacy analysis and thus not yet implemented by the estimators.**   
 Let $𝑓_𝑗$ be the coordinate of stimuli $j$ in neural representation space $ℝ^𝑚$ ($m$ being the number of voxels). For any two stimuli $𝑗,𝑘$, we define the neural vector (coding direction) from $𝑗$ to $𝑘$ as:  
 $$𝑣_{𝑗𝑘}=𝑓_𝑗− 𝑓_𝑘$$
 For any given pair of neural vectors, we can compute its cosine similarity as an indicator of how parallel these two neural vectors are
 $$cos⁡(𝑣_1, 𝑣_2)=  \frac{𝑣_1 \times 𝑣_2}{\left\Vert 𝑣_1 \right\Vert \times \left\Vert 𝑣_2 \right\Vert}$$
 If we replace $𝑓_𝑗$ and $𝑓_𝑘$ with the feature vector from the three models of representation (row vector from the feature matrices), we can compute the theoretical cosine similarity of any given pair of coding directions, and compare that with our data.  
 
-![feature matrices for different models of representation](../../readmeplots/featurematrix_by_representationmodels.png)
+![feature matrices for different models of representation](/docs/featurematrix_by_representationmodels.png)
 
 ### Direction pair types
 If we plot the groundtruth map of stimuli (based on groundtruth x/y locations), we can define different coding direction pairs. In this analysis, we focused on four types of direction pairs:
@@ -52,16 +102,17 @@ If we plot the groundtruth map of stimuli (based on groundtruth x/y locations), 
 - **within Y**: cosine similarity between two horizontal coding directions that
   1) locate within the same y row
 
-![different types of coding direction pairs](/readmeplots/codingdirectionpairtypes.png)  
+![different types of coding direction pairs](/docs/codingdirectionpairtypes.png)  
 
 Similarly, we can use a feature-based groundtruth map, disregarding which feature maps onto x and which feature maps onto y, to derive the above direction types.
+
 ### Predicted Cosine Similarity of different models of representation
 Right now all the analyses in this section is based on the assumption that there is only one run. All the predictions are within run. We haven't formalize a good hypothesis for between-run data yet.
 #### highDim-25
 Under the assumption of highDim-25 model, there are three possible values of cosine similarity between any given pair of coding directions: $0.5$, $0$, $-0.5$.
 To better understand why this is the case, here is an illustration that represent 4 stimuli using one hot coding. The locations of these 4 stimuli in this representation space form a tetrahedron. When the pair of coding directions intersect at the starting location or ending location, its  cosine similarity is $0.5$ or $-0.5$. When the pair do not share starting or ending location, its cosine similarity is 0. However, this is assuming that there are no bias towards certain stimuli (e.g., no shape/color bias, no training/test bias). If there are biases, the vertices of the tetrahedron will not be equidistant. It may strech,  then the cosine similarity of the pair of coding directions that intersect will no longer be 0.5 or -0.5. The true null of this model will be hard to estimate. Therefore, we focus only on the case where there are no intersection (with a theorectical prediciton of 0).
 
-![cosine similarity between coding directions in one-hot coding case](/readmeplots/highDcodingdir_cossim.png)
+![cosine similarity between coding directions in one-hot coding case](/docs/highDcodingdir_cossim.png)
 
 Coming back to the 25 stimuli in our experiment, in the within X/Y case, each X column/Y row has 5 stimuli, which yields ${5\choose2} = 10$ coding directions. These $10$ coding directions constitutes ${10\choose2} = 45$ pairs of coding directions to compute cosine similarity measures on. Among all $45$ pairs of coding directions, there are: 
  - $\left[{4\choose2} + {3\choose2} + {2\choose2}\right]*2 = 20$ pairs of stimuli that share the same starting/ending locations
@@ -86,34 +137,16 @@ This model assumes that not only the representations factorise color and shape, 
 
 Similarly, we can calculate the theoretical prediction of these models using a feature-based groundtruth map for classifying direction pairs. Together we can arrive at the following predictions:  
 
-![Theoretical Predictions of cosine similarity between coding directions](/readmeplots/TheoPred_codingdir_cossim.png) 
+![Theoretical Predictions of cosine similarity between coding directions](/docs/TheoPred_codingdir_cossim.png) 
 
-## Correlation / Regression Analysis on neural and model RDM
-### Neural RDM
-activity pattern within each mask/sphere is extracted to compute the neural RDM. If voxel selection is performed, then the spherical region will only include the selected voxels to compute neural RDM.   
-Some choices need to be made before calculating neural RDM: 
-1) Centering
-   - No centering: this is the one we are currently using
-   - cocktail blank removal: subtract mean activity pattern, centering is performed for each voxel (each column of the activity pattern matrix) separately.
-   - demean: subtract mean activity value, centering is performed for each condition (each row of the activity pattern matrix) separately.
-1) Distance metrics
-   - Euclidean
-   - Correlation: this is the one we are currently using
-   - Mahalanobis distance 
- 
-### Quantifying similarity between neural RDM and model RDM
-Only the lower triangular part of the model RDMs and neural RDMs (excluding diagonals) are extracted for the analysis
-(1) regression
-regression uses one or a set of model RDMs to predict neural RDM. Dependent variable and predictors are standardized (separately) before entering the regression analysis.
-(2) correlation
-Spearman's rank correlation is computed between the neural RDM and one model RDM. the correlation coefficient is Fisher z-transformed before entering second level analysis
-# Running RSA Analysis
+
+# Running MVPA Analysis
 ## Regions
-### 1. Brain parcellation based RSA: obtaining ROI masks from AAL parcellation
+### 1. ROI-based: obtaining ROI masks from AAL parcellation or functional maskss
 AAL3v1 parcellation is used to generate anatomical masks for ROIs. The procedure was carried out in marsbar. Each anatomical masks is a binarize and resampled to match the resolution of the participants' functional images.  
 Details on what parcellation is included in each anatomical mask are in [`anatomical_masks.json`](/scripts/anatomical_masks.json). This is read in by [`anatomical_masks.m`](/scripts/anatomical_masks.m) to generate the mask file in nii format. 
 
-### 2. Whole brain searchlight RSA: obtaining spherical searchlight regions
+### 2. Whole brain searchlight: obtaining spherical searchlight regions
 For each voxel, a spherical ROI is defined with a radius of 10mm (4 times the voxel size). An additional constraint is added: each searchlight sphere should include at least 50 usable voxels. 
 
 ## Statistical tests
