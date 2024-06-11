@@ -1,0 +1,259 @@
+---
+title: "1_Treasure Hunt Task"
+output: html_document
+date: "2024-03-20"
+self_contained: false
+---
+
+```{r setup, include=FALSE}
+
+rm(list = ls())
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE,fig.width = 16,fig.height = 9)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+
+data_dir = file.path(project_dir, "data","Exp2_pilots","1_M1_v1", fsep="/")
+result_dir = file.path(project_dir, "results","Exp2_pilots","1_M1_v1", fsep="/")
+
+
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+load(file.path(data_dir,"allexpdata_compo_lapse-0_01.RData"))
+```
+
+
+
+## Behavioural performance of learner/generalizer in treasure hunt task{.tabset}
+```{r treasurehunt block average}
+blockdata_sub = aggregate_data(data_with_prob,
+                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
+                           groupbyvars = c("subid","stim_group","expt_session","blocknumber_withinsess"),
+                           stats = c("mu"),
+                           additionalvars = c("islearner","isgeneralizer","session_str"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
+                                "mu_resp_dist","mu_error_x","mu_error_y"),
+                   newnames = c("LLR","LLR_x","LLR_y",
+                                "distance","errorx","errory"))
+
+
+blockdata_sum = aggregate_data(blockdata_sub,
+                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory"),
+                           groupbyvars = c("islearner","isgeneralizer","stim_group",
+                                           "expt_session","blocknumber_withinsess"),
+                           stats = c("mu","se","n"),
+                           additionalvars = c("session_str"))
+```
+
+
+### rescaled distance to goal
+```{r rescaled distance to goal}
+# with data count
+
+blockdata_sub = left_join(blockdata_sub,change_cols_name(participant_count,"label","generalizer_label"),by=c("islearner","isgeneralizer"))
+blockdata_sum = left_join(blockdata_sum,change_cols_name(participant_count,"label","generalizer_label"),by=c("islearner","isgeneralizer"))
+(p = blockdata_sub%>%
+  ggplot(aes(x=blocknumber_withinsess,y=distance,fill=stim_group,color=stim_group))+
+  geom_point(alpha = 0.3,size = 2,stroke=0)+
+  geom_line(data = blockdata_sum,
+            aes(x=blocknumber_withinsess,y=mu_distance))+
+  geom_errorbar(data = blockdata_sum,
+                aes(x=blocknumber_withinsess,
+                    y = mu_distance,
+                    ymin = mu_distance - se_distance,
+                    ymax = mu_distance + se_distance),
+                width=0.4)+
+  facet_nested(cols =vars(session_str),
+               rows = vars(islearner,generalizer_label),
+               scales = "free_x",space = "free_x")+
+  scale_x_continuous(breaks = seq(1,36,1))+
+  guides(fill = "none")+
+  labs(x="block number",y="mean distance to goal (a.u.) rescaled",color = "stim_group",
+       title = "Distance to correct location")+
+  theme(aspect.ratio = 8,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot = p,device = 'png',width = 15,height = 8)
+```
+
+### mean LLR
+```{r}
+#withdatacount
+(p = blockdata_sub%>%
+  ggplot(aes(x=blocknumber_withinsess,y=LLR,fill=stim_group,color=stim_group))+
+  geom_point(alpha = 0.3,size = 2,stroke=0)+
+  geom_line(data = blockdata_sum,
+            aes(x=blocknumber_withinsess,y=mu_LLR))+
+  geom_errorbar(data = blockdata_sum,
+                aes(x=blocknumber_withinsess,
+                    y = mu_LLR,
+                    ymin = mu_LLR - se_LLR,
+                    ymax = mu_LLR + se_LLR),
+                width=0.4)+
+  facet_nested(cols =vars(session_str),
+               rows = vars(islearner,generalizer_label),
+               scales = "free_x",space = "free_x")+
+  scale_x_continuous(breaks = seq(1,36,1))+
+  guides(fill = "none")+
+  labs(x="block number",y="mean LLR",color = "stim group",
+       title = "Log-Likelihood Ratio")+
+  theme(aspect.ratio = 8,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = 'png',width = 15,height = 8)
+```
+
+### Individual response map
+<!-- ### with label -->
+<!-- ```{r} -->
+<!-- for (pid in unique(data_with_prob$subid)){ -->
+<!--   current_data = filter(data_with_prob,subid == pid) -->
+<!--   plot_name = paste0(pid,"\n", -->
+<!--                     ifelse(pid %in% learnerids,"learner","nonlearner"), -->
+<!--                     " - ", -->
+<!--                     ifelse(pid %in% generalizerids,"generalizer","nongeneralizer")) -->
+
+<!--   n_refresher=6 -->
+<!--   n_trainingcycle=12 -->
+<!--   nb_percyc = 3 -->
+<!--   n_test = 4 -->
+<!--   layoutmat = matrix(c(## first three rows are training cycles -->
+<!--                        seq(1,n_trainingcycle*nb_percyc,by=nb_percyc), -->
+<!--                        seq(2,n_trainingcycle*nb_percyc,by=nb_percyc), -->
+<!--                        seq(3,n_trainingcycle*nb_percyc,by=nb_percyc), -->
+<!--                        ## refresher -->
+<!--                        seq(n_trainingcycle*nb_percyc+1,n_trainingcycle*nb_percyc+n_refresher,by=1), NA,NA, -->
+<!--                        ## test -->
+<!--                        seq(n_trainingcycle*nb_percyc+n_refresher+2, -->
+<!--                            n_trainingcycle*nb_percyc+n_refresher+n_test+1),  -->
+<!--                        rep(NA,n_trainingcycle-n_test-n_refresher-2) -->
+<!--                        ), -->
+<!--                      4, n_trainingcycle, byrow = TRUE) -->
+<!--   (p = current_data%>% -->
+<!--     ggplot(aes(x=resp_x, y = resp_y, color = stim_attrx,fill = stim_attrx))+ -->
+<!--     facet_manual(vars(session_str,blocknumber_withinsess),design = layoutmat,strip = strip_nested())+ -->
+<!--     geom_point(aes(shape = stim_attry),size=3.5,alpha=0.6)+ -->
+<!--     scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+ -->
+<!--     scale_shape_manual(values = x_shapes)+ -->
+<!--     guides(fill = "none")+ -->
+<!--     labs(title = plot_name,color = "true x",shape = "true y", x = "response x", y = "response y")+ -->
+<!--     theme(legend.position = "top",aspect.ratio = 1)) -->
+<!--   ggsave(file.path(result_dir,'individualmaps',"participant_map_rescaled",paste0(pid,'.png')),plot = p,device = 'png',width = 15,height = 9) -->
+<!-- } -->
+<!-- ``` -->
+
+```{r 2D + 1D LLR}
+for (pid in unique(filter(data_with_prob)$subid)){
+  current_data = filter(data_with_prob,subid == pid)%>%
+    mutate(stim_attrx = factor(stim_attrx),
+           stim_attry = factor(stim_attry))
+  current_data_sum = aggregate_data(current_data,
+                                    yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
+                                    groupbyvars = c("subid","expt_session","blocknumber_withinsess"),
+                                    stats = c("mu"),
+                                    additionalvars = c("islearner","isgeneralizer","session_str"))%>%
+                    change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
+                                                  "mu_resp_dist","mu_error_x","mu_error_y"),
+                                     newnames = c("LLR","LLR_x","LLR_y",
+                                                  "distance","errorx","errory"))#%>%
+                    #mutate(islearner = factor(islearner,levels = c(0,1),labels = c("non-learner","learner")),
+                    #       isgeneralizer = factor(isgeneralizer,levels = c(0,1),labels = c("non-generalizer","generalizer")))
+  
+  
+  plot_name = paste(pid,unique(current_data$islearner),unique(current_data$isgeneralizer))
+  n_refresher=6
+  n_trainingcycle=12
+  nb_percyc = 3
+  n_test = 4
+  layoutmat = matrix(c(## first three rows are training cycles
+                       seq(1,n_trainingcycle*nb_percyc,by=nb_percyc),
+                       seq(2,n_trainingcycle*nb_percyc,by=nb_percyc),
+                       seq(3,n_trainingcycle*nb_percyc,by=nb_percyc),
+                       ## refresher
+                       seq(n_trainingcycle*nb_percyc+1,n_trainingcycle*nb_percyc+n_refresher,by=1), NA,NA,
+                       ## test
+                       seq(n_trainingcycle*nb_percyc+n_refresher+2,
+                           n_trainingcycle*nb_percyc+n_refresher+n_test+1), 
+                       rep(NA,n_trainingcycle-n_test-n_refresher-2)
+                       ),
+                     4, n_trainingcycle, byrow = TRUE)
+  (p = current_data%>%
+    ggplot(aes(x=resp_x, y = resp_y))+
+    facet_manual(vars(session_str,blocknumber_withinsess),design = layoutmat,strip = strip_nested())+
+    geom_point(aes(shape = stim_attry, color = stim_attrx,fill = stim_attrx),size=3.5,alpha=0.7)+
+    geom_text(data = current_data_sum,size = 3,
+            aes(x=0.1,y=2,label = sprintf("2D LLR = %s", formatC(LLR, digits = 2))))+
+    geom_text(data = current_data_sum,size = 3,
+              aes(x=0.1,y=1.6,
+                  label = sprintf("1D LLR(x,y): [%s, %s]",
+                                  formatC(LLR_x, digits = 2),
+                                  formatC(LLR_y, digits = 2))))+
+    scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+
+    #scale_shape_manual(values = x_shapes)+
+    guides(fill = "none")+
+    labs(title = plot_name,
+         color = "x feature",shape = "y feature", x = "x", y = "y")+
+    theme(legend.position = "top"))
+  show(p)
+  ggsave(file.path(result_dir,'individualmaps',"participant_map_with1dLLR",paste0(pid,'.png')),plot = p,width = 16,height = 9)
+  
+}
+```
+
+### average response map
+```{r}
+generalize_js = c("non-generalizer","generalizer")
+learn_ks = c("non-learner","learner")
+for (j in generalize_js){
+  for (k in learn_ks){
+    ave_resp_map_df = data_with_prob %>%
+    filter(isgeneralizer==j,islearner==k)%>%
+    aggregate_data(
+      yvars = c("resp_x","resp_y"),
+      groupbyvars = c("islearner","isgeneralizer","expt_session","blocknumber_withinsess","stim_id"),
+      stats = c("mu"),
+      additionalvars = c("expt_block","session_str","stim_x","stim_y","stim_attrx","stim_attry")
+    )%>%
+    change_cols_name(oldnames = c("mu_resp_x","mu_resp_y"),
+                     newnames = c("resp_x", "resp_y"))%>%
+    mutate(stim_attrx = factor(stim_attrx),
+             stim_attry = factor(stim_attry))
+  
+    if (nrow(ave_resp_map_df)>0){
+      n_refresher=6
+      n_trainingcycle=12
+      nb_percyc = 3
+      n_test = 4
+      layoutmat = matrix(c(## first three rows are training cycles
+                           seq(1,n_trainingcycle*nb_percyc,by=nb_percyc),
+                           seq(2,n_trainingcycle*nb_percyc,by=nb_percyc),
+                           seq(3,n_trainingcycle*nb_percyc,by=nb_percyc),
+                           ## refresher
+                           seq(n_trainingcycle*nb_percyc+1,n_trainingcycle*nb_percyc+n_refresher,by=1), NA,NA,
+                           ## test
+                           seq(n_trainingcycle*nb_percyc+n_refresher+2,
+                               n_trainingcycle*nb_percyc+n_refresher+n_test+1), 
+                           rep(NA,n_trainingcycle-n_test-n_refresher-2)
+                           ),
+                         4, n_trainingcycle, byrow = TRUE)
+      p = ave_resp_map_df%>%
+        ggplot(aes(x=resp_x, y = resp_y))+
+        facet_manual(vars(session_str,blocknumber_withinsess),design = layoutmat,strip = strip_nested())+
+        geom_point(aes(color = stim_attry,fill = stim_attry,shape = stim_attrx),size = 3)+
+        scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+
+        #scale_shape_manual(values = x_shapes)+
+        guides(fill = "none")+
+        labs(title =paste0("average response map: ", k,'_',j),
+             color = "y feature",shape = "x feature", x = "x", y = "y")+
+        theme(legend.position = "top")
+      ggsave(file.path(result_dir,'individualmaps',"averagemaps",
+                       paste0(k,'_',j,'.png')),plot = p,width = 16,height = 9)
+      show(p)
+    }
+  
+  }
+}
+
+```
+

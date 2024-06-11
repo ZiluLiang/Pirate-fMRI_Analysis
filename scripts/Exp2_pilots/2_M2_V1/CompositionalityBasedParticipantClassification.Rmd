@@ -1,0 +1,224 @@
+---
+title: "new GnG classification"
+author: "zilu"
+date: "2024-05-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE,fig.width = 9,fig.height = 9)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+
+data_dir = file.path(project_dir, "data","Exp2_pilots","2_M2_v1", fsep="/")
+result_dir = file.path(project_dir, "results","Exp2_pilots","2_M2_v1", fsep="/")
+
+
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+load(file.path(data_dir,"allexpdata_compo_lapse-0_01.RData"))
+```
+
+```{r}
+
+
+th_df = data_with_prob%>%
+   mutate(
+     xgroup=ifelse(expt_map %in% c(0,2),"x1","x2"),
+     ygroup=ifelse(expt_map %in% c(0,3),"y1","y2")
+   )
+```
+
+This Document is to demonstrate participant classification in the pirate task based on the compositionality of their response.
+
+
+```{r}
+subid_list = unique(th_df$subid)
+map_list = unique(th_df$subid)
+nsub = length(subid_list)
+
+
+testblock_trainingstim_df = filter(th_df,session_str=="refresher"&
+                                     stim_group=="training")%>%
+  filter(blocknumber_withinsess==max(blocknumber_withinsess))#test (no feedback)
+nrow(testblock_trainingstim_df)/nsub # this should be 16, because we have 2 training maps, 8 training locations on each map
+
+sub_testblock_trainstim_dfs = group_split(testblock_trainingstim_df,subid)
+new_th_df = data.frame()
+cor_df = data.frame()
+  
+for (curr_subid in subid_list){
+  # get response for x1,x2,y1,y2 for participant
+  sub_testblock_trainstim_df = filter(testblock_trainingstim_df,subid==curr_subid)
+  x1_resp  = filter(sub_testblock_trainstim_df,expt_map==0)[c("subid","stim_x","resp_x")]%>%
+    change_cols_name(c("stim_x","resp_x"),c("axisLoc","resp_loc"))%>%
+    aggregate_data(groupbyvars = "axisLoc",yvars="resp_loc",stats = "mu")%>%
+    change_cols_name(c("mu_resp_loc"),c("resp_loc"))%>%
+    mutate(axisname = "x1")
+  
+  x2_resp  = filter(sub_testblock_trainstim_df,expt_map==1)[c("subid","stim_x","resp_x")]%>%
+    change_cols_name(c("stim_x","resp_x"),c("axisLoc","resp_loc"))%>%
+    aggregate_data(groupbyvars = "axisLoc",yvars="resp_loc",stats = "mu")%>%
+    change_cols_name(c("mu_resp_loc"),c("resp_loc"))%>%
+    mutate(axisname = "x2")
+  
+  y1_resp  = filter(sub_testblock_trainstim_df,expt_map==0)[c("subid","stim_y","resp_y")]%>%
+    change_cols_name(c("stim_y","resp_y"),c("axisLoc","resp_loc"))%>%
+    aggregate_data(groupbyvars = "axisLoc",yvars="resp_loc",stats = "mu")%>%
+    change_cols_name(c("mu_resp_loc"),c("resp_loc"))%>%
+    mutate(axisname = "y1")
+  
+  y2_resp  = filter(sub_testblock_trainstim_df,expt_map==1)[c("subid","stim_y","resp_y")]%>%
+    change_cols_name(c("stim_y","resp_y"),c("axisLoc","resp_loc"))%>%
+    aggregate_data(groupbyvars = "axisLoc",yvars="resp_loc",stats = "mu")%>%
+    change_cols_name(c("mu_resp_loc"),c("resp_loc"))%>%
+    mutate(axisname = "y2")
+  
+  learned_resp = rbind(x1_resp,x2_resp,y1_resp,y2_resp)
+  
+  map0resp = cbind(expand.grid(stim_x = x1_resp$axisLoc, 
+                               stim_y = y1_resp$axisLoc),
+                   expand.grid(gen_resp_x = x1_resp$resp_loc, 
+                               gen_resp_y = y1_resp$resp_loc))%>%
+    mutate(expt_map = 0)
+  
+  map1resp = cbind(expand.grid(stim_x = x2_resp$axisLoc, 
+                               stim_y = y2_resp$axisLoc),
+                   expand.grid(gen_resp_x = x2_resp$resp_loc, 
+                               gen_resp_y = y2_resp$resp_loc))%>%
+    mutate(expt_map = 1)
+  
+  map2resp = cbind(expand.grid(stim_x = x1_resp$axisLoc, 
+                               stim_y = y2_resp$axisLoc),
+                   expand.grid(gen_resp_x = x1_resp$resp_loc, 
+                               gen_resp_y = y2_resp$resp_loc))%>%
+    mutate(expt_map = 2)
+  
+  map3resp = cbind(expand.grid(stim_x = x2_resp$axisLoc, 
+                               stim_y = y1_resp$axisLoc),
+                   expand.grid(gen_resp_x = x2_resp$resp_loc, 
+                               gen_resp_y = y1_resp$resp_loc))%>%
+    mutate(expt_map = 3)
+
+  generative_resp = rbind(map0resp,map1resp,map2resp,map3resp)%>%
+    mutate(subid    = curr_subid,
+           expt_map = factor(expt_map,levels=c(0,1,2,3)))
+  subdf = left_join(filter(th_df,subid==curr_subid),
+                    generative_resp,by=c("subid","expt_map","stim_x","stim_y"))
+  new_th_df = rbind(new_th_df, subdf)
+  
+  
+  # find the correlation bewteen participant resp and different map during session 2
+  sub_testb_df = filter(subdf,session_str=="test (no feedback)")#&stim_group=="training"
+  curr_islearner = sub_testblock_trainstim_df$islearner[1]
+  curr_isgener = sub_testblock_trainstim_df$isgeneralizer[1]
+  for (tmpdf in group_split(sub_testb_df,istraining)){
+    #print(nrow(tmpdf))
+    currsg = tmpdf$istraining[1]
+    cx  = cor.test(tmpdf$gen_resp_x,tmpdf$resp_x)$estimate
+    cy  = cor.test(tmpdf$gen_resp_y,tmpdf$resp_y)$estimate
+    cxy = cor.test(c(tmpdf$gen_resp_x,tmpdf$gen_resp_y),c(tmpdf$resp_x,tmpdf$resp_y))$estimate
+    lmx = lm(resp_x~gen_resp_x,tmpdf)
+    lmy = lm(resp_y~gen_resp_y,tmpdf)
+    lx  = lmx$coefficients["gen_resp_x"]
+    ly  = lmy$coefficients["gen_resp_y"]
+    
+    tmpdf_long = data.frame(generated_resp = c(tmpdf$gen_resp_x,tmpdf$gen_resp_y),
+                            true_resp       = c(tmpdf$resp_x,tmpdf$resp_y))
+    lxy  = lm(true_resp~generated_resp,tmpdf_long)$coefficients["generated_resp"]
+    
+    #fstat = summary(lmx)[["fstatistic"]] # pf(fstat[["value"]],fstat[["numdf"]],fstat[["dendf"]],lower.tail = FALSE)
+    px  = summary(lmx)[["coefficients"]]["gen_resp_x","Pr(>|t|)"]#[["adj.r.squared"]]#
+    py  = summary(lmy)[["coefficients"]]["gen_resp_y","Pr(>|t|)"]#[["adj.r.squared"]]#
+    rx  = summary(lmx)[["adj.r.squared"]]#
+    ry  = summary(lmy)[["adj.r.squared"]]#
+    pxy = summary(lm(true_resp~generated_resp,tmpdf_long))[["coefficients"]]["generated_resp","Pr(>|t|)"]#[["adj.r.squared"]]
+    sgcordf = data.frame(stim_group=currsg,
+                         corr_x=cx,corr_y=cy,corr_xy=cxy,
+                         compo_x=lx,compo_y=ly,compo_xy=lxy,
+                         compo_px = px,compo_py = py,compo_pxy = pxy,
+                         compo_rx = rx,compo_ry = ry,
+                         subid=curr_subid,islearner=curr_islearner,isgeneralizer=curr_isgener)#%>%
+#      mutate(stim_group = factor(stim_group,levels=c(1,0),labels=c("training","validation+test")))
+    row.names(sgcordf) = NULL
+    cor_df  = rbind(cor_df,sgcordf)
+  }
+  
+
+}
+```
+
+## plot correlation between putative response and actual response
+
+```{r}
+criteria_df = cor_df%>%
+  filter(stim_group == "validation+test")%>%
+  mutate(compo_2d = factor(compo_rx>0.3 & compo_ry>0.3,
+                           levels = c(TRUE,FALSE),
+                           labels=c("compositional","non-compositional")))
+(compositional_ids = unique(filter(criteria_df,compo_2d=="compositional")$subid))
+(noncompositional_ids = unique(filter(criteria_df,compo_2d=="non-compositional")$subid))
+```
+
+```{r}
+cor_df = cor_df%>%
+  mutate(iscompositional = factor(ifelse(subid %in% compositional_ids,"compositional","non-compositional"),
+                                  levels=c("compositional","non-compositional")))
+cor_df%>%
+  ggplot(aes(x=compo_x,y=compo_y,color=iscompositional,shape=isgeneralizer))+
+  facet_grid(cols = vars(stim_group))+
+    geom_point(size=3)+
+    geom_abline(slope = 1)+
+  labs(x="coefficient of putative x",y="coefficient of putative y")
+
+```
+
+
+```{r}
+data_with_prob = data_with_prob%>%
+  mutate(iscompositional = factor(ifelse(subid %in% compositional_ids,"compositional","non-compositional"),
+                                  levels=c("compositional","non-compositional")))
+fc_df_all = fc_df_all%>%
+  mutate(iscompositional = factor(ifelse(subid %in% compositional_ids,"compositional","non-compositional"),
+                                  levels=c("compositional","non-compositional")))
+
+debrief_cluster_data = debrief_cluster_data%>%
+  mutate(iscompositional = factor(ifelse(subid %in% compositional_ids,"compositional","non-compositional"),
+                                  levels=c("compositional","non-compositional")))
+
+ncompos = length(compositional_ids)
+nsub = length(unique(data_with_prob$subid))
+participant_count = data_with_prob%>%
+  distinct(subid,iscompositional)%>%
+  group_by(iscompositional)%>%
+  summarise(n = n())
+participant_count = participant_count%>%
+  mutate(label = paste0(iscompositional, "\n n=",n))
+participant_count
+
+save(data_with_prob,fc_df_all,debrief_cluster_data,learnerids,generalizerids,compositional_ids,noncompositional_ids,
+     labelling_func,participant_count,
+     file = file.path(data_dir,"allexpdata_reclassify.RData"))
+
+```
+
+
+```{r pressure, echo=FALSE,fig.height=4}
+cor_df%>%
+  pivot_longer(cols=c("compo_x","compo_y","compo_xy"),names_to = "metric",values_to = "correlation")%>%
+  mutate(metric=factor(metric,levels=c("compo_x","compo_y","compo_xy")))%>%
+  ggplot(aes(x=metric,y=correlation,color=isgeneralizer))+
+  facet_grid(cols = vars(stim_group))+
+    geom_point(position = position_dodge(1))
+```
+
+```{r}
+new_th_df%>%
+  aggregate_data(groupbyvars = c())
+```
+
