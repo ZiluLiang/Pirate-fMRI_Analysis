@@ -14,10 +14,5 @@ probdf
 **/bspmview**.mat
 **/test*
 
-plotroirsa.Rmd
-scripts/prepare_image.m
-scripts/behavior
-scripts/generic
-scripts/tidydata
-scripts/behavior.Rmd
+scripts/resultvisualization
 .Rproj.user
