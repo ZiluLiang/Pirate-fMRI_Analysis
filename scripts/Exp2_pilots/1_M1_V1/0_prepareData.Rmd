@@ -1,0 +1,317 @@
+---
+title: "1_PrepareData"
+output: html_document
+date: "2024-03-20"
+---
+```{r setup, include=FALSE}
+
+rm(list = ls())
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE,fig.height = 9)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+
+data_dir = file.path(project_dir, "data","Exp2_pilots","1_M1_v1", fsep="/")
+result_dir = file.path(project_dir, "results","Exp2_pilots","1_M1_v1", fsep="/")
+
+
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+```
+
+# Attention Check
+Plot attention check results and see if any need to be excluded from analyses
+```{r}
+pilot_data = read.csv(file.path(data_dir,"task_data.csv",fsep="/"))
+attention_check_data = pilot_data%>%
+  filter(ctrl_ept==0)
+attention_check_sum = attention_check_data%>%
+  aggregate_data(groupbyvars=c("subid","expt_session"),
+                 yvars="resp_correct",
+                 stats = c("sum","n","mu"))%>%
+  change_cols_name(oldnames=c("sum_resp_correct","n_resp_correct","mu_resp_correct"),
+                   newnames=c("n_correct","n_totaltrials","accuracy"))
+attention_check_sum = attention_check_sum%>%
+  mutate(session_str = factor(expt_session,
+                              levels=c(0,1),
+                              labels=c(sprintf("session1 (%d trials)",unique(filter(attention_check_sum,expt_session==0)$n_totaltrials)),
+                                       sprintf("session1 (%d trials)",unique(filter(attention_check_sum,expt_session==1)$n_totaltrials))
+                                       )
+                              ))
+  
+
+
+ggplot(data=attention_check_sum,aes(x=subid,y=accuracy,fill=session_str))+
+  geom_col(position=position_dodge2(1))+
+  theme(aspect.ratio = 0.6,axis.text.x = element_text(angle=90),legend.position = "top")+
+  labs(fill="session",title="attention check accuracy")
+
+filter(attention_check_sum,accuracy==min(attention_check_sum$accuracy))$subid
+```
+
+Subid "lKo186FW3Hk0" attention check accuracy is too low, so removed from analysis
+```{r}
+remove_sub = c("lKo186FW3Hk0")
+pilot_data = pilot_data%>%
+  filter(ctrl_ept==1&!(subid %in% remove_sub))%>%
+  mutate(session_str=factor(expt_session,levels=c(0,1),labels=c("session 1","session2")))
+
+range_xy = c(max(pilot_data$stim_x)-min(pilot_data$stim_x),
+             max(pilot_data$stim_y)-min(pilot_data$stim_y))
+
+pilot_data = pilot_data%>%
+  mutate(stim_group = factor(stim_group,levels = c("training","validation","test")),
+         stim_xO = stim_x,
+         stim_yO = stim_y,
+         resp_xO = resp_x,
+         resp_yO = resp_y,
+         ##rescale so that correct location is between -1 and 1
+         stim_x = round(2*stim_x/range_xy[1],digits = 3),
+         stim_y = round(2*stim_y/range_xy[2],digits = 3),
+         distractor_x = round(2*distractor_x/range_xy[1],digits = 3),
+         distractor_y = round(2*distractor_y/range_xy[2],digits = 3),
+         resp_x = round(2*resp_x/range_xy[1],digits = 3),
+         resp_y = round(2*resp_y/range_xy[2],digits = 3),
+         stim_attrx = factor(stim_x),
+         stim_attry = factor(stim_y),
+         stim_attryshape = factor(stim_attry,labels = x_shapes),
+         )
+
+```
+
+# classify participants according to performance in Treasure Hunt task
+```{r filter treasure hunt data}
+data = pilot_data%>%
+  filter(expt_task==0)
+
+#check if number of trials is correct:
+#nsub = length(unique(respdata$subid)) = ?
+#ntrialpersub = nrow(respdata)/nsub = ?
+
+
+data = data%>%
+  mutate(resp_dist = sqrt((resp_x-stim_x)^2+(resp_y-stim_y)^2))
+
+re_Assign_block = data%>%distinct(subid,expt_session,expt_block,.keep_all = T)%>%
+  group_by(subid,expt_session)%>%
+  arrange(expt_block)%>%
+  mutate(blocknumber_withinsess = row_number())%>%
+  dplyr::select(c("subid","expt_session","expt_block","blocknumber_withinsess"))
+data = left_join(data,re_Assign_block)
+
+```
+
+## calculate llr for each participant and classify learner/generalizer
+```{r load model distribution df}
+load(file.path(llr_dir,"probDF_data_compo_withlapse.RData"))
+```
+
+
+```{r calculate llr for each participant}
+tryCatch(
+  expr = {
+    data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+  },
+  error = function(e){
+    cl<- makeCluster(detectCores())
+    clusterExport(cl=cl,
+                  varlist = c("data","unique_stimloc","base","prob_df_list"),
+                  envir=environment())
+    new_rows <- pblapply(cl = cl,X = seq(1,nrow(data)),FUN = function(j){
+      library(dplyr)
+      sx = data$stim_x[j]
+      sy = data$stim_y[j]
+      rx = data$resp_x[j]
+      ry = data$resp_y[j]
+
+      ind = filter(unique_stimloc,x == sx & y == sy)$loc_id
+      search_df=prob_df_list[[ind]]
+      xlb = base[max(which(base<=rx))]
+      xub = base[min(which(base>rx))]
+      ylb = base[max(which(base<=ry))]
+      yub = base[min(which(base>ry))]
+      
+      new_row = filter(search_df,x<xub & x>=xlb & y<yub & y>=ylb)
+      if(nrow(new_row)==0){
+        new_row[1, ] <- NA
+        new_row = new_row%>%
+        mutate(resp_x = rx, resp_y = ry,
+               subid = data$subid[j],
+               expt_session = data$expt_sess[j],
+               expt_block = data$expt_block[j],
+               expt_trial = data$expt_trial[j])
+      }else{
+        new_row = new_row%>%
+        mutate(resp_x = rx, resp_y = ry,
+               subid  = data$subid[j],
+               expt_session = data$expt_sess[j],
+               expt_block = data$expt_block[j],
+               expt_trial = data$expt_trial[j])
+      }
+      
+      return(new_row)
+      })
+    stopCluster(cl)
+    
+    a = do.call(rbind,new_rows)
+    
+    data_with_prob = left_join(data,a)
+    save(data_with_prob, file = file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+  }
+)
+
+data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+
+```
+
+
+
+```{r classify learner}
+data_with_prob = data_with_prob%>%
+  mutate(error_x = abs(stim_x - resp_x),
+         error_y = abs(stim_y - resp_y))%>%
+  mutate(binorm_lap = BND_compo_lap)%>%
+  mutate(LR_trial = binorm_lap/uniform,
+         LRx_trial = UND_x_lap/uniform,
+         LRy_trial = UND_y_lap/uniform,)%>%
+  mutate(LLR_trial = log(LR_trial),
+         LLRx_trial = log(LRx_trial),
+         LLRy_trial = log(LRy_trial))%>%
+  group_by(subid)%>%
+    arrange(stim_group,expt_session,expt_block)%>%
+    mutate(trialid_withinstage = row_number(),
+           ntrials = n())%>%
+  ungroup()
+
+sub_LLR_data = aggregate_data(data_with_prob,
+                              groupbyvars = c("subid","stim_group","expt_session","blocknumber_withinsess"),
+                              yvars = c("LLR_trial","LLRx_trial","LLRy_trial"),
+                              stats = c("mu"),
+                              additionalvars = c("expt_coordsys","expt_curricula","expt_session"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial"),
+                   newnames = c("LLR","LLR_x","LLR_y"))
+
+dividesub = sub_LLR_data%>%
+  dplyr::select(-c(starts_with("n_")))%>%
+  group_by(subid,stim_group)%>%
+  mutate(nblock = max(blocknumber_withinsess))%>%
+  aggregate_data(groupbyvars = c("subid","stim_group","expt_session"),
+                 yvars = c("LLR"),
+                 stats = c("sum"))
+
+learnerids = unique(filter(dividesub,expt_session==1&stim_group=="training"&sum_LLR>=0)$subid)
+generalizerids = unique(filter(dividesub,expt_session==1&stim_group=="validation"&sum_LLR>=0)$subid)
+(nonlearnerids = unique(filter(dividesub,expt_session==1&stim_group=="training"&sum_LLR<0)$subid))
+(nongeneralizerids = unique(filter(dividesub,expt_session==1&stim_group=="validation"&sum_LLR<0)$subid))
+
+data_with_prob = data_with_prob%>%
+  mutate(islearner = ifelse(subid%in%learnerids,1,0),
+         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))%>%
+  mutate(islearner = factor(islearner,levels = c(0,1),labels = c("non-learner","learner")),
+         isgeneralizer = factor(isgeneralizer,levels = c(0,1),labels = c("non-generalizer","generalizer")))
+
+sub_LLR_data = sub_LLR_data%>%
+  mutate(islearner = ifelse(subid%in%learnerids,1,0),
+         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))%>%
+  mutate(islearner = factor(islearner,levels = c(0,1),labels = c("non-learner","learner")),
+         isgeneralizer = factor(isgeneralizer,levels = c(0,1),labels = c("non-generalizer","generalizer")))
+```
+
+```{r count participant type}
+nlearners = length(learnerids)
+ngeneralizers = length(generalizerids)
+nsub = length(unique(sub_LLR_data$subid))
+participant_count = sub_LLR_data%>%
+  distinct(subid,islearner,isgeneralizer)%>%
+  group_by(islearner,isgeneralizer)%>%
+  summarise(n = n())
+participant_count = participant_count%>%
+  mutate(label = paste0(isgeneralizer, "\n n=",n))
+participant_count
+labelling_func = function(row){
+  l = row[1]
+  g = row[2]
+  return(filter(participant_count,islearner==l&isgeneralizer==g)$label)
+}
+```
+
+# organize 2AFC data
+# 2AFC task{.tabset}
+
+```{r filter 2AFC task data}
+fc_df_all = pilot_data%>%
+  filter(expt_task==1)%>%
+  mutate(distractor_dist = sqrt((distractor_x-stim_x)^2+(distractor_y-stim_y)^2),
+         distractor_distx = abs(distractor_x-stim_x),
+         distractor_disty = abs(distractor_y-stim_y),
+         distractor_relx = distractor_x-stim_x,
+         distractor_rely = distractor_y-stim_y,
+         )%>%
+  mutate(islearner = ifelse(subid%in%learnerids,1,0),
+         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))
+
+re_Assign_blockfc = fc_df_all%>%distinct(subid,expt_session,expt_block,.keep_all = T)%>%
+  group_by(subid,expt_session)%>%
+  arrange(expt_block)%>%
+  mutate(blocknumber_withinsess = row_number())%>%
+  dplyr::select(c("subid","expt_session","expt_block","blocknumber_withinsess"))
+fc_df_all = left_join(fc_df_all,re_Assign_blockfc)
+fc_df_all = fc_df_all%>%
+  mutate(resp_correct = resp_choice!=distactorside,
+         stage = factor(stim_group,levels = c("training","validation","test")),
+         session_str = factor(expt_session, levels = c(0,1),labels=c("s1","s2")),
+         missed = is.na(resp_correct),
+         istraining = factor(istraining,level=c(1,0),labels=c("training","validation+test")),
+         choosen_x = if_else(resp_correct==1,stim_x,distractor_x),
+         choosen_y = if_else(resp_correct==1,stim_y,distractor_y))
+
+
+## assign location id to each stimuli
+find_loc_id = function(datax,datay){
+  filter(unique_stimloc,x == datax & y == datay)$ind
+}
+cl<- makeCluster(detectCores())
+clusterExport(cl=cl,
+              varlist = c("fc_df_all","unique_stimloc","find_loc_id"),
+              envir=environment())
+stim_locid <- pblapply(cl = cl,X = seq(1,nrow(fc_df_all)),
+                     FUN = function(j){ 
+                       library(dplyr)
+                       return (find_loc_id(fc_df_all$stim_x[j],fc_df_all$stim_y[j]))}
+                     )
+distractor_locid <- pblapply(cl = cl,X = seq(1,nrow(fc_df_all)),
+                     FUN = function(j){ 
+                       library(dplyr)
+                       return (find_loc_id(fc_df_all$distractor_x[j],fc_df_all$distractor_y[j]))}
+                     )
+fc_df_all$stim_locid=stim_locid
+fc_df_all$distractor_locid=distractor_locid
+
+
+```
+
+# debrief
+
+```{r}
+debrief_data = read.csv(file.path(data_dir,"debrief_data.csv",fsep="/"))
+cluster_data = read.csv(file.path(data_dir,"cluster_data.csv",fsep="/"))
+debrief_cluster_data = left_join(cluster_data,debrief_data,by=c("prolificid","subid"))%>%
+  filter(!(subid %in% remove_sub))%>%
+  mutate(islearner = subid %in% learnerids,
+         isgeneralizer = subid %in% generalizerids,
+         symbol_side = if_else(floor(symID/5)==0,"L","R"),
+         symbol_axisloc = mod(symID,5)-2)%>%
+  mutate(islearner = factor(islearner,levels = c(FALSE,TRUE),labels = c("non-learner","learner")),
+         isgeneralizer = factor(isgeneralizer,levels = c(FALSE,TRUE),labels = c("non-generalizer","generalizer")))
+```
+
+# save data
+```{r}
+save(data_with_prob,fc_df_all,debrief_cluster_data,learnerids,generalizerids,
+     labelling_func,participant_count,
+     file = file.path(data_dir,"allexpdata_compo_lapse-0_01.RData"))
+```
+
