@@ -68,12 +68,11 @@ class ModelRDM:
                                     ],axis=1) 
         # local features are encoded as from left-right and bottom-up, centre locations are encoded as zero
         wrtlrbu_x,wrtlrbu_y = self.stimloc[:,[0]],self.stimloc[:,[1]]
-        wrtlrbu_x[wrtlrbu_x==0]=numpy.nan
-        wrtlrbu_y[wrtlrbu_y==0]=numpy.nan
-        wrtlrbu_x = scipy.stats.rankdata(wrtlrbu_x,method="dense",axis=0,nan_policy="omit")
-        wrtlrbu_y = scipy.stats.rankdata(wrtlrbu_y,method="dense",axis=0,nan_policy="omit")
-        wrtlrbu_x[numpy.isnan(wrtlrbu_x)]=0
-        wrtlrbu_y[numpy.isnan(wrtlrbu_y)]=0
+        
+        wrtlrbu_x[wrtlrbu_x<0] = scipy.stats.rankdata(wrtlrbu_x[wrtlrbu_x<0],method="dense",axis=0,nan_policy="omit")
+        wrtlrbu_y[wrtlrbu_y<0] = scipy.stats.rankdata(wrtlrbu_y[wrtlrbu_y<0],method="dense",axis=0,nan_policy="omit")
+        wrtlrbu_x[wrtlrbu_x>0] = scipy.stats.rankdata(wrtlrbu_x[wrtlrbu_x>0],method="dense",axis=0,nan_policy="omit")
+        wrtlrbu_y[wrtlrbu_y>0] = scipy.stats.rankdata(wrtlrbu_y[wrtlrbu_y>0],method="dense",axis=0,nan_policy="omit")
         self.stimloc_wrtlrbu  = numpy.concatenate([wrtlrbu_x, wrtlrbu_y, self.stimloc_wrtcentre[:,[2,3]]],axis=1)
         
         ## two-hot encoded color/shape features - 10D
@@ -179,6 +178,8 @@ class ModelRDM:
         stim["resploc"]        = numpy.array(self.stimdf[["resp_x","resp_y"]])
         stim["resploc_xydist"] = numpy.array(self.stimdf[["resp_xdist","resp_ydist"]])
         stim["resploc_xysign"] = numpy.array(self.stimdf[["resp_xsign","resp_ysign"]])
+        stim["hierachical_wrtcentre"]= numpy.array(self.stimdf[["stim_xsign","stim_ysign","stim_xdist","stim_ydist"]])
+        stim["hierachical_wrtlrbu"]= numpy.array(self.stimdf[["stim_xsign","stim_ysign","stim_lrbux","stim_lrbuy"]])
         
         
         ### shuffle
@@ -195,12 +196,14 @@ class ModelRDM:
                                # 'hierachical' models: global + local feature
                                "global_xsign","global_ysign","global_xysign", ## global features                               
                                "locwrtcentre_localx","locwrtcentre_localy","locwrtcentre_localxy",## local feature encoded using central axis as reference - gt
-                               "locwrtlrbu_localx","locwrtlrbu_localy","locwrtlrbu_localxy"  ## local features are encoded as from left-right and bottom-up
+                               "locwrtlrbu_localx","locwrtlrbu_localy","locwrtlrbu_localxy",  ## local features are encoded as from left-right and bottom-up
+                               "hierachical_wrtcentre","hierachical_wrtlrbu"
                                ],
                               ["gtloc","stim_x","stim_y",
                                "stim_xsign","stim_ysign","stim_xysign",
                                "stim_xdist","stim_ydist","stim_xydist",
-                               "stim_lrbux","stim_lrbuy","stim_lrbuxy"])) 
+                               "stim_lrbux","stim_lrbuy","stim_lrbuxy",
+                               "hierachical_wrtcentre","hierachical_wrtlrbu"])) 
         for mname,col in euclidean_rdms.items():
             models[mname] = compute_rdm(stim[col],metric="euclidean")
 
@@ -221,7 +224,7 @@ class ModelRDM:
                                "resplocEuclidean","resploc1dx","resploc1dy",
                                # 'hierachical' models: global + local feature
                                "respglobal_xsign","respglobal_ysign","respglobal_xysign", ## global features                               
-                               "resplocwrtcentre_localx","resplocwrtcentre_localy","resplocwrtcentre_localxy"
+                               "resplocwrtcentre_localx","resplocwrtcentre_localy","resplocwrtcentre_localxy" ## local features 
                                ],
                               ["resploc","resp_x","resp_y",
                                "resp_xsign","resp_ysign","resploc_xysign",
@@ -249,10 +252,33 @@ class ModelRDM:
                 mix_n = 'mixedstimpairs_' + k
                 rdmmix = numpy.multiply(models[k],MIX)
                 models |= {wtr_n:rdmwtr,wte_n:rdmwte,mix_n:rdmmix}
+            
+        #split rdm into withinx/y or acrossx/y pairs        
+        BX, BY = compute_rdm_identity(self.stimdf["stim_x"].to_numpy()), compute_rdm_identity(self.stimdf["stim_y"].to_numpy()) # 0 - within x or y; 1 - between x or y
+        BC = numpy.multiply(BX, BY)      # 0 - either within x or within y; 1 - neither withinx also not within y
+        WC = 1-BC
+        WX,WY = 1-BX, 1-BY
+        BC[BC==0]=numpy.nan
+        WX[WX==0]=numpy.nan
+        WY[WY==0]=numpy.nan
+        WC[WC==0]=numpy.nan
+        tmp = list(models.items()) ## this is so that we don't change models
+        for k,v in tmp:
+            if "Euclidean" in k:
+                wc_n  = f"withinxy_{k}"
+                rdmwc = numpy.multiply(v,WC)
+                wx_n  = f"withinx_{k}"
+                rdmwx = numpy.multiply(v,WX)
+                wy_n  = f"withiny_{k}"
+                rdmwy = numpy.multiply(v,WY)
+                bc_n  = f"betweenxy_{k}"
+                rdmbc = numpy.multiply(v,BC)
+                models |= {wc_n:rdmwc,bc_n:rdmbc,wx_n:rdmwx,wy_n:rdmwy}
+
 
         # split into sessions
         if self.n_session>1:
-            BS = compute_rdm_identity(self.stimsession) # 0 - within session; 1 - within session
+            BS = compute_rdm_identity(self.stimsession) # 0 - within session; 1 - between session
             WS = 1 - BS         # 0 - between session; 1 - between session
             BS[BS==0]=numpy.nan
             WS[WS==0]=numpy.nan
@@ -264,6 +290,7 @@ class ModelRDM:
                 rdmbs = numpy.multiply(v,BS)
                 models |= {ws_n:rdmws,bs_n:rdmbs}
             models["session"] = compute_rdm_identity(self.stimsession)
+
         for k,v in models.items():
             if self.nan_identity:
                 from copy import deepcopy

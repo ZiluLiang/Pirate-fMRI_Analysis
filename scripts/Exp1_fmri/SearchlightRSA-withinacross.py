@@ -2,10 +2,12 @@
 This script runs sanity check for RSA analysis in whole-brain searchlight
 
 """
+
 import json
 import os
 import sys
 from joblib import cpu_count
+
 from zpyhelper.filesys import checkdir
 from zpyhelper.MVPA.preprocessors import average_odd_even_session,normalise_multivariate_noise
 
@@ -13,24 +15,36 @@ project_path = r'E:\pirate_fmri\Analysis'
 sys.path.append(os.path.join(project_path,'src'))
 from multivariate.rsa_runner import RSARunner
 
-###################################################### Run RSA Analysis in different 'preprocessing pipelines' ##################################################
 
-with open(os.path.join(project_path,'scripts','Exp1_fmri','pirate_defaults.json')) as f:
+###################################################### Run different RSA Analysis  ##################################################
+study_scripts   = os.path.join(project_path,'scripts','Exp1_fmri')
+with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
     fmribeh_dir = pirate_defaults['directory']['fmribehavior']
     fmridata_dir = pirate_defaults['directory']['fmri_data']
 
-analyses_localizer = [
-            ]
-
 analyses_navigation = [
-    ######################### sanity check correlation ##################################             
-                  {"type":"correlation",
-                  "name":"rsa_sanity_check",
-                  "modelrdms":["stimuli","feature1d_color","feature1d_shape"]
-                  }
-            ]
+                 {"type":"regression",
+                 "name":"betweenxy_Euclidean",
+                 "regressors":["feature2d","betweenxy_gtlocEuclidean"]},
+
+                 {"type":"regression",
+                 "name":"withinxy_Euclidean",
+                 "regressors":["withinxy_gtlocEuclidean"]},
+
+                 {"type":"regression",
+                 "name":"withinx_Euclidean",
+                 "regressors":["withinx_gtlocEuclidean"]},
+
+                 {"type":"regression",
+                 "name":"withiny_Euclidean",
+                 "regressors":["withiny_gtlocEuclidean"]},
+
+                 {"type":"feature_composition",
+                 "name":"train2test"
+                 }
+           ]
 
 
 fmridata_preprocess = "unsmoothedLSA"
@@ -44,8 +58,7 @@ beta_preproc_steps_nomvnn= {
                 }
 
 config_neuralrdm= {
-    "mvnn_aoe": {"preproc":beta_preproc_steps_withmvnn, "distance_metric":"correlation"},
-    #"raw_aoe":  {"preproc":beta_preproc_steps_nomvnn,   "distance_metric":"correlation"}
+    "mvnn_aoe": {"preproc":beta_preproc_steps_withmvnn, "distance_metric":"correlation"}
 }
 config_modelrdm_ = {"nan_identity":False, "splitgroup":False}
 
@@ -71,8 +84,8 @@ for nconfig_name,nconfig in config_neuralrdm.items():
         vsmask_dir = ds
         vsmask_fname = ['mask.nii']*len(ds)
         
-        taskname = "navigation" if ds_name != "localizer" else ds_name
-        analyses_list = analyses_navigation if taskname == "navigation" else analyses_localizer
+        taskname = "navigation" 
+        analyses_list = analyses_navigation
 
         maskdir = os.path.join(fmridata_dir,'masks','anat')
         RSA = RSARunner(participants=subid_list,
@@ -83,13 +96,11 @@ for nconfig_name,nconfig in config_neuralrdm.items():
                         res_dir=ds*n_sess[ds_name], res_fname=[f'resid_run{j+1}.nii.gz' for j in range(n_sess[ds_name])],
 
                         anatmasks=[],
-#                        anatmasks=[os.path.join(maskdir,'hippocampus_left.nii')],
-                        taskname=taskname,
+                        #anatmasks=[os.path.join(maskdir,'hippocampus_left.nii')],
+                       taskname=taskname,
                         config_modelrdm = config_modelrdm_,
                         config_neuralrdm = nconfig)
-        
         RSA.run_SearchLight(radius = 10,
                                 outputdir = os.path.join(fmridata_dir,fmridata_preprocess,'rsa_searchlight',f'{ds_name}_noselection_{nconfig_name}'),
                                 analyses = analyses_list,
-                                njobs = cpu_count()-1)
-        
+                                njobs = 10)
