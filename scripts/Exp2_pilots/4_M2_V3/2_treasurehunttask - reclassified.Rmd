@@ -15,8 +15,8 @@ project_dir = rstudioapi::getActiveProject();
 src_dir = file.path(project_dir, "src/R", fsep="/")
 llr_dir = file.path(project_dir, "src/LLR", fsep="/")
 
-data_dir = file.path(project_dir, "data","Exp2_pilots","3_M2_v2", fsep="/")
-result_dir = file.path(project_dir, "results","Exp2_pilots","3_M2_v2", fsep="/")
+data_dir = file.path(project_dir, "data","Exp2_pilots","4_M2_v3", fsep="/")
+result_dir = file.path(project_dir, "results","Exp2_pilots","4_M2_v3", fsep="/")
 
 
 source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
@@ -25,6 +25,7 @@ source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_globa
 #load(file.path(data_dir,"allexpdata_compo_lapse-0_01.RData"))
 load(file.path(data_dir,"allexpdata_reclassify.RData"))
 data_with_prob = data_with_prob%>%
+  filter(islearner=="learner")%>%
   mutate(expt_map = factor(expt_map,levels=c(0,1,2,3),
                            labels=c("training map 1","training map 2",
                                     "cross map 1", "cross map 2")))
@@ -116,7 +117,8 @@ for(currid in unique(stimrepdata_sub$subid)){
        )
   for (dfname in names(stimdfs)){
     curr_fit_df = stimdfs[[dfname]]
-    fit_res = fit_decay(curr_fit_df$stim_exptrep,curr_fit_df$distance)
+    # added a small float number to distance so that we can avoid log(0)
+    fit_res = fit_decay(curr_fit_df$stim_exptrep,curr_fit_df$distance+1e-20) 
     curr_fit_res_df = data.frame(fit_res$param)
     curr_fit_res_df[["paramname"]] = row.names(curr_fit_res_df)
     row.names(curr_fit_res_df) = NULL
@@ -144,7 +146,7 @@ for(currid in unique(stimrepdata_sub$subid)){
 }
 ```
 
-```{r}
+```{r,fig.height=3,fig.width=10}
 fit_val_df = do.call(rbind,fit_val_dfs)
 fit_val_df = separate(fit_val_df,col=stimuli,sep = "-", into = c("maptype", "stimtype"),remove =F)%>%
   mutate(stimtype = paste0(stimtype," stimuli"))
@@ -180,7 +182,7 @@ p.modelfit
 ```
 
 
-```{r}
+```{r,fig.height=3,fig.width=10}
 fit_res_df_sum = aggregate_data(fit_res_df,
                                 groupbyvars = c("iscompositional","stimuli","paramname"),
                                 yvars = "estval",
@@ -196,7 +198,7 @@ fit_res_df%>%
     y = list(paramname == "N0" ~ scale_y_continuous(limits = ylim_n0),
              paramname == "rate" ~ scale_y_continuous(limits = ylim_rate,trans="sqrt"))
   )+
-  geom_point(position=position_dodge(1))+
+  geom_point(position=position_jitterdodge(jitter.width = 0.4,dodge.width = 1))+
   geom_col(data=fit_res_df_sum,aes(y=mu_estval),
            position=position_dodge(1),fill=NA)+
   geom_errorbar(data=fit_res_df_sum,
@@ -234,18 +236,18 @@ export_summs(model_N0tr,model_ratetr,model_N0va,model_rateva,
 ## Behavioural performance of learner/generalizer in treasure hunt task{.tabset}
 ```{r treasurehunt block average}
 blockdata_sub = aggregate_data(data_with_prob,
-                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y","resp_correct"),
+                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y","resp_correct","resp_rt"),
                            groupbyvars = c("subid","expt_maptype","expt_map","stim_group","expt_session","blocknumber_withinsess"),
                            stats = c("mu"),
                            additionalvars = c("islearner","isgeneralizer","iscompositional","session_str","expt_maptype"))%>%
   change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
-                                "mu_resp_dist","mu_error_x","mu_error_y","mu_resp_correct"),
+                                "mu_resp_dist","mu_error_x","mu_error_y","mu_resp_correct","mu_resp_rt"),
                    newnames = c("LLR","LLR_x","LLR_y",
-                                "distance","errorx","errory","accuracy"))
+                                "distance","errorx","errory","accuracy","rt"))
 
 
 blockdata_sum = aggregate_data(blockdata_sub,
-                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory","accuracy"),
+                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory","accuracy","rt"),
                            groupbyvars = c("iscompositional","expt_map","stim_group",
                                            "expt_session","blocknumber_withinsess"),
                            stats = c("mu","se","n"),
@@ -296,6 +298,40 @@ blockdata_sum = left_join(blockdata_sum,change_cols_name(participant_count,"labe
 ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot = p,device = 'png',width = 15,height = 8)
 ```
 
+```{r rt,fig.height=6}
+
+(p = blockdata_sub%>%
+    filter(session_str!="test (no feedback)")%>%
+  ggplot(aes(x=blocknumber_withinsess,y=rt,fill=stim_group,color=stim_group))+
+  geom_line(aes(group=interaction(stim_group, subid)),
+            position=position_dodge(width=0.5),
+            alpha = 0.5,linewidth=0.4)+
+  geom_point(aes(group=interaction(stim_group, subid)),
+             alpha = 0.5,size = 0.8,stroke=0,
+             position = position_dodge(width=0.5))+
+
+  geom_line(data = blockdata_sum%>%filter(session_str!="test (no feedback)"),
+            aes(x=blocknumber_withinsess,y=mu_rt),
+            linewidth=0.8)+
+  geom_errorbar(data = blockdata_sum%>%filter(session_str!="test (no feedback)"),
+                aes(x=blocknumber_withinsess,
+                    y = mu_rt,
+                    ymin = mu_rt - se_rt,
+                    ymax = mu_rt + se_rt),
+                width=0.3)+
+    
+    
+  facet_nested(cols =vars(expt_map,session_str),
+               rows = vars(generalizer_label),
+               scales = "free_x",space = "free_x")+
+  scale_x_continuous(breaks = seq(1,36,1))+
+  guides(fill = "none")+
+  labs(x="block number",y="RT",color = "stim_group",
+       title = "RT")+
+  theme(aspect.ratio = 10,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('rt_classified','.png')),plot = p,device = 'png',width = 15,height = 8)
+```
 
 ```{r,fig.height=4}
 testnofbdata = filter(data_with_prob,session_str=="test (no feedback)")%>%
@@ -345,6 +381,9 @@ testnofbdata_sum = left_join(testnofbdata_sum,change_cols_name(participant_count
   labs(x="stim_type",y="mean distance to goal (a.u.) rescaled",color = "map type",
        title = "Distance to correct location")+
   theme(aspect.ratio = 4,legend.position = "top"))
+
+
+
 ```
 
 ```{r,fig.height=4}
@@ -397,6 +436,20 @@ testnofbdata_sum = left_join(testnofbdata_sum,change_cols_name(participant_count
        title = "Treasure Hunt RT")+
   theme(aspect.ratio = 4,legend.position = "top"))
 ```
+```{r}
+model_rt_trial_g   = lmer(resp_rt~iscenter+expt_maptype + (iscenter|subid) + (1|stim_id),
+              data=filter(testnofbdata,iscompositional=="compositional"&resp_correct==TRUE))
+model_error_trial_g   = glmer(resp_correct~iscenter+expt_maptype + (iscenter|subid) + (1|stim_id),
+              data=filter(testnofbdata,iscompositional=="compositional"))
+#model_dist = lmer(distractor_dist~iscompositional+blocknumber_withinsess + (1 |subid),
+#              data=fc_df)
+export_summs(model_rt_trial_g,model_error_trial_g,error_format = "(\u00B1{std.error})",error_pos ="same",
+             model.names=c("RT in Generalizers","Error in Generalizers"),
+             coefs = c("Center>nonCenter" = "iscentercenter",
+                       "Cmap>Tmap"  = "expt_maptypecross maps"
+                       ))
+```
+
 
 ```{r, fig.height=4,fig.width=3}
 testnofbdata = filter(data_with_prob,session_str=="test (no feedback)")%>%
@@ -462,7 +515,6 @@ testnofbdata_sum = left_join(testnofbdata_sum,change_cols_name(participant_count
        title = "Treasure Hunt \n RTs")+
   theme(aspect.ratio = 5,legend.position = "top"))
 
-```
 ```
 
 

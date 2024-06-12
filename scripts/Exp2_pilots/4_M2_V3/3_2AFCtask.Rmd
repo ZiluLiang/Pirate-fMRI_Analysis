@@ -14,8 +14,8 @@ project_dir = rstudioapi::getActiveProject();
 src_dir = file.path(project_dir, "src/R", fsep="/")
 llr_dir = file.path(project_dir, "src/LLR", fsep="/")
 
-data_dir = file.path(project_dir, "data","Exp2_pilots","3_M2_v2", fsep="/")
-result_dir = file.path(project_dir, "results","Exp2_pilots","3_M2_v2", fsep="/")
+data_dir = file.path(project_dir, "data","Exp2_pilots","4_M2_v3", fsep="/")
+result_dir = file.path(project_dir, "results","Exp2_pilots","4_M2_v3", fsep="/")
 
 source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
 source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
@@ -164,18 +164,18 @@ blockfcdata_sum = aggregate_data(blockfcdata_sub,
 
 ggsave(file.path(result_dir,paste0('blockacc_withsess','.png')),plot = p,device = 'png',width = 15,height = 7)
 ```
-```{r,fig.width=5,fig.height=5}
 
-blockfcdata_sub = aggregate_data(fc_df%>%filter(resp_correct=TRUE),
-                           yvars = c("resp_correct","resp_rt","distractor_dist"),
+```{r,fig.width=5,fig.height=5}
+blockfcdata_sub = aggregate_data(filter(fc_df,resp_correct=TRUE),
+                           yvars = c("resp_rt","distractor_dist"),
                            groupbyvars = c("subid","expt_maptype","stim_group","session_str","blocknumber_withinsess"),
                            stats = c("mu"),
                            additionalvars = c("blocknumber_withinsess","session_str","islearner","isgeneralizer","iscompositional"))%>%
-  change_cols_name(oldnames = c("mu_resp_correct","mu_resp_rt","mu_distractor_dist"),
-                   newnames = c("blockacc","blockrt","blockdist"))
+  change_cols_name(oldnames = c("mu_resp_rt","mu_distractor_dist"),
+                   newnames = c("blockrt","blockdist"))
 
 blockfcdata_sum = aggregate_data(blockfcdata_sub,
-                           yvars = c("blockacc","blockrt","blockdist"),
+                           yvars = c("blockrt","blockdist"),
                            groupbyvars = c("session_str","expt_maptype","iscompositional","stim_group","blocknumber_withinsess"),
                            additionalvars = c("session_str","blocknumber_withinsess"),
                            stats = c("mu","se"))
@@ -203,11 +203,8 @@ blockfcdata_sum = aggregate_data(blockfcdata_sub,
   labs(x="block number",y="block rt",color = "stim group",
        title = "RT")+
   guides(fill = "none")+
-  theme(aspect.ratio = 3,legend.position = "top"))
-
-ggsave(file.path(result_dir,paste0('blockrt_withsess','.png')),plot = p,device = 'png',width = 15,height = 7)
+  theme(aspect.ratio = 4,legend.position = "top"))
 ```
-
 
 
 ### checking the effect of Distance
@@ -257,9 +254,9 @@ fc_df <- within(fc_df, iscompositional <- relevel(iscompositional, ref = "non-co
 ```
 
 ```{r}
-model_acc  = glmer(resp_correct~blocknumber_withinsess+iscompositional*iscenter+expt_maptype+distractor_tsrespdist + (iscenter|subid)+(distractor_tsrespdist|subid),
+model_acc  = glmer(resp_correct~blocknumber_withinsess+iscompositional*iscenter+expt_maptype+distractor_tsrespdist + (iscenter|subid)+(distractor_tsrespdist|subid) + (1|stim_id),
               data=fc_df,family = binomial) 
-model_rt   = lmer(resp_rt~blocknumber_withinsess+iscompositional*iscenter+expt_maptype+distractor_tsrespdist + (iscenter|subid)+(distractor_tsrespdist|subid),
+model_rt   = lmer(resp_rt~blocknumber_withinsess+iscompositional*iscenter+expt_maptype+distractor_tsrespdist + (iscenter|subid)+(distractor_tsrespdist|subid) + (1|stim_id),
               data=filter(fc_df,resp_correct==TRUE))
 #model_dist = lmer(distractor_dist~iscompositional+blocknumber_withinsess + (1 |subid),
 #              data=fc_df)
@@ -285,18 +282,18 @@ fc_df_switch = fc_df_all%>%
   filter(expt_trial>min(expt_trial)&missed==0)
   
 map_switch_sub = fc_df_switch%>%
-  aggregate_data(groupbyvars = c("subid","iscenter","maptype_switch"),
+  aggregate_data(groupbyvars = c("subid","iscenter","stimtype_switch"),
                  yvars = c("resp_correct","resp_rt"),
                  additionalvars = "iscompositional",
                  stats = "mu")%>%
   change_cols_name(c("mu_resp_correct","mu_resp_rt"),c("accuracy","rt"))
 
 map_switch_sum = map_switch_sub%>%
-  aggregate_data(groupbyvars = c("iscompositional","iscenter","maptype_switch"),
+  aggregate_data(groupbyvars = c("iscompositional","iscenter","stimtype_switch"),
                  yvars=c("accuracy","rt"),
                  stats=c("mu","se"))
 
-ggplot(data=map_switch_sum,aes(x=iscenter,color=maptype_switch,group=maptype_switch))+
+ggplot(data=map_switch_sum,aes(x=iscenter,color=stimtype_switch,group=stimtype_switch))+
   facet_grid(col=vars(iscompositional))+
   geom_col(aes(y=mu_accuracy),
            fill=NA,
@@ -307,18 +304,18 @@ ggplot(data=map_switch_sum,aes(x=iscenter,color=maptype_switch,group=maptype_swi
 
 map_switch_sub = fc_df_switch%>%
   filter(resp_correct ==1&iscenter=="noncenter")%>%
-  aggregate_data(groupbyvars = c("subid","maptype_switch"),
+  aggregate_data(groupbyvars = c("subid","stimtype_switch"),
                  yvars = c("resp_rt"),
                  additionalvars = "iscompositional",
                  stats = "mu")%>%
   change_cols_name(c("mu_resp_rt"),c("rt"))
 
 map_switch_sum = map_switch_sub%>%
-  aggregate_data(groupbyvars = c("iscompositional","maptype_switch"),
+  aggregate_data(groupbyvars = c("iscompositional","stimtype_switch"),
                  yvars=c("rt"),
                  stats=c("mu","se"))
 
-ggplot(data=map_switch_sum,aes(x=iscompositional,color=maptype_switch,group=maptype_switch))+
+ggplot(data=map_switch_sum,aes(x=iscompositional,color=stimtype_switch,group=stimtype_switch))+
   geom_col(aes(y=mu_rt),
            fill=NA,
            position=position_dodge(1))+
@@ -417,6 +414,8 @@ blockfcdata_sumallb = aggregate_data(blockfcdata_suballb,
                            yvars = c("acc","rt","dist"),
                            groupbyvars = c("session_str","iscompositional","iscenter"),
                            stats = c("mu","se"))
+
+
 (p=
    ggplot(data = blockfcdata_sumallb,
        aes(x=iscenter,y=mu_acc,color=iscenter))+
@@ -448,7 +447,6 @@ blockfcdata_sumallb = aggregate_data(blockfcdata_suballb,
                            groupbyvars = c("session_str","iscompositional","iscenter"),
                            additionalvars = c("session_str","blocknumber_withinsess"),
                            stats = c("mu","se"))
-
 
 blockfcdata_sumallb <- within(blockfcdata_sumallb, iscenter <- relevel(iscenter, ref = "center"))
 blockfcdata_suballb <- within(blockfcdata_suballb, iscenter <- relevel(iscenter, ref = "center"))
@@ -489,8 +487,6 @@ export_summs(model_rt,error_format = "(\u00B1{std.error})",error_pos ="same",
 ```
  
 ```{r}
-model_rt_block_g   = lmer(rt~blocknumber_withinsess+iscenter + (1|subid),
-                         data=filter(blockfcdata_suballb,iscompositional=="compositional"))
 model_rt_trial_g   = lmer(resp_rt~blocknumber_withinsess+iscenter+expt_maptype+distractor_tsrespdist + (iscenter|subid)+(distractor_tsrespdist|subid) + (1|stim_id),
               data=filter(fc_df,iscompositional=="compositional"&resp_correct==TRUE))
 model_acc_trial_g   = glmer(resp_correct~blocknumber_withinsess+iscenter+expt_maptype+distractor_tsrespdist + (iscenter|subid)+(distractor_tsrespdist|subid) + (1|stim_id),
@@ -506,7 +502,9 @@ export_summs(model_rt_trial_g,model_acc_trial_g,error_format = "(\u00B1{std.erro
                        ))
 ```
  
- 
+
+
+
  
 ## taking into account distractor location
 
