@@ -398,6 +398,73 @@ testnofbdata_sum = left_join(testnofbdata_sum,change_cols_name(participant_count
   theme(aspect.ratio = 4,legend.position = "top"))
 ```
 
+```{r, fig.height=4,fig.width=3}
+testnofbdata = filter(data_with_prob,session_str=="test (no feedback)")%>%
+  mutate(
+    stim_type = ifelse(stim_x*stim_y==0,"center","non center")
+  )
+testnofbdata_sub = aggregate_data(testnofbdata,
+                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y","resp_correct","resp_rt"),
+                           groupbyvars = c("subid","iscenter"),
+                           stats = c("mu"),
+                           additionalvars = c("iscompositional"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
+                                "mu_resp_dist","mu_error_x","mu_error_y","mu_resp_correct",
+                                "mu_resp_rt"),
+                   newnames = c("LLR","LLR_x","LLR_y",
+                                "distance","errorx","errory","accuracy","rt"))
+
+
+testnofbdata_sum = aggregate_data(testnofbdata_sub,
+                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory","accuracy","rt"),
+                           groupbyvars = c("iscompositional","iscenter"),
+                           stats = c("mu","se","n"))
+
+
+testnofbdata_sub = left_join(testnofbdata_sub,change_cols_name(participant_count,"label","generalizer_label"),by=c("iscompositional"))
+testnofbdata_sum = left_join(testnofbdata_sum,change_cols_name(participant_count,"label","generalizer_label"),by=c("iscompositional"))
+
+(p = testnofbdata_sub%>%
+  ggplot(aes(x=iscenter,y=distance,color=iscenter))+
+  geom_point(alpha = 0.3,size = 2,stroke=0)+
+  geom_col(data = testnofbdata_sum,
+            aes(x=iscenter,y=mu_distance),fill=NA)+
+  geom_errorbar(data = testnofbdata_sum,
+                aes(x=iscenter,
+                    y = mu_distance,
+                    ymin = mu_distance - se_distance,
+                    ymax = mu_distance + se_distance),
+                width=0.4)+
+  facet_nested(cols = vars(generalizer_label),
+               scales = "free_x",space = "free_x")+
+  scale_color_manual(values=twolevel_colors)+
+  guides(fill = "none")+
+  labs(x="stimuli type",y="mean distance to goal (a.u.) rescaled",color = "stimuli type",
+       title = "Treasure Hunt \n Error")+
+  theme(aspect.ratio = 5,legend.position = "top"))
+
+(p = testnofbdata_sub%>%
+  ggplot(aes(x=iscenter,y=rt,color=iscenter))+
+  geom_point(alpha = 0.3,size = 2,stroke=0)+
+  geom_col(data = testnofbdata_sum,
+            aes(x=iscenter,y=mu_rt),fill=NA)+
+  geom_errorbar(data = testnofbdata_sum,
+                aes(x=iscenter,
+                    y = mu_rt,
+                    ymin = mu_rt - se_rt,
+                    ymax = mu_rt + se_rt),
+                width=0.4)+
+  facet_nested(cols = vars(generalizer_label),
+               scales = "free_x",space = "free_x")+
+  scale_color_manual(values=twolevel_colors)+
+  guides(fill = "none")+
+  labs(x="stimuli type",y="mean distance to goal (a.u.) rescaled",color = "stimuli type",
+       title = "Treasure Hunt \n RTs")+
+  theme(aspect.ratio = 5,legend.position = "top"))
+
+```
+```
+
 
 ### mean LLR
 ```{r,fig.height=6}
