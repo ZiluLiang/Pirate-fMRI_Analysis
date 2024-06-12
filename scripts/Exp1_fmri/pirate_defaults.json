@@ -6,7 +6,7 @@
 		"marsbar":"C:\\Program Files\\MATLAB\\matlab toolbox\\jsonlab-master",
 		"SPM12OldNorm":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\toolbox\\OldNorm",
 		"SPM12batch":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\matlabbatch",
-		"src":"E:\\pirate_fmri\\Analysis\\src;E:\\pirate_fmri\\Analysis\\src\\LLR;E:\\pirate_fmri\\Analysis\\src\\LLR\\probdf_nolapse_csv;E:\\pirate_fmri\\Analysis\\src\\R;E:\\pirate_fmri\\Analysis\\src\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\multivariate;E:\\pirate_fmri\\Analysis\\src\\multivariate\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\preprocessing;E:\\pirate_fmri\\Analysis\\src\\qualitycheck;E:\\pirate_fmri\\Analysis\\src\\spm_utils;E:\\pirate_fmri\\Analysis\\src\\tidydata;E:\\pirate_fmri\\Analysis\\src\\univariate;E:\\pirate_fmri\\Analysis\\src\\utils;",
+		"src":"E:\\pirate_fmri\\Analysis\\src;E:\\pirate_fmri\\Analysis\\src\\LLR;E:\\pirate_fmri\\Analysis\\src\\LLR\\probdf_nolapse_csv;E:\\pirate_fmri\\Analysis\\src\\R;E:\\pirate_fmri\\Analysis\\src\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\multivariate;E:\\pirate_fmri\\Analysis\\src\\multivariate\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\preprocessing;E:\\pirate_fmri\\Analysis\\src\\qualitycheck;E:\\pirate_fmri\\Analysis\\src\\spm_utils;E:\\pirate_fmri\\Analysis\\src\\tidydata;E:\\pirate_fmri\\Analysis\\src\\univariate;E:\\pirate_fmri\\Analysis\\src\\utils;E:\\pirate_fmri\\Analysis\\src\\utils\\__pycache__;",
 		"scripts":"E:\\pirate_fmri\\Analysis\\scripts\\Exp1_fmri"
 	},
 	"directory":{

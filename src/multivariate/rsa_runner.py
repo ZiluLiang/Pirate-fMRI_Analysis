@@ -615,7 +615,7 @@ class RSARunner:
                         subSearchLight.run(
                             estimator = CompositionalRSA,
                             estimator_kwargs = loc2stim_resid_kwarg,
-                            outputpath   = os.path.join(outputdir,'correlation',A["name"],'first',subid), 
+                            outputpath   = os.path.join(outputdir,'composition',A["name"],'first',subid), 
                             outputregexp = 'rho_%04d.nii', 
                             verbose      = j == 0
                             )
@@ -641,7 +641,7 @@ class RSARunner:
                         subSearchLight.run(
                             estimator = CompositionalRSA,
                             estimator_kwargs = train2test_resid_kwarg,
-                            outputpath   = os.path.join(outputdir,'correlation',A["name"],'first',subid), 
+                            outputpath   = os.path.join(outputdir,'composition',A["name"],'first',subid), 
                             outputregexp = 'rho_%04d.nii', 
                             verbose      = j == 0
                             )
