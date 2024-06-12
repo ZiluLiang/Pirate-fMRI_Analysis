@@ -25,48 +25,59 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     fmridata_dir = pirate_defaults['directory']['fmri_data']
 
 analyses_localizer = [
-    {"type":"regression",
-    "name":"compete_featurecartesian_combinexy",
-    "regressors":["feature2d","gtlocEuclidean"]},
+    # {"type":"regression",
+    # "name":"compete_featurecartesian_combinexy",
+    # "regressors":["feature2d","gtlocEuclidean"]},
 
-    {"type":"regression",
-    "name":"compete_featurecartesian_separatexy",
-    "regressors":["feature2d","gtloc1dx","gtloc1dy"]},
+    # {"type":"regression",
+    # "name":"compete_featurecartesian_separatexy",
+    # "regressors":["feature2d","gtloc1dx","gtloc1dy"]},
 
     {"type":"correlation",
     "name":"all",
-    "modelrdms":["gtlocEuclidean","feature2d","gtloc1dx","gtloc1dy"]}                  
+    "modelrdms":["gtlocEuclidean","gtloc1dx","gtloc1dy",
+                 "withinxy_gtlocEuclidean","withinx_gtlocEuclidean","withiny_gtlocEuclidean","betweenxy_gtlocEuclidean",
+                 "feature2d","feature1d_color","feature1d_shape"]}                  
             ]
 
 analyses_navigation = [
+    {"type":"correlation",
+    "name":"all",
+    "modelrdms":[#"gtlocEuclidean","withinxy_gtlocEuclidean","withinx_gtlocEuclidean","withiny_gtlocEuclidean","betweenxy_gtlocEuclidean"
+                 #"feature2d","feature1d_color","feature1d_shape",
+                 "gtlocEuclidean","feature2d","feature1d_color","feature1d_shape","stimuligroup",
+                 "teststimpairs_gtlocEuclidean","teststimpairs_withinxy_gtlocEuclidean","teststimpairs_withinx_gtlocEuclidean","teststimpairs_withiny_gtlocEuclidean","teststimpairs_betweenxy_gtlocEuclidean",
+                 "teststimpairs_feature2d","teststimpairs_feature1d_color","teststimpairs_feature1d_shape",
+                 ]},     
+
     ############################# test for competition between models  ###########################################
-    {"type":"regression",
-    "name":"compete_featurecartesian_combinexy",
-    "regressors":["feature2d","gtlocEuclidean"]},
+    # {"type":"regression",
+    # "name":"compete_featurecartesian_combinexy",
+    # "regressors":["feature2d","gtlocEuclidean"]},
 
-    {"type":"regression",
-        "name":"compete_featurecartesian_combinexy_teststim",
-        "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean"]},
+    # {"type":"regression",
+    #     "name":"compete_featurecartesian_combinexy_teststim",
+    #     "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean"]},
 
-    {"type":"regression",
-        "name":"compete_featurecartesian_separatexy_teststim",
-        "regressors":["teststimpairs_feature2d","teststimpairs_gtloc1dx","teststimpairs_gtloc1dy"]},
+    # {"type":"regression",
+    #     "name":"compete_featurecartesian_separatexy_teststim",
+    #     "regressors":["teststimpairs_feature2d","teststimpairs_gtloc1dx","teststimpairs_gtloc1dy"]},
 
-    {"type":"regression",
-        "name":"compete_featurecartesian_separatexy_withsg",
-        "regressors":["feature2d","gtloc1dx","gtloc1dy","stimuligroup"]},
+    # {"type":"regression",
+    #     "name":"compete_featurecartesian_separatexy_withsg",
+    #     "regressors":["feature2d","gtloc1dx","gtloc1dy","stimuligroup"]},
 
-    {"type":"regression",
-        "name":"compete_featurecartesian_combinexy_withsg",
-        "regressors":["feature2d","gtlocEuclidean","stimuligroup"]},
+    # {"type":"regression",
+    #     "name":"compete_featurecartesian_combinexy_withsg",
+    #     "regressors":["feature2d","gtlocEuclidean","stimuligroup"]},
 
-    {"type":"regression",
-        "name":"resp-compete_featurecartesian_combinexy_teststim",
-        "regressors":["teststimpairs_feature2d","teststimpairs_resplocEuclidean"]},
+    # {"type":"regression",
+    #     "name":"resp-compete_featurecartesian_combinexy_teststim",
+    #     "regressors":["teststimpairs_feature2d","teststimpairs_resplocEuclidean"]},
 
-    {"type":"regression",
-        "name":"resp-compete_featurecartesian_combinexy_withsg",
-        "regressors":["feature2d","resplocEuclidean","stimuligroup"]},
+    # {"type":"regression",
+    #     "name":"resp-compete_featurecartesian_combinexy_withsg",
+    #     "regressors":["feature2d","resplocEuclidean","stimuligroup"]},
 
     ############################# test for hierarchical model  ###########################################
 
@@ -78,21 +89,21 @@ analyses_navigation = [
     #     "name":"compete_hierarchical_combinexy_teststim",
     #     "regressors":["teststimpairs_feature2d","teststimpairs_global_xysign","teststimpairs_locwrtcentre_localxy","teststimpairs_locwrtlrbu_localxy"]},
 
-    {"type":"regression",
-        "name":"compete_hierarchicalcartesian_combinexy",
-        "regressors":["feature2d","stimuligroup","gtlocEuclidean","locwrtcentre_localxy","locwrtlrbu_localxy"]},
+    # {"type":"regression",
+    #     "name":"compete_hierarchicalcartesian_combinexy",
+    #     "regressors":["feature2d","stimuligroup","gtlocEuclidean","locwrtcentre_localxy","locwrtlrbu_localxy"]},
 
-    {"type":"regression",
-        "name":"compete_hierarchicalcartesian_combinexy_teststim",
-        "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean","teststimpairs_locwrtcentre_localxy","teststimpairs_locwrtlrbu_localxy"]},
+    # {"type":"regression",
+    #     "name":"compete_hierarchicalcartesian_combinexy_teststim",
+    #     "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean","teststimpairs_locwrtcentre_localxy","teststimpairs_locwrtlrbu_localxy"]},
 
-    {"type":"regression",
-        "name":"compete_hierarchicalcartesian_combinexy",
-        "regressors":["feature2d","stimuligroup","gtlocEuclidean","hierachical_wrtcentre","hierachical_wrtlrbu"]},
+    # {"type":"regression",
+    #     "name":"compete_hierarchicalcartesian_combinexy",
+    #     "regressors":["feature2d","stimuligroup","gtlocEuclidean","hierachical_wrtcentre","hierachical_wrtlrbu"]},
 
-    {"type":"regression",
-        "name":"compete_hierarchicalcartesian_combinexy_teststim",
-        "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean","teststimpairs_hierachical_wrtcentre","teststimpairs_hierachical_wrtlrbu"]}
+    # {"type":"regression",
+    #     "name":"compete_hierarchicalcartesian_combinexy_teststim",
+    #     "regressors":["teststimpairs_feature2d","teststimpairs_gtlocEuclidean","teststimpairs_hierachical_wrtcentre","teststimpairs_hierachical_wrtlrbu"]}
             ]
 
 
@@ -145,6 +156,6 @@ for nconfig_name,nconfig in config_neuralrdm.items():
         RSA.run_SearchLight(radius = 10,
                             outputdir = os.path.join(fmridata_dir,fmridata_preprocess,'rsa_searchlight',f'{ds_name}_noselection_{nconfig_name}'),
                             analyses = analyses_list,
-                            njobs = cpu_count()-4)
+                            njobs = cpu_count()-6)
         
         
