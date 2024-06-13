@@ -7,6 +7,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas
 import itertools
+import sys
+import os
+project_path = r'E:\pirate_fmri\Analysis'
+sys.path.append(os.path.join(project_path,'src'))
+from multivariate.modelrdms import ModelRDM
+
 from sklearn.linear_model import LinearRegression
 
 def _compose_pattern_from_reference_single_source(source_feature:Union[numpy.ndarray,list],
@@ -110,51 +116,35 @@ def compose_pattern_from_reference(source_features:numpy.ndarray,
 
 class CompositionalRSA(MetaEstimator):
     def __init__(self,activitypattern:numpy.ndarray,
-                 source_ref_split:numpy.ndarray,
-                 compose_features:numpy.ndarray,control_features:numpy.ndarray,
+                 stim_df:pandas.DataFrame,
+                 source_ref_split_name:numpy.ndarray,
                  compose_feature_names:list=None,
-                 control_feature_names:list=None,
-                 controlrdms_src:Union[numpy.ndarray,list]=[],
-                 controlrdms_ref:Union[numpy.ndarray,list]=[],
-                 controlrdms_src_name:Union[numpy.ndarray,list]=[],
-                 session:numpy.ndarray=[],
-                 stimgroup:numpy.ndarray=[],
-                 compose_method="concat") -> None:
+                 control_feature_names:list=None) -> None:
         """CompositionalRSA analysis, compare the RDM of data and the RDM generated using composed pattern from reference data
 
         Parameters
         ----------
         activitypattern : numpy.ndarray
             activity pattern matrix, a 2D numpy array of shape ``(nsample,nvoxel)``
-        source_ref_split : numpy.ndarray
+        stim_df : pandas.DataFrame
+            dataframe containing stimuli information
+        source_ref_split_name : numpy.ndarray
             whether each row of activity pattern is source (0) or split (1), a 1D numpy array of shape ``(nsample,)`, must contain [0,1]
-        compose_features : numpy.ndarray
-            stimuli features that are used to match the reference and the source
-        control_features : numpy.ndarray
-            stimuli features that are used to further constrain the matching
         compose_feature_names : list, optional
             names of compose features, by default None
         control_feature_names : list, optional
             names of control features, by default None
-        controlrdms_src : Union[numpy.ndarray,list], optional
-            control rdms for data rdm, by default []
-        controlrdms_ref : Union[numpy.ndarray,list], optional
-            control rdms for composed rdm, by default [] \n
-            if `len(controlrdms_ref)>0`, rsa analysis will run on the residuals of composed rdm after regressing out the control rdms
-        session : numpy.ndarray, optional
-            session of stimuli, a 1D numpy array of shape ``(nsample,)`, must contain [0,1], by default []
-        stimgroup : numpy.ndarray, optional
-            groups of stimuli, a 1D numpy array of shape ``(nsample,)`, must contain [0,1], by default []
         """
         
         activitypattern  = numpy.atleast_2d(activitypattern)
-        compose_features = numpy.atleast_2d(compose_features)
-        control_features = numpy.atleast_2d(control_features)        
+        check_cols = [source_ref_split_name]+compose_feature_names+control_feature_names+["stim_x","stim_y","stim_id","stim_color","stim_shape"]
+        assert all([x in stim_df.columns for x in check_cols])
+        compose_features,control_features,source_ref_split = stim_df[compose_feature_names].to_numpy(),stim_df[control_feature_names].to_numpy(),stim_df[source_ref_split_name].to_numpy()
         assert activitypattern.shape[0] == compose_features.shape[0]
         assert numpy.array_equal(numpy.unique(source_ref_split),[0,1])
 
         # split into source and ref
-        source_mat,    ref_mat    = split_data(activitypattern,groups=source_ref_split,select_groups=[0,1])
+        source_mat, ref_mat = split_data(activitypattern,groups=source_ref_split,select_groups=[0,1])
         source_cmpsfs, ref_cmpsfs = split_data(compose_features,groups=source_ref_split,select_groups=[0,1])
         if control_features.size>0:
             assert activitypattern.shape[0] == control_features.shape[0]
@@ -179,130 +169,37 @@ class CompositionalRSA(MetaEstimator):
         self.control_feature_names = [f"{k}" for k in range(self.n_control_features)] if control_feature_names is None else control_feature_names
         assert len(self.control_feature_names) == self.n_control_features
 
-        # separate and combined feature
-        cmbf_apm = dict(zip(
-            [f"cpsdrdm_{''.join(self.compose_feature_names)}"],
-            [compose_pattern_from_reference(source_cmpsfs,ref_mat,ref_cmpsfs,source_ctrlfs,ref_ctrlfs,compose_method=compose_method)]
-        ))
-        if self.n_compose_features>1:
-            sepf_apm = dict(zip(
-                [f"cpsdrdm_{x}" for x in self.compose_feature_names],
-                [compose_pattern_from_reference(source_cmpsfs[:,[j]],ref_mat,ref_cmpsfs[:,[j]],source_ctrlfs,ref_ctrlfs) for j in range(self.n_compose_features)]
-            ))            
-        else:
-            sepf_apm = []
-        self.composed_apm = dict(zip(list(cmbf_apm.keys()) + list(sepf_apm.keys()), list(cmbf_apm.values()) + list(sepf_apm.values())))
         
-        self.composed_info = {
-            "stim_session":session,
-            "stim_group":stimgroup
-        }
-        self.control_rdms = {
-            "ref":controlrdms_ref,
-            "src":controlrdms_src
-        }
-        self.models = self._construct_compostional_modelrdm(session,stimgroup,controlrdms_ref)
+        self.composed_apm = compose_pattern_from_reference(source_cmpsfs,ref_mat,ref_cmpsfs,source_ctrlfs,ref_ctrlfs,compose_method="vec_add")
+        self.src_composed_apm = numpy.vstack([source_mat,self.composed_apm])
+        self.src_composed_df  = pandas.concat(
+            [stim_df[source_ref_split==0].copy().assign(dstype=0),stim_df[source_ref_split==0].copy().assign(dstype=0).assign(dstype=1)],axis=0).reset_index(drop=True)
 
-        # define estimator
-        #ESTIMATOR_CATELOGUE = {"correlation":PatternCorrelation,"regression":MultipleRDMRegression}
-        #estimator_class = "correlation"
+        submodelrdm = ModelRDM(
+                    stimid    = self.src_composed_df["stim_id"].to_numpy(),
+                    stimgtloc = self.src_composed_df[["stim_x","stim_y"]].to_numpy(),
+                    stimfeature = self.src_composed_df[["stim_color","stim_shape"]].to_numpy(),
+                    stimgroup = self.src_composed_df["stim_group"].to_numpy(),
+                    sessions =  self.src_composed_df["dstype"].to_numpy(),
+                    nan_identity = False,
+                    splitgroup  = False
+                )
+        correlation_config={"euclidean":"between_gtlocEuclidean","feature":"between_feature2d","stimuli":"between_stimuli"}
+        self.modelRDMs = dict(zip(correlation_config.keys(),[submodelrdm.models[m] for m in correlation_config.values()]))
 
-        combined_mname = f"cpsdrdm_{''.join(self.compose_feature_names)}"
-        modelnames = [combined_mname,f"teststimpairs_{combined_mname}",f"mixedstimpairs_{combined_mname}"]
-        modelnames = modelnames + [f"between_{m}" for m in modelnames] + [f"within_{m}" for m in modelnames]
-        modelnames = modelnames + [f"resid_{m}" for m in modelnames]
-        # filter out those that actually exists
-        modelnames = [m for m in modelnames if m in self.models.keys()]
-        modelrdms  = [self.models[m] for m in modelnames]      
-                
-        if len(controlrdms_src)>0:
-            self.estimator = []
-            for mn,m in zip(modelnames,modelrdms): 
-                predictor_lists = [m]  + controlrdms_src
-                predictor_names = [mn] + [f"{mn}_ctrl_{x}" for x in controlrdms_src_name]
-                predictors = numpy.vstack([lower_tri(x)[0] for x in predictor_lists])
-                nan_filter = numpy.all(~numpy.isnan(predictors),0)
-                keep_ps = [numpy.unique(arr[nan_filter]).size>1 for arr in predictors]
-                if sum(keep_ps)>0:
-                    mrdms = [p for p,kp in zip(predictor_lists,keep_ps) if kp]    
-                    mrdm_names = [pn for pn,kp in zip(predictor_names,keep_ps) if kp]    
-                    self.estimator.append(
-                        MultipleRDMRegression(
-                            source_mat,
-                            modelrdms  = mrdms,
-                            modelnames = mrdm_names,
-                            rdm_metric="correlation")
-                        )
-        else:
-            self.estimator = [PatternCorrelation(
-                                    source_mat,
-                                    modelrdms=modelrdms,
-                                    modelnames=modelnames,
-                                    runonresidual=True,controlrdms=controlrdms_ref,
-                                    type="spearman",
-                                    rdm_metric="correlation")]
-        
-    def _construct_compostional_modelrdm(self,session,stimgroup,controlrdms_ref):
-        models = dict(zip(self.composed_apm.keys(),
-                          [compute_rdm(apm,"correlation") for apm in self.composed_apm.values()]))
 
-        # split rdm into train/test/mix pairs
-        if numpy.unique(stimgroup).size>1:
-            U,V = numpy.meshgrid(stimgroup,stimgroup)
-            WTR = numpy.multiply(1.*(U == 1),1.*(V == 1))
-            WTE = numpy.multiply(1.*(U == 0),1.*(V == 0))
-            MIX = 1. * ~(U==V)
-            WTR[WTR==0]=numpy.nan
-            WTE[WTE==0]=numpy.nan
-            MIX[MIX==0]=numpy.nan
-            split_models = [x for x in models.keys() if x not in ["stimuli","stimuligroup"]]
-            for k in split_models:
-                wtr_n = 'trainstimpairs_' + k
-                rdmwtr = numpy.multiply(models[k],WTR)
-                wte_n = 'teststimpairs_' + k
-                rdmwte = numpy.multiply(models[k],WTE)
-                #mix_n = 'mixedstimpairs_' + k
-                #rdmmix = numpy.multiply(models[k],MIX)
-                models |= {wtr_n:rdmwtr,wte_n:rdmwte}# ,mix_n:rdmmix
-
-        # within and between session
-        if numpy.unique(session).size>1:
-            BS = compute_rdm_identity(session) # 0 - within session; 1 - within session
-            WS = 1 - BS         # 0 - between session; 1 - between session
-            BS[BS==0]=numpy.nan
-            WS[WS==0]=numpy.nan
-            wsbs_models = {}
-            for k,v in models.items():
-                ws_n  = 'within_'+k
-                rdmws = numpy.multiply(v,WS)
-                bs_n  = 'between_'+k
-                rdmbs = numpy.multiply(v,BS)
-                wsbs_models |= {ws_n:rdmws,bs_n:rdmbs}#
-            models.update(wsbs_models)
-
-        # control for control rdm
-        if len(controlrdms_ref)>0:
-            resid_models = {}
-            for mn,m in models.items():
-                # resid_m = deepcopy(m)
-                # for cm in controlrdms_ref:      
-                #     try:
-                #         resid_m = compute_rdm_residual(resid_m,cm,squareform=True)
-                #     except:
-                #         pass
-                # resid_models[f"resid_{mn}"] = resid_m
-                resid_models[f"resid_{mn}"] = compute_rdm_residual(m,controlrdms_ref,squareform=True)
-            models.update(resid_models)
-        # remove models in which lower tri have only one value that is not nan
-        valid_mn = [k for k,v in models.items() if numpy.sum(~numpy.isnan(numpy.unique(lower_tri(v)[0])))>1]
-        valid_m = [models[k] for k in valid_mn]
-        models = dict(zip(valid_mn,valid_m))
-        
-        return models
+        self.PCestimator = PatternCorrelation(
+            activitypattern=self.src_composed_apm,
+            modelnames=list(self.modelRDMs.keys()),
+            modelrdms=list(self.modelRDMs.values()),
+            rdm_metric="correlation",
+            type="spearman",
+            ztransform=False
+        )
 
     def fit(self):
-        self.result = numpy.hstack([e.fit().result for e in self.estimator])
-        self.resultnames = numpy.hstack([e.modelnames for e in self.estimator])
+        self.result = self.PCestimator.fit().result
+        self.resultnames = list(self.modelRDMs.keys())
         return self
     
     def visualize(self):
@@ -313,12 +210,12 @@ class CompositionalRSA(MetaEstimator):
         #if self.compose_separate:
         #    return f"CompositionalRSA based on separate features using {self.estimator.__str__()}"
         #else:
-        return f"CompositionalRSA based on all features using {self.estimator[0].__str__()}"
+        return f"CompositionalRSA with {self.PCestimator.__str__()}"
     
     def get_details(self)->str:
         details = {
             "name": self.__str__(),
             "resultnames": list(self.resultnames),
-            "estimator": self.estimator[0].get_details()
+            "estimator": self.PCestimator.get_details()
         }
         return details

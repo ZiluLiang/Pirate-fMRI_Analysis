@@ -11,12 +11,12 @@ analysis = {'regression','correlation','composition','cosinesimilarity','decodin
 %run_rec = cell(numel(par_dirs),numel(analysis));
 for x = 1:numel(par_dirs)
     searchlight_rsa_dir = par_dirs{x};        
-    for j_analysis = 3%1:numel(analysis)
+    for j_analysis = 2%1:numel(analysis)
         rsa_folders = {dir(fullfile(searchlight_rsa_dir,analysis{j_analysis})).name};
         rsa_folders = rsa_folders(cellfun(@(x) ~contains(x,'.'),rsa_folders));
         rsa_dirs = fullfile(searchlight_rsa_dir,analysis{j_analysis},rsa_folders);
         run_rec{x}{j_analysis} = cell(numel(rsa_dirs),1);
-        for j_rsadir = 1:numel(rsa_dirs)
+        for j_rsadir = 2%1:numel(rsa_dirs)
             rsa_dir = rsa_dirs{j_rsadir};
             switch analysis{j_analysis}
                 case "correlation"
@@ -40,7 +40,7 @@ for x = 1:numel(par_dirs)
                     metric_idxs = 1:numel(metric_names);
                     img_regexp ="rho_%04d.nii";
                     get_new_imgname = @(x) strcat('transformed_',x);                
-                    trans_formula = 'atanh(i1)';
+                    trans_formula = '';
                 case "cosinesimilarity"
                     metric_names = loadjson(fullfile(rsa_dir,'first',participants.validids{1},'searchlight.json')).estimator.resultnames;
                     metric_idxs = 1:numel(metric_names);
