@@ -1,4 +1,4 @@
-function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidlist,groupglm_pref,subgroups,groupglm_cov)
+function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidlist,groupglm_pref,subgroups,groupglm_cov,flag_saveres)
 % run first and second level analysis for different glms
 % INPUT:
 % - glm_name: name of the glm, this will be used to find glm
@@ -45,6 +45,7 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
     if nargin < 6 || isempty(groupglm_pref),   groupglm_pref = ''; end
     if nargin < 7 || isempty(subgroups),       subgroups = ones(size(subidlist)); end
     if nargin < 8 || isempty(groupglm_cov),    groupglm_cov = struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}); end
+    if nargin < 9 || ~isa(logical(flag_saveres),'logical'),   flag_saveres = false; end
 
 
     nsub = numel(subidlist);
@@ -92,7 +93,7 @@ function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,s
             end
         end
 
-        if ismember('estimate',steps), glm_estimate(output_dir,true);  end
+        if ismember('estimate',steps), glm_estimate(output_dir,flag_saveres);  end
         
         if ismember('contrast',steps)        
             if ~isempty(glm_config.contrasts)
