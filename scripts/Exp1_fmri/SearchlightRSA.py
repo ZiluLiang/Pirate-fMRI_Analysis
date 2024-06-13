@@ -42,12 +42,14 @@ analyses_localizer = [
 
 analyses_navigation = [
     {"type":"correlation",
-    "name":"all",
+    "name":"withinacrossxy",
     "modelrdms":[#"gtlocEuclidean","withinxy_gtlocEuclidean","withinx_gtlocEuclidean","withiny_gtlocEuclidean","betweenxy_gtlocEuclidean"
                  #"feature2d","feature1d_color","feature1d_shape",
-                 "gtlocEuclidean","feature2d","feature1d_color","feature1d_shape","stimuligroup",
-                 "teststimpairs_gtlocEuclidean","teststimpairs_withinxy_gtlocEuclidean","teststimpairs_withinx_gtlocEuclidean","teststimpairs_withiny_gtlocEuclidean","teststimpairs_betweenxy_gtlocEuclidean",
-                 "teststimpairs_feature2d","teststimpairs_feature1d_color","teststimpairs_feature1d_shape",
+                 #"gtlocEuclidean","feature2d","feature1d_color","feature1d_shape","stimuligroup",
+                 #"teststimpairs_gtlocEuclidean",
+                 #"teststimpairs_feature2d","teststimpairs_feature1d_color","teststimpairs_feature1d_shape",
+                 "withinxy_teststimpairs_gtlocEuclidean","withinx_teststimpairs_gtlocEuclidean",
+                 "withiny_teststimpairs_gtlocEuclidean","betweenxy_teststimpairs_gtlocEuclidean",
                  ]},     
 
     ############################# test for competition between models  ###########################################
@@ -128,7 +130,7 @@ beta_fname = {
     "fourruns":['stimuli_4r.nii'],
     }
 
-run_ds = ["fourruns"]
+run_ds = ["fourruns","localizer"]
 for nconfig_name,nconfig in config_neuralrdm.items():
     for ds_name in run_ds:
         ds = beta_dir[ds_name]

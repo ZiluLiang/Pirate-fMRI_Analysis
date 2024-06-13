@@ -25,85 +25,80 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     fmridata_dir = pirate_defaults['directory']['fmri_data']
 
 
-analyses_both = [
+analyses_list = [
     ############################# test for competition between models  ###########################################
-    {"type":"location_composition",
-    "name":"loc2stim"
-    }#,
-    #{"type":"feature_composition",
-    #"name":"train2test"
-    #}
+    {"type":"composition",
+     "name":"loc2stim",
+     "task":"both"
+    },
+    {"type":"composition",
+     "name":"train2test",
+     "task":"navigation"
+    }
     
             ]
 
 
 fmridata_preprocess = "unsmoothedLSA"
-beta_preproc_steps_withmvnn= {"MVNN": [None]*2, "ATOE": [None]*2}
-config_neuralrdm= {
-    "mvnn_aoe": {"preproc":beta_preproc_steps_withmvnn, "distance_metric":"correlation"},
-}
+beta_preproc_steps_withmvnn = {"MVNN": [None]*2,  "AOE": [None]*2}
+cross_task_beta_preproc     = {"MVNN": [None]*2, "ATOE": [None]*2}
+ 
 config_modelrdm_ = {"nan_identity":False, "splitgroup":True}
-
-n_sess = {
-          "localizer":1,
-          "fourruns":4
-          }
 
 beta_dir = {
         "localizer":[os.path.join(fmridata_dir,fmridata_preprocess,'LSA_stimuli_localizer')],
-        "fourruns": [os.path.join(fmridata_dir,fmridata_preprocess,'LSA_stimuli_navigation')],
+        "navigation": [os.path.join(fmridata_dir,fmridata_preprocess,'LSA_stimuli_navigation')],
         }
+beta_dir["both"]   = sum(list(beta_dir.values()),[])
+
 beta_fname = {
     "localizer":['stimuli_1r.nii'],
-    "fourruns":['stimuli_4r.nii'],
-    }
-
-beta_dir = {
-    "navigation":[os.path.join(fmridata_dir,'unsmoothedLSA','LSA_stimuli_navigation')],
-    "localizer": [os.path.join(fmridata_dir,'unsmoothedLSA','LSA_stimuli_localizer')],
-}
-beta_fname = {
     "navigation":['stimuli_4r.nii'],
-    "localizer":['stimuli_1r.nii']
-}
+    }
+beta_fname["both"] = sum(list(beta_fname.values()),[])
+
 n_sess={
     "navigation":4,
     "localizer":1
 }
-cross_task_beta_dir   = sum(list(beta_dir.values()),[])
-cross_task_beta_fname = sum(list(beta_fname.values()),[])
-cross_task_vsmask_dir = cross_task_beta_dir
-cross_task_vsmask_fname = ['mask.nii']*len(cross_task_vsmask_dir)
-cross_task_res_dir   = beta_dir["navigation"]*n_sess["navigation"] + beta_dir["localizer"]*n_sess["localizer"]
-cross_task_res_fname = [f'resid_run{j+1}.nii.gz' for j in range(n_sess["navigation"])] + [f'resid_run{j+1}.nii.gz' for j in range(n_sess["localizer"])]
+n_sess["both"] = n_sess["navigation"]+n_sess["localizer"]
 
-config_modelrdm_ = {"nan_identity":False, "splitgroup":True}
-cross_task_beta_preproc = {"preproc":{"MVNN": [None]*2,
-                                      "ATOE": [None]*2}, 
-                           "distance_metric":"correlation"}
+res_dir={}
+res_dir["navigation"] = beta_dir["navigation"]*n_sess["navigation"] 
+res_dir["localizer"] = beta_dir["localizer"]*n_sess["localizer"]
+res_dir["both"] = beta_dir["navigation"]*n_sess["navigation"] + beta_dir["localizer"]*n_sess["localizer"]
 
-
-analyses_list = analyses_both
+res_fname = {}
+res_fname["navigation"]  = [f'resid_run{j+1}.nii.gz' for j in range(n_sess["navigation"])]
+res_fname["localizer"]  = [f'resid_run{j+1}.nii.gz' for j in range(n_sess["localizer"])]
+res_fname["both"] = [f'resid_run{j+1}.nii.gz' for j in range(n_sess["navigation"])] + [f'resid_run{j+1}.nii.gz' for j in range(n_sess["localizer"])]
 
 maskdir = os.path.join(fmridata_dir,'masks','anat')
-RSA = RSARunner(
-                participants=subid_list,#[:1], 
-                fmribeh_dir=fmribeh_dir,
-                beta_dir   = cross_task_beta_dir,    beta_fname   = cross_task_beta_fname,
-                vsmask_dir = cross_task_vsmask_dir,  vsmask_fname = cross_task_vsmask_fname,
-                pmask_dir  = cross_task_vsmask_dir,  pmask_fname  = cross_task_vsmask_fname,
-                res_dir    = cross_task_res_dir, 
-                res_fname = cross_task_res_fname,
-                anatmasks = [],
-#                anatmasks=[os.path.join(maskdir,'parahippocampus_left.nii')],
-                taskname  = "both",
-                config_modelrdm  = config_modelrdm_,
-                config_neuralrdm = cross_task_beta_preproc
-                )
+    
+for analysis in analyses_list:
+    task = analysis["task"]
+    if task=="both":
+        config_neuralrdm= {"preproc":cross_task_beta_preproc, "distance_metric":"correlation"}
+    else:
+        config_neuralrdm= {"preproc":beta_preproc_steps_withmvnn, "distance_metric":"correlation"}
 
-RSA.run_SearchLight(radius = 10,
+    RSA = RSARunner(
+                    participants=subid_list, 
+                    fmribeh_dir=fmribeh_dir,
+                    beta_dir   = beta_dir[task],    beta_fname = beta_fname[task],
+                    vsmask_dir = beta_dir[task],  vsmask_fname = ['mask.nii']*len(beta_dir[task]),
+                    pmask_dir  = beta_dir[task],  pmask_fname  = ['mask.nii']*len(beta_dir[task]),
+                    res_dir    = res_dir[task],     res_fname  = res_fname[task],
+                    anatmasks = [],
+    #                anatmasks=[os.path.join(maskdir,'parahippocampus_left.nii')],
+                    taskname  = task,
+                    config_modelrdm  = config_modelrdm_,
+                    config_neuralrdm = config_neuralrdm
+                    )
+
+    RSA.run_SearchLight(radius = 10,
                         outputdir = os.path.join(fmridata_dir,fmridata_preprocess,'rsa_searchlight',f'crosstask_noselection_mvnn_atoe'),
-                        analyses = analyses_list,
+                        analyses = [analysis],
                         njobs = cpu_count()-4)
 
-        
+            

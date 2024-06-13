@@ -31,10 +31,10 @@ from zpyhelper.MVPA.preprocessors import chain_steps,scale_feature, average_odd_
 from zpyhelper.image.niidatahandler import retrieve_data_from_image
 from zpyhelper.image.searchlight import MVPASearchLight
 
-from multivariate.MVPA_estimator import CompositionalRSA
 
 project_path = r'E:\pirate_fmri\Analysis'
 sys.path.append(os.path.join(project_path,'src'))
+from multivariate.MVPA_estimator import CompositionalRSA
 from multivariate.modelrdms import ModelRDM
 
 
@@ -524,7 +524,7 @@ class RSARunner:
 
             ## compute model rdm
             modelrdm  = self.get_modelRDM(subid)
-            _,stimgtloc,stimfeature,stimgroup,_,sessions = self.get_stimbehav(subid)
+            stimid,stimgtloc,stimfeature,stimgroup,_,sessions = self.get_stimbehav(subid)
             nsession = np.sum(self.nsession)
 
             ## loop over searchlight analyses
@@ -565,8 +565,8 @@ class RSARunner:
                     assert "modelrdms" in A.keys(), "must specify the model rdms to run correlation with!"
                     corr_rdm_names = deepcopy(A["modelrdms"])
                     
-                    if nsession>1: # if multiple runs do between and within run as well
-                        corr_rdm_names = corr_rdm_names + [f'between_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()] + [f'within_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()]
+                    if nsession>1: # if multiple runs do between run as well
+                        corr_rdm_names = [f'between_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()] + [f'within_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()]
                     
                     corr_rdm_names = [x for x in A["modelrdms"] if x in modelrdm.models.keys()]
 
@@ -594,57 +594,35 @@ class RSARunner:
                         verbose      = j == 0
                         )# only show details at the first participant
                 
-                elif A["type"] == "location_composition":
+                elif A["type"] == "composition":
+                    sbhav = pd.DataFrame(np.hstack([stimid,stimgtloc,stimfeature,stimgroup,sessions]),
+                                        columns=["stim_id","stim_x","stim_y","stim_color","stim_shape","stim_group","stim_session"])
                     if self.taskname=="both":
-                        print(f"running correlation searchlight {A['name']}")
-                        task_splitter = (sessions==np.max(sessions)).flatten()
-                        control_feature_rdm = compute_rdm_nomial(stimfeature[~task_splitter,:])
-                        control_session_rdm = compute_rdm_identity(sessions[~task_splitter,:])
-                        loc2stim_resid_kwarg = {
-                            "source_ref_split": task_splitter*1,
-                            "compose_features":stimgtloc,
-                            "compose_feature_names":["x","y"],
-                            "control_features":[],
-                            "control_feature_names":None,
-                            "controlrdms_src":[control_session_rdm,control_feature_rdm],
-                            "controlrdms_src_name":["session","feature"],
-                            "controlrdms_ref":[control_session_rdm,control_feature_rdm],
-                            "session":sessions.flatten()[~task_splitter],
-                            "stimgroup":stimgroup.flatten()[~task_splitter]
-                        }
-                        subSearchLight.run(
-                            estimator = CompositionalRSA,
-                            estimator_kwargs = loc2stim_resid_kwarg,
-                            outputpath   = os.path.join(outputdir,'composition',A["name"],'first',subid), 
-                            outputregexp = 'rho_%04d.nii', 
-                            verbose      = j == 0
-                            )
+                        print(f"running composition searchlight {A['name']}")
+                        sbhav["stim_task"] = 1*(sbhav["stim_session"] == np.max(sbhav["stim_session"]))
+                        
+                        CompositionalRSA_kwarg = {"stim_df":sbhav,
+                                                "source_ref_split_name":"stim_task",
+                                                "compose_feature_names":["stim_x","stim_y"],
+                                                "control_feature_names":[]
+                                                }
+                    elif self.taskname=="navigation":
+                        CompositionalRSA_kwarg = {"stim_df":sbhav,
+                                                "source_ref_split_name":"stim_group",
+                                                "compose_feature_names":["stim_x","stim_y"],
+                                                "control_feature_names":["stim_session"]
+                                                }
+                        
+                        
+                    subSearchLight.run(
+                        estimator = CompositionalRSA,
+                        estimator_kwargs = CompositionalRSA_kwarg,
+                        outputpath   = os.path.join(outputdir,A["type"],A["name"],'first',subid), 
+                        outputregexp = 'rho_%04d.nii', 
+                        verbose      = j == 0
+                        )
                     
-                elif A["type"] == "feature_composition":
-                    if self.taskname=="navigation":
-                        print(f"running correlation searchlight {A['name']}")
-                        task_splitter = (stimgroup==1).flatten()
-                        control_feature_rdm = compute_rdm_nomial(stimfeature[~task_splitter,:])
-                        control_session_rdm = compute_rdm_identity(sessions[~task_splitter,:])
-                        train2test_resid_kwarg = {
-                            "source_ref_split": task_splitter*1,
-                            "compose_features":stimgtloc,
-                            "compose_feature_names":["x","y"],
-                            "control_features":[],
-                            "control_feature_names":None,
-                            "controlrdms_src":[control_session_rdm,control_feature_rdm],
-                            "controlrdms_src_name":["session","feature"],
-                            "controlrdms_ref":[control_session_rdm,control_feature_rdm],
-                            "session":sessions.flatten()[~task_splitter],
-                            "stimgroup":stimgroup.flatten()[~task_splitter]
-                        }
-                        subSearchLight.run(
-                            estimator = CompositionalRSA,
-                            estimator_kwargs = train2test_resid_kwarg,
-                            outputpath   = os.path.join(outputdir,'composition',A["name"],'first',subid), 
-                            outputregexp = 'rho_%04d.nii', 
-                            verbose      = j == 0
-                            )
+                
 
         dump(sphere_vox_count,os.path.join(outputdir,'searchlight_voxcount.pkl'))
 
