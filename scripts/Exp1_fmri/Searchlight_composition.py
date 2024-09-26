@@ -13,7 +13,7 @@ from zpyhelper.MVPA.preprocessors import average_odd_even_session,normalise_mult
 
 project_path = r'E:\pirate_fmri\Analysis'
 sys.path.append(os.path.join(project_path,'src'))
-from multivariate.rsa_runner import RSARunner
+from multivariate.mvpa_runner import RSARunner
 
 
 ###################################################### Run different RSA Analysis  ##################################################
@@ -28,19 +28,15 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 analyses_list = [
     ############################# test for competition between models  ###########################################
     {"type":"composition",
-     "name":"loc2stim",
+     "name":"compositionRetrieval",
      "task":"both"
-    },
-    {"type":"composition",
-     "name":"train2test",
-     "task":"navigation"
     }
     
             ]
 
 
 fmridata_preprocess = "unsmoothedLSA"
-beta_preproc_steps_withmvnn = {"MVNN": [None]*2,  "AOE": [None]*2}
+beta_preproc_steps_withmvnn = {"MVNN": [None]*2,  "ATOE": [None]*2}
 cross_task_beta_preproc     = {"MVNN": [None]*2, "ATOE": [None]*2}
  
 config_modelrdm_ = {"nan_identity":False, "splitgroup":True}
@@ -73,7 +69,7 @@ res_fname["navigation"]  = [f'resid_run{j+1}.nii.gz' for j in range(n_sess["navi
 res_fname["localizer"]  = [f'resid_run{j+1}.nii.gz' for j in range(n_sess["localizer"])]
 res_fname["both"] = [f'resid_run{j+1}.nii.gz' for j in range(n_sess["navigation"])] + [f'resid_run{j+1}.nii.gz' for j in range(n_sess["localizer"])]
 
-maskdir = os.path.join(fmridata_dir,'masks','anat')
+maskdir = os.path.join(fmridata_dir,'masks','anat_AAL3')
     
 for analysis in analyses_list:
     task = analysis["task"]
@@ -83,22 +79,22 @@ for analysis in analyses_list:
         config_neuralrdm= {"preproc":beta_preproc_steps_withmvnn, "distance_metric":"correlation"}
 
     RSA = RSARunner(
-                    participants=subid_list, 
+                    participants=subid_list[:1], 
                     fmribeh_dir=fmribeh_dir,
                     beta_dir   = beta_dir[task],    beta_fname = beta_fname[task],
                     vsmask_dir = beta_dir[task],  vsmask_fname = ['mask.nii']*len(beta_dir[task]),
                     pmask_dir  = beta_dir[task],  pmask_fname  = ['mask.nii']*len(beta_dir[task]),
                     res_dir    = res_dir[task],     res_fname  = res_fname[task],
-                    anatmasks = [],
-    #                anatmasks=[os.path.join(maskdir,'parahippocampus_left.nii')],
+    #                anatmasks = [],
+                    anatmasks=[os.path.join(maskdir,'HPC_left.nii')],
                     taskname  = task,
                     config_modelrdm  = config_modelrdm_,
                     config_neuralrdm = config_neuralrdm
                     )
 
     RSA.run_SearchLight(radius = 10,
-                        outputdir = os.path.join(fmridata_dir,fmridata_preprocess,'rsa_searchlight',f'crosstask_noselection_mvnn_atoe'),
+                        outputdir = os.path.join(fmridata_dir,fmridata_preprocess,'rsa_searchlight',f'compositionRetrieval_noselection_mvnn_atoetest'),
                         analyses = [analysis],
-                        njobs = cpu_count()-4)
+                        njobs = 1)#)cpu_count()-6)
 
             

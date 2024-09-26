@@ -61,6 +61,7 @@ function pirate_defaults = setdefaults
     pirate_defaults.packages.MRIcroGL     = 'C:\MRIcroGL_windows\MRIcroGL\MRIcroGL.exe';
     pirate_defaults.packages.jsonlab      = 'C:\Program Files\MATLAB\matlab toolbox\marsbar-0.45';
     pirate_defaults.packages.marsbar      = 'C:\Program Files\MATLAB\matlab toolbox\jsonlab-master';
+    pirate_defaults.packages.jubrain      = 'C:\Program Files\MATLAB\matlab toolbox\jubrain-anatomy-toolbox';   % for access to parcellation
     pirate_defaults.packages.SPM12OldNorm = fullfile(pirate_defaults.packages.SPM12,'toolbox','OldNorm'); % this is so that auto reorientation runs
     pirate_defaults.packages.SPM12batch   = fullfile(pirate_defaults.packages.SPM12,'matlabbatch');         % this is so that batch management runs
     % packages that need to add with subfolders
@@ -92,10 +93,11 @@ function pirate_defaults = setdefaults
     pirate_defaults.participants.validids  = pirate_defaults.participants.ids([1:26,28:30]); % exclude sub 31 due to incomplete scans and exclude sub027 due to wierd performance
     pirate_defaults.participants.nvalidsub = numel(pirate_defaults.participants.validids);% exclude sub 31 due to incomplete scans and exclude sub027 due to wierd performance
     
-    pirate_defaults.participants.nonlearnerids     = {'sub010','sub012','sub013','sub017'}'; %,'sub027'
-    pirate_defaults.participants.nongeneralizerids = {'sub010','sub012','sub013','sub004','sub023','sub002','sub014','sub021','sub017'}';%,'sub027'
-    pirate_defaults.participants.learnerids        = pirate_defaults.participants.validids(~ismember(pirate_defaults.participants.validids,pirate_defaults.participants.nonlearnerids));
-    pirate_defaults.participants.generalizerids    = pirate_defaults.participants.validids(~ismember(pirate_defaults.participants.validids,pirate_defaults.participants.nongeneralizerids));
+    pirate_defaults.participants.nonlearnerids     = {'sub010','sub012','sub013','sub017'}'; 
+    pirate_defaults.participants.nongeneralizerids = {'sub010','sub012','sub013','sub004','sub023','sub002','sub014','sub021','sub017'}';
+    pirate_defaults.participants.learnerids        = pirate_defaults.participants.validids(~ismember(pirate_defaults.participants.validids, pirate_defaults.participants.nonlearnerids));
+    % we only keep learners & generalizers here
+    pirate_defaults.participants.generalizerids    = pirate_defaults.participants.learnerids(~ismember(pirate_defaults.participants.learnerids,pirate_defaults.participants.nongeneralizerids));
 
     %% --------------  naming patterns ------------------
     pirate_defaults.filepattern.task1   = 'sub-.*_task-piratenavigation_run-[1-4]';

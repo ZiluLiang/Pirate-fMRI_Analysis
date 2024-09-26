@@ -52,12 +52,18 @@ Some literature argue that there is a benefit of centering before running analys
    - **demean**:   
     subtract mean activity value, centering is performed for each condition (each row of the activity pattern matrix) separately.  
 
-But in general, centering may change the way we interpret the neural geometry (see [Walther et al., 2016](https://doi.org/10.1016/j.neuroimage.2015.12.012)). Some distance metrix is sensitive to the centering performed. Hence we did not perform any centering for the neural activity pattern matrix.  
+But in general, centering may change the way we interpret the neural geometry (see [Walther et al., 2016](https://doi.org/10.1016/j.neuroimage.2015.12.012)). Some distance metrix is sensitive to the centering performed. Hence we did not perform any centering for the neural activity pattern matrix.   
+
+  
+## What we did in the end
+**In the end, we went with the following pipeline:  
+We performed multivariate noise normalisation on the beta activity pattern matrix extracted from the first level GLM of the LSA approach. The whitening matrix used for noise normalisation is estimated from the residuals of this GLM (stored in residual.nii files) using an OAS estimator.  
+We made this choice because analysis in ROIs show that MVNN has improved the split-half stability of the neural RDM, while VS has small or no influence on this metric, so we only performed MVNN to our data.**
 
 
 
 # Different types of MVPA
-Several types of MVP analysis are designed to test the representation geometry. Analyses are performed via different class of [`Estimators`](https://github.com/ZiluLiang/zpyhelper/blob/main/zpyhelper/MVPA/estimators.py). There are also [Estimators defined specifically for this project](/src/multivariate/MVPA_estimator.py)
+Several types of MVP analysis are designed to test the representation geometry. Analyses are performed via different class of [`Estimators`](https://github.com/ZiluLiang/zpyhelper/blob/main/zpyhelper/MVPA/estimators.py). There are also [Estimators defined specifically for this project](/src/multivariate/mvpa_estimator.py)
 
 ## Correlation / Regression Analysis on neural and model RDM
 This is implemented by the `PatternCorrelation` and `MultipleRDMRegression` esimator in zpyhelper
@@ -72,22 +78,23 @@ Some choices need to be made before calculating neural RDM:
 ### Quantifying similarity between neural RDM and model RDM
 Only the lower triangular part of the model RDMs and neural RDMs (excluding diagonals) are extracted for the analysis  
 **(1) regression**  
-regression uses one or a set of model RDMs to predict neural RDM. Dependent variable and predictors are standardized (separately) before entering the regression analysis.  
+regression uses one or a set of model RDMs to predict neural RDM. Dependent variable and predictors are standardized (separately) before entering the regression analysis.  Note that the coefficient estimates can be unreliable when multiple highly correlated model RDMs are entered. Always check the degree of conlinearity before runnning the analysis.  
 **(2) correlation**  
 Spearman's rank correlation is computed between the neural RDM and one model RDM. the correlation coefficient is Fisher z-transformed before entering second level analysis.  
 
 
 ## Neural Vector Analysis
-**Note this a legacy analysis and thus not yet implemented by the estimators.**   
+**Note this analysis is not yet implemented by the estimators.**   
 Let $𝑓_𝑗$ be the coordinate of stimuli $j$ in neural representation space $ℝ^𝑚$ ($m$ being the number of voxels). For any two stimuli $𝑗,𝑘$, we define the neural vector (coding direction) from $𝑗$ to $𝑘$ as:  
 $$𝑣_{𝑗𝑘}=𝑓_𝑗− 𝑓_𝑘$$
 For any given pair of neural vectors, we can compute its cosine similarity as an indicator of how parallel these two neural vectors are
 $$cos⁡(𝑣_1, 𝑣_2)=  \frac{𝑣_1 \times 𝑣_2}{\left\Vert 𝑣_1 \right\Vert \times \left\Vert 𝑣_2 \right\Vert}$$
-If we replace $𝑓_𝑗$ and $𝑓_𝑘$ with the feature vector from the three models of representation (row vector from the feature matrices), we can compute the theoretical cosine similarity of any given pair of coding directions, and compare that with our data.  
+If we replace $𝑓_𝑗$ and $𝑓_𝑘$ with the feature vector from the different models of representation (row vector from the feature matrices), we can compute the theoretical cosine similarity of any given pair of coding directions, and compare that with our data.     
 
-![feature matrices for different models of representation](/docs/featurematrix_by_representationmodels.png)
 
-### Direction pair types
+### Predicted Cosine Similarity of different models of representation  
+**Note that the following predictions are from legacy analysis and needs to be updated to include prediction from the Parallel Training Axis model.**     
+
 If we plot the groundtruth map of stimuli (based on groundtruth x/y locations), we can define different coding direction pairs. In this analysis, we focused on four types of direction pairs:
 - **between X**: cosine similarity between two vertical coding directions that
   1) start from the same y
@@ -106,8 +113,8 @@ If we plot the groundtruth map of stimuli (based on groundtruth x/y locations), 
 
 Similarly, we can use a feature-based groundtruth map, disregarding which feature maps onto x and which feature maps onto y, to derive the above direction types.
 
-### Predicted Cosine Similarity of different models of representation
-Right now all the analyses in this section is based on the assumption that there is only one run. All the predictions are within run. We haven't formalize a good hypothesis for between-run data yet.
+Right now all the analyses in this section is based on the assumption that there is only one run. All the predictions are within run.
+
 #### highDim-25
 Under the assumption of highDim-25 model, there are three possible values of cosine similarity between any given pair of coding directions: $0.5$, $0$, $-0.5$.
 To better understand why this is the case, here is an illustration that represent 4 stimuli using one hot coding. The locations of these 4 stimuli in this representation space form a tetrahedron. When the pair of coding directions intersect at the starting location or ending location, its  cosine similarity is $0.5$ or $-0.5$. When the pair do not share starting or ending location, its cosine similarity is 0. However, this is assuming that there are no bias towards certain stimuli (e.g., no shape/color bias, no training/test bias). If there are biases, the vertices of the tetrahedron will not be equidistant. It may strech,  then the cosine similarity of the pair of coding directions that intersect will no longer be 0.5 or -0.5. The true null of this model will be hard to estimate. Therefore, we focus only on the case where there are no intersection (with a theorectical prediciton of 0).
@@ -143,16 +150,15 @@ Similarly, we can calculate the theoretical prediction of these models using a f
 # Running MVPA Analysis
 ## Regions
 ### 1. ROI-based: obtaining ROI masks from AAL parcellation or functional maskss
-AAL3v1 parcellation is used to generate anatomical masks for ROIs. The procedure was carried out in marsbar. Each anatomical masks is a binarize and resampled to match the resolution of the participants' functional images.  
-Details on what parcellation is included in each anatomical mask are in [`anatomical_masks.json`](/scripts/anatomical_masks.json). This is read in by [`anatomical_masks.m`](/scripts/anatomical_masks.m) to generate the mask file in nii format. 
+AAL3v1 parcellation and the HCP-MMP1 parcellation are used to generate anatomical masks for ROIs. The procedure was carried out in marsbar. Each anatomical masks is a binarize and resampled to match the resolution of the participants' functional images.  
+Details on what parcellation is included in each anatomical mask are in [`AAL_anatomical_masks.json`](/src/AAL_anatomical_masks.json) and [`HCP-MMP_anatomical_masks.json`](/src/HCP-MMP_anatomical_masks.json). This is read in by [`anatomical_masks.m`](/src/anatomical_masks.m) to generate the mask file in nii format. 
 
 ### 2. Whole brain searchlight: obtaining spherical searchlight regions
 For each voxel, a spherical ROI is defined with a radius of 10mm (4 times the voxel size). An additional constraint is added: each searchlight sphere should include at least 50 usable voxels. 
 
 ## Statistical tests
 ### Parametric tests
-For ROI-based analysis one sample t-test is performed on the metric
+For ROI-based analysis wilcoxon test is performed on the metric (due to small sample size we didn't use ttest).  
 For whole-brain searchlight analysis, for a given predictor, a metric map is generated for each participant. This is then entered into SPM's second level analysis to perform statistic test (one-sample t-test) and multiple correction.
 ### Non-parametric tests with permutation test
-TBC
 non parametric test do not assume distribution of the metric, and maybe a more exact test for the effect. We can shuffle the activity pattern matrix and generate null distribution of the metric and compare our estimated value to this null distribution.

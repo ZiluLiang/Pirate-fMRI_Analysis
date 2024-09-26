@@ -4,9 +4,10 @@
 		"MRIcroGL":"C:\\MRIcroGL_windows\\MRIcroGL\\MRIcroGL.exe",
 		"jsonlab":"C:\\Program Files\\MATLAB\\matlab toolbox\\marsbar-0.45",
 		"marsbar":"C:\\Program Files\\MATLAB\\matlab toolbox\\jsonlab-master",
+		"jubrain":"C:\\Program Files\\MATLAB\\matlab toolbox\\jubrain-anatomy-toolbox",
 		"SPM12OldNorm":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\toolbox\\OldNorm",
 		"SPM12batch":"C:\\Program Files\\MATLAB\\matlab toolbox\\spm12\\matlabbatch",
-		"src":"E:\\pirate_fmri\\Analysis\\src;E:\\pirate_fmri\\Analysis\\src\\LLR;E:\\pirate_fmri\\Analysis\\src\\LLR\\probdf_nolapse_csv;E:\\pirate_fmri\\Analysis\\src\\R;E:\\pirate_fmri\\Analysis\\src\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\multivariate;E:\\pirate_fmri\\Analysis\\src\\multivariate\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\preprocessing;E:\\pirate_fmri\\Analysis\\src\\qualitycheck;E:\\pirate_fmri\\Analysis\\src\\spm_utils;E:\\pirate_fmri\\Analysis\\src\\tidydata;E:\\pirate_fmri\\Analysis\\src\\univariate;E:\\pirate_fmri\\Analysis\\src\\utils;E:\\pirate_fmri\\Analysis\\src\\utils\\__pycache__;",
+		"src":"E:\\pirate_fmri\\Analysis\\src;E:\\pirate_fmri\\Analysis\\src\\LLR;E:\\pirate_fmri\\Analysis\\src\\LLR\\probdf_nolapse_csv;E:\\pirate_fmri\\Analysis\\src\\R;E:\\pirate_fmri\\Analysis\\src\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\external;E:\\pirate_fmri\\Analysis\\src\\external\\Ordinal_Classifier;E:\\pirate_fmri\\Analysis\\src\\external\\Ordinal_Classifier\\.idea;E:\\pirate_fmri\\Analysis\\src\\external\\Ordinal_Classifier\\.idea\\inspectionProfiles;E:\\pirate_fmri\\Analysis\\src\\external\\Ordinal_Classifier\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\multivariate;E:\\pirate_fmri\\Analysis\\src\\multivariate\\__pycache__;E:\\pirate_fmri\\Analysis\\src\\preprocessing;E:\\pirate_fmri\\Analysis\\src\\qualitycheck;E:\\pirate_fmri\\Analysis\\src\\spm_utils;E:\\pirate_fmri\\Analysis\\src\\tidydata;E:\\pirate_fmri\\Analysis\\src\\univariate;E:\\pirate_fmri\\Analysis\\src\\utils;E:\\pirate_fmri\\Analysis\\src\\utils\\__pycache__;",
 		"scripts":"E:\\pirate_fmri\\Analysis\\scripts\\Exp1_fmri"
 	},
 	"directory":{
