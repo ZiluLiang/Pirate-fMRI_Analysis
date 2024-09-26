@@ -14,7 +14,9 @@ function normalise(subimg_dir)
     func_imgs = cellstr(spm_select('ExtFPList', subimg_dir, [filepattern.preprocess.realignunwarp,'.*\.nii']));
 
     % get the bounding box of the template image normalized to
-    [bb,~]=spm_get_bbox([spm('dir'),filesep,'tpm',filesep,'TPM.nii']);
+    [bb,~]=spm_get_bbox([spm('dir'),filesep,'tpm',filesep,'TPM.nii']); 
+    % SEE https://neurostars.org/t/spm-registration-to-standard-space/25356/3
+    % Concerning spaces, the TPM.nii in SPM12 matches an asymmetric variant of the MNI ICBM 152 non-linear 6th Gen space 
 
     % set up normalization job
     matlabbatch = {};
