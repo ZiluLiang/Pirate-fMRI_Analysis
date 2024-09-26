@@ -21,21 +21,19 @@ class ModelRDM:
     Parameters
     ----------
     stimid : numpy.ndarray
-        a 1D/2D numpy array of stimuli ids, shape = `(nstim,)` or `(nstim,1)`
+        a 1D/2D numpy array of stimuli ids, shape = `(nstim,)`
     stimgtloc : numpy.ndarray
         a 2D numpy array of stimuli groundtruth locations (x and y), shape = `(nstim,2)`
     stimfeature : numpy.ndarray
         a 2D numpy array of stimuli features (color and feature), shape = `(nstim,2)`
     stimgroup : numpy.ndarray
-        a 1D/2D numpy array of stimuli group, shape = `(nstim,)` or `(nstim,1)`
+        a 1D/2D numpy array of stimuli group, shape = `(nstim,)`
     sessions : int, optional
-        a 1D/2D numpy array of stimuli sessions, shape = `(nstim,)` or `(nstim,1)`
+        a 1D/2D numpy array of stimuli sessions, shape = `(nstim,)`
         If multiple sessions are present, model rdms will be separated in to between and within case as well. by default 1
     stimresploc : numpy.ndarray
         a 2D numpy array of stimuli locations (x and y) based on participants response, shape = `(nstim*n_session,2)`, by default None
         number of sessions, by default 1
-    randomseed: int, optional
-        randomseed passed to `self.random` to initiate random generator to create random model rdm, by default 1
     nan_identity: bool, optional
         whether or not to nan out same-same stimuli pairs in the model rdm. by default true.  
     splitgroup: bool, optional
@@ -53,14 +51,14 @@ class ModelRDM:
                  splitgroup:bool=False):
         
         self.n_session   = numpy.unique(sessions).size
-        self.stimid      = numpy.atleast_2d(stimid).T if numpy.ndim(stimid) <2 else numpy.array(stimid)
-        self.n_stim      = self.stimid.shape[0]
+        self.stimid      = numpy.array(stimid).flatten()
+        self.n_stim      = self.stimid.size
 
-        #### stimuli features
-        ## groundtruth location - 2D        
+        ############################# stimuli features and locations #############################
+        ## 1. groundtruth location - 2D        
         self.stimloc     = numpy.array(stimgtloc)
         
-        ## 'hierarchical' model - 4D: quadrant (global feature) - location within each quadrant (local feature)
+        ## 2. 'hierarchical' model - 4D: quadrant (global feature) - location within each quadrant (local feature)
         # local feature encoded using central axis as reference
         self.stimloc_wrtcentre = numpy.concatenate(
                                     [numpy.absolute(self.stimloc),
@@ -75,14 +73,30 @@ class ModelRDM:
         wrtlrbu_y[wrtlrbu_y>0] = scipy.stats.rankdata(wrtlrbu_y[wrtlrbu_y>0],method="dense",axis=0,nan_policy="omit")
         self.stimloc_wrtlrbu  = numpy.concatenate([wrtlrbu_x, wrtlrbu_y, self.stimloc_wrtcentre[:,[2,3]]],axis=1)
         
-        ## two-hot encoded color/shape features - 10D
+        ## 3. two-hot encoded color/shape features - 10D
         self.stimfeature = numpy.array(stimfeature)
 
+        ############################# stimuli group ############################# 
         # stimuli group and session
-        self.stimgroup   = numpy.atleast_2d(stimgroup).T if numpy.ndim(stimgroup) <2 else numpy.array(stimgroup) 
-        self.stimsession = numpy.atleast_2d(sessions).T if numpy.ndim(sessions) <2 else numpy.array(sessions) 
-        
-        ## response location
+        self.stimgroup   = numpy.array(stimgroup).flatten()
+        self.stimsession = numpy.array(sessions).flatten()
+
+        # for training stimuli - axis set and location
+        training_axloc = numpy.full((self.n_stim,),fill_value=numpy.nan)
+        training_axlocRev = numpy.full((self.n_stim,),fill_value=numpy.nan)
+        training_axset = numpy.full((self.n_stim,),fill_value=numpy.nan)
+        rev_mapping = dict(zip(numpy.sort(numpy.unique(self.stimloc[:,0])),
+                               -numpy.sort(-numpy.unique(self.stimloc[:,0]))))
+        for j,s in enumerate(self.stimgroup):
+            if s == 1:
+                if numpy.logical_xor(self.stimloc[j,0] == 0, self.stimloc[j,1] == 0):
+                    training_axloc[j] = self.stimloc[j,1] if self.stimloc[j,0] == 0 else self.stimloc[j,0]
+                    training_axset[j] = 1 if self.stimloc[j,0] == 0 else 0 # if stimx ==0. then training axis is y(coded as 0 in training_axset) else it would be training axis is x (coded as 1 in training_axset)
+                    training_axlocRev[j] = training_axloc[j] if training_axset[j]==0 else rev_mapping[training_axloc[j]]
+                    
+        self.training_axloc,self.training_axset, self.training_axlocRev = training_axloc, training_axset, training_axlocRev
+
+        ############################# response location ############################# 
         if stimresploc is None:
             self.gen_resprdm = False
             self.stimresploc,self.resploc_wrtcentre = numpy.full_like(self.stimloc,fill_value=numpy.nan),numpy.full_like(self.stimloc_wrtcentre,fill_value=numpy.nan)
@@ -98,9 +112,9 @@ class ModelRDM:
         #concatenate into a df for convenience ## TODO: maybe use a structured numpy array? which is more efficient?
         self.stimdf = pandas.DataFrame(
             {
-                "stim_id":self.stimid[:,0],
-                "stim_group":self.stimgroup[:,0],
-                "stim_session":self.stimsession[:,0],
+                "stim_id":self.stimid,
+                "stim_group":self.stimgroup,
+                "stim_session":self.stimsession,
                 "stim_x":self.stimloc[:,0],
                 "stim_y":self.stimloc[:,1],
                 "stim_color":self.stimfeature[:,0],
@@ -116,7 +130,10 @@ class ModelRDM:
                 "resp_xsign":self.resploc_wrtcentre[:,2],
                 "resp_ysign":self.resploc_wrtcentre[:,3],
                 "resp_xdist":self.resploc_wrtcentre[:,0],            
-                "resp_ydist":self.resploc_wrtcentre[:,1]
+                "resp_ydist":self.resploc_wrtcentre[:,1],
+                "training_axset":self.training_axset,
+                "training_axloc":self.training_axloc,
+                "training_axlocRev": self.training_axlocRev
             },                
         )
         
@@ -164,14 +181,14 @@ class ModelRDM:
         # retrieve feature arrays for model rdm construction
         stim = {}
         
-        ### 1d features
+        ### single features
         stim = dict(zip(self.stimdf.columns, self.stimdf.to_numpy().T))
         for k,v in stim.items():
             stim[k] = numpy.atleast_2d(v).T
 
-        ### 2d features
+        ### multi features
         stim["gtloc"]          = numpy.array(self.stimdf[["stim_x","stim_y"]])
-        stim["feature2d"]      = numpy.array(self.stimdf[["stim_color","stim_shape"]])
+        stim["features"]      = numpy.array(self.stimdf[["stim_color","stim_shape"]])
         stim["stim_xysign"]    = numpy.array(self.stimdf[["stim_xsign","stim_ysign"]])
         stim["stim_xydist"]    = numpy.array(self.stimdf[["stim_xdist","stim_ydist"]])
         stim["stim_lrbuxy"]    = numpy.array(self.stimdf[["stim_lrbux","stim_lrbuy"]])
@@ -180,6 +197,9 @@ class ModelRDM:
         stim["resploc_xysign"] = numpy.array(self.stimdf[["resp_xsign","resp_ysign"]])
         stim["hierachical_wrtcentre"]= numpy.array(self.stimdf[["stim_xsign","stim_ysign","stim_xdist","stim_ydist"]])
         stim["hierachical_wrtlrbu"]= numpy.array(self.stimdf[["stim_xsign","stim_ysign","stim_lrbux","stim_lrbuy"]])
+        stim["training_axes"]   = numpy.array(self.stimdf[["training_axset","training_axloc"]])
+        stim["training_axesReV"]   = numpy.array(self.stimdf[["training_axset","training_axlocRev"]])
+        
         
         
         ### shuffle
@@ -197,23 +217,28 @@ class ModelRDM:
                                "global_xsign","global_ysign","global_xysign", ## global features                               
                                "locwrtcentre_localx","locwrtcentre_localy","locwrtcentre_localxy",## local feature encoded using central axis as reference - gt
                                "locwrtlrbu_localx","locwrtlrbu_localy","locwrtlrbu_localxy",  ## local features are encoded as from left-right and bottom-up
-                               "hierachical_wrtcentre","hierachical_wrtlrbu"
+                               "hierachical_wrtcentre","hierachical_wrtlrbu",
+                               # parallel training axes model (only valid for train-train distance)
+                               "PTA_locEuc","PTA_locRevEuc"
                                ],
                               ["gtloc","stim_x","stim_y",
                                "stim_xsign","stim_ysign","stim_xysign",
                                "stim_xdist","stim_ydist","stim_xydist",
                                "stim_lrbux","stim_lrbuy","stim_lrbuxy",
-                               "hierachical_wrtcentre","hierachical_wrtlrbu"])) 
+                               "hierachical_wrtcentre","hierachical_wrtlrbu",
+                               "training_axloc","training_axlocRev"])) 
         for mname,col in euclidean_rdms.items():
             models[mname] = compute_rdm(stim[col],metric="euclidean")
 
-        nomial_rdms = dict(zip(["feature2d"],["feature2d"]))
+        models["gtlocCityBlock"] = compute_rdm(stim["gtloc"],metric="cityblock")
+
+        nomial_rdms = dict(zip(["feature","PTA"],["features","training_axes"]))
         for mname,col in nomial_rdms.items():
             models[mname] = compute_rdm_nomial(stim[col].squeeze())
 
         identity_rdms = dict(zip(
-                            ["feature1d_color","feature1d_shape","stimuli","stimuligroup"],
-                            ["stim_color","stim_shape","stim_id","stim_group"]
+                            ["feature_color","feature_shape","stimuli","stimuligroup","session","PTA_ax","PTA_locNomial","PTA_locRevNomial"],
+                            ["stim_color","stim_shape","stim_id","stim_group","stim_session","training_axset","training_axloc","training_axlocRev"]
         ))
         for mname,col in identity_rdms.items():
             models[mname] = compute_rdm_identity(stim[col].squeeze())
@@ -243,7 +268,7 @@ class ModelRDM:
             WTR[WTR==0]=numpy.nan
             WTE[WTE==0]=numpy.nan
             MIX[MIX==0]=numpy.nan
-            split_models = [x for x in models.keys() if x not in ["stimuli","stimuligroup"]]
+            split_models = [x for x in models.keys() if x not in ["stimuligroup"]]
             for k in split_models:
                 wtr_n = 'trainstimpairs_' + k
                 rdmwtr = numpy.multiply(models[k],WTR)
@@ -264,7 +289,7 @@ class ModelRDM:
         WC[WC==0]=numpy.nan
         tmp = list(models.items()) ## this is so that we don't change models
         for k,v in tmp:
-            if "Euclidean" in k:
+            if numpy.any(["Euclidean" in k,"PTA_loc" in k,"locwrtcentre" in k, "hierachical" in k, "global" in k]):
                 wc_n  = f"withinxy_{k}"
                 rdmwc = numpy.multiply(v,WC)
                 wx_n  = f"withinx_{k}"
@@ -412,7 +437,8 @@ class ModelRDM:
         modeldf = modeldf[0].join(modeldf[1:])
         return modeldf
 
-"""double check by running the following code:
+"""Example use:
+
 import itertools
 f = [0.,1.,2.,3.,4.]
 stimfeature = numpy.array(list(itertools.product(f,f)))
@@ -426,9 +452,12 @@ stimid = numpy.tile(numpy.atleast_2d(stimid).T,(nsess,1))
 stimgroup = numpy.tile(numpy.atleast_2d(stimgroup).T,(nsess,1))
 sessions = numpy.concatenate([numpy.ones((25,1))*x for x in range(nsess)],axis=0)
 modelrdm = ModelRDM(stimid,stimgtloc,stimfeature,stimgroup,sessions,splitgroup=True)
+
+# check if modelrdm contains invalid models
 violate_keys = ["within_session","within_stimuli","teststimpairs_stimuligroup"]
 non_const_check = all([x not in modelrdm.models.keys() for x in violate_keys])
+#non_const_check must return True
 
-non_const_check must return True
+
 """
 

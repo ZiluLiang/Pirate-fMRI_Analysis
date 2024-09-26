@@ -34,7 +34,7 @@ from zpyhelper.image.searchlight import MVPASearchLight
 
 project_path = r'E:\pirate_fmri\Analysis'
 sys.path.append(os.path.join(project_path,'src'))
-from multivariate.MVPA_estimator import CompositionalRSA
+from multivariate.mvpa_estimator import CompositionalRetrieval
 from multivariate.modelrdms import ModelRDM
 
 
@@ -149,7 +149,7 @@ class RSARunner:
                     "resid_groups": np.concatenate([np.ones((n_scanperrun[t],))*j for j,t in enumerate(task_seq)])
                 }
             
-        if "AOE" in spec_steps:
+        if "AOE" in spec_steps:  # average odd and even runs
             if taskname == "localizer":
                 self.config_neuralrdm["preproc"].pop("AOE")
             if taskname == "navigation":
@@ -158,25 +158,34 @@ class RSARunner:
                     "session":np.concatenate([np.ones((n_stim[taskname],))*j for j in range(n_run[taskname])])
                 }
         
-        if "ATOE" in spec_steps:
-            assert taskname == "both"
-            task_seq = ["navigation"]*n_run["navigation"] + ["localizer"]*n_run["localizer"]
-            self.config_neuralrdm["preproc"]["ATOE"][0] = PREPROC_CATELOGUE["ATOE"]
-            self.config_neuralrdm["preproc"]["ATOE"][1] = {
-                "session":np.concatenate([np.ones((n_stim[t],))*j for j,t in enumerate(task_seq)]),
-                "average_by":[[0,2],[1,3],[4]]
-            }
+        if "ATOE" in spec_steps: # average all runs within task
+            if taskname == "both":
+                task_seq = ["navigation"]*n_run["navigation"] + ["localizer"]*n_run["localizer"]
+                self.config_neuralrdm["preproc"]["ATOE"][0] = PREPROC_CATELOGUE["ATOE"]
+                self.config_neuralrdm["preproc"]["ATOE"][1] = {
+                    "session":np.concatenate([np.ones((n_stim[t],))*j for j,t in enumerate(task_seq)]),
+                    "average_by":[[0,1,2,3],[4]]
+                }
+            elif taskname == "navigation":
+                task_seq = ["navigation"]*n_run["navigation"]
+                self.config_neuralrdm["preproc"]["ATOE"][0] = PREPROC_CATELOGUE["ATOE"]
+                self.config_neuralrdm["preproc"]["ATOE"][1] = {
+                    "session":np.concatenate([np.ones((n_stim[t],))*j for j,t in enumerate(task_seq)]),
+                    "average_by":[[0,1,2,3]]
+                }
 
         # define number of sessions based on preproc options        
         if taskname == "both":
             if "ATOE" in self.config_neuralrdm["preproc"].keys(): 
-                self.nsession = [2,1]
+                self.nsession = [1,1]
             else:
                 self.nsession = [4,1]
         else:
             self.nsession = n_run[taskname]
             if taskname == "navigation" and "AOE" in self.config_neuralrdm["preproc"].keys():           
-                    self.nsession = 2
+                self.nsession = 2
+            if taskname == "navigation" and "ATOE" in self.config_neuralrdm["preproc"].keys():    
+                self.nsession = 1
 
 
 ############################################### PARTICIPANT-SPECIFIC DATA EXTRACTION METHODS ###################################################
@@ -533,20 +542,56 @@ class RSARunner:
                     m_regs = A["regressors"]
 
                     print(f'running regression searchlight {A["name"]}') 
-                    if nsession>1: # if multiple runs do between run                        
-                        m_regs = [f'between_{x}' for x in A["regressors"]]
+                    if nsession>1: # if multiple runs do between run as well as within run and across run          
+                        # ####between run        
+                        # m_regs = [f'between_{x}' for x in A["regressors"]]
+                        # if not all([x in modelrdm.models.keys() for x in m_regs]):
+                        #     warnings.warn("this analysis contains invalid regressor so it will be skipped")
+                        # else:
+                        #     print(f'running regression searchlight {A["name"]} in between session') 
+                        #     regress_models = [modelrdm.models[m] for m in m_regs]
+                        #     subSearchLight.run(
+                        #         estimator = MultipleRDMRegression,
+                        #         estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, 
+                        #                             "standardize":True,"rdm_metric":self.config_neuralrdm["distance_metric"]},
+                        #         outputpath   = os.path.join(outputdir,"regression",f'{A["name"]}_between','first',subid), 
+                        #         outputregexp = 'beta_%04d.nii', 
+                        #         verbose      = j == 0
+                        #         ) # only show details at the first participant
+
+                        # ####within run    
+                        # m_regs = [f'within_{x}' for x in A["regressors"]]
+                        # if not all([x in modelrdm.models.keys() for x in m_regs]):
+                        #     warnings.warn("this analysis contains invalid regressor so it will be skipped")
+                        # else:
+                        #     print(f'running regression searchlight {A["name"]} in within session') 
+                        #     regress_models = [modelrdm.models[m] for m in m_regs]
+                        #     subSearchLight.run(
+                        #         estimator = MultipleRDMRegression,
+                        #         estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, 
+                        #                             "standardize":True,"rdm_metric":self.config_neuralrdm["distance_metric"]},
+                        #         outputpath   = os.path.join(outputdir,"regression",f'{A["name"]}_within','first',subid), 
+                        #         outputregexp = 'beta_%04d.nii', 
+                        #         verbose      = j == 0
+                        #         ) # only show details at the first participant
+
+                        ####across run   
+                        m_regs = [x for x in A["regressors"]] + ["session"]
                         if not all([x in modelrdm.models.keys() for x in m_regs]):
                             warnings.warn("this analysis contains invalid regressor so it will be skipped")
                         else:
+                            print(f'running regression searchlight {A["name"]} in across session') 
                             regress_models = [modelrdm.models[m] for m in m_regs]
                             subSearchLight.run(
                                 estimator = MultipleRDMRegression,
                                 estimator_kwargs = {"modelrdms":regress_models, "modelnames":m_regs, 
                                                     "standardize":True,"rdm_metric":self.config_neuralrdm["distance_metric"]},
-                                outputpath   = os.path.join(outputdir,"regression",f'{A["name"]}_between','first',subid), 
+                                outputpath   = os.path.join(outputdir,"regression_withidentity",f'{A["name"]}','first',subid), 
                                 outputregexp = 'beta_%04d.nii', 
                                 verbose      = j == 0
                                 ) # only show details at the first participant
+
+
                     else: 
                         if not all([x in modelrdm.models.keys() for x in m_regs]):
                             warnings.warn("this analysis contains invalid regressor so it will be skipped")
@@ -565,11 +610,12 @@ class RSARunner:
                     assert "modelrdms" in A.keys(), "must specify the model rdms to run correlation with!"
                     corr_rdm_names = deepcopy(A["modelrdms"])
                     
-                    if nsession>1: # if multiple runs do between run as well
-                        corr_rdm_names = [f'between_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()] + [f'within_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()]
+                    corr_rdm_names = [x for x in A["modelrdms"] if x in corr_rdm_names]
+                    if nsession>1: # if multiple runs do between run only
+                        bs_corr_rdm_names = [f'between_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()]
+                        ws_corr_rdm_names = [f'within_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()]
+                        corr_rdm_names = corr_rdm_names + ws_corr_rdm_names + bs_corr_rdm_names
                     
-                    corr_rdm_names = [x for x in A["modelrdms"] if x in modelrdm.models.keys()]
-
                     corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
 
                     # run analysis
@@ -597,28 +643,18 @@ class RSARunner:
                 elif A["type"] == "composition":
                     sbhav = pd.DataFrame(np.hstack([stimid,stimgtloc,stimfeature,stimgroup,sessions]),
                                         columns=["stim_id","stim_x","stim_y","stim_color","stim_shape","stim_group","stim_session"])
-                    if self.taskname=="both":
-                        print(f"running composition searchlight {A['name']}")
-                        sbhav["stim_task"] = 1*(sbhav["stim_session"] == np.max(sbhav["stim_session"]))
-                        
-                        CompositionalRSA_kwarg = {"stim_df":sbhav,
-                                                "source_ref_split_name":"stim_task",
-                                                "compose_feature_names":["stim_x","stim_y"],
-                                                "control_feature_names":[]
-                                                }
-                    elif self.taskname=="navigation":
-                        CompositionalRSA_kwarg = {"stim_df":sbhav,
-                                                "source_ref_split_name":"stim_group",
-                                                "compose_feature_names":["stim_x","stim_y"],
-                                                "control_feature_names":["stim_session"]
-                                                }
+                    assert self.taskname=="both"
+                    print(f"running composition searchlight {A['name']}")
+                    sbhav["stim_task"] = 1*(sbhav["stim_session"] == np.max(sbhav["stim_session"]))
+                    
+                    CompositionalRSA_kwarg = {"stim_df":sbhav}
                         
                         
                     subSearchLight.run(
-                        estimator = CompositionalRSA,
+                        estimator = CompositionalRetrieval,#CompositionalRSA,
                         estimator_kwargs = CompositionalRSA_kwarg,
                         outputpath   = os.path.join(outputdir,A["type"],A["name"],'first',subid), 
-                        outputregexp = 'rho_%04d.nii', 
+                        outputregexp = 'beta_%04d.nii',#'rho_%04d.nii', 
                         verbose      = j == 0
                         )
                     

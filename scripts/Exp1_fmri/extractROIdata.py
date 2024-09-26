@@ -1,5 +1,5 @@
 """
-This file extracts data from different anatomical or functional ROIgit add
+This file extracts data from different anatomical or functional ROIs
 """
 
 import numpy as np
@@ -15,7 +15,7 @@ project_path = r'E:\pirate_fmri\Analysis'
 sys.path.append(os.path.join(project_path,'src'))
 from zpyhelper.filesys import checkdir
 
-from multivariate.rsa_runner import RSARunner
+from multivariate.mvpa_runner import RSARunner
 
 
 project_path = r'E:\pirate_fmri\Analysis'
@@ -28,31 +28,17 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     fmridata_dir = pirate_defaults['directory']['fmri_data']
     nongeneralizers = pirate_defaults['participants']["nongeneralizerids"]
 
-# #FUNCTIONAL ROI: mvnn_wbsearch_reg_compete_featurecartesian_combinexy_testpairs_between
-roi_analysise_dir = os.path.join(fmridata_dir,'ROIRSA','mvnn_wbsearch_reg_compete_featurecartesian_combinexy_withsg_between')
-rois = ["stimuligroup_FrontalMid2L","stimuligroup_FrontalSup2L","stimuligroup_ParietalInfL","stimuligroup_SMAL"] + \
-       ["sphere_neggtloc_FrontalMid2L",
-        "sphere_posgtloc_CalcarineL",
-        "sphere_posgtloc_CalcarineR",
-        "sphere_posgtloc_HippocampusR",
-        "sphere_posgtloc_PrecentralL"]
-# #FUNCTIONAL ROI: mvnn_wbsearch_reg_compete_featurecartesian_combinexy_testpairs_between
-roi_analysise_dir = os.path.join(fmridata_dir,'ROIRSA','mvnn_wbsearch_reg_compete_featurecartesian_combinexy_testpairs_between')
-rois = [#"cluster_posgtlocGnG_CuneusPrecuneusR",
-        #"cluster_posgtlocGnG_OccipitalMidParietalSupL",
-        #"sphere_posgtlocGnG_ParaHippocampalR",
-        "cluster_posgtlocG_CalcarineLingualRL","cluster_posgtlocG_PostcentralParietalSupL",
-        #"cluster_posfeatureG_OccipitalInfRL",
-        "cluster_posfeatureG_ACCpreFrontalMedOrbL","cluster_posfeatureG_FrontalInfOperFrontalMid2L","cluster_posfeatureG_PostcentralR",
-        "cluster_posfeaturenolocG_occipital"]
-# #ANATOMICAL ROI
-# roi_analysise_dir = os.path.join(fmridata_dir,'ROIRSA','anatomical')
-# rois =  ["frontal_bilateral","ofc_bilateral", "parietal_bilateral",  "hippocampus_bilateral","parahippocampus_bilateral"] + \
-#         ["rV1", "rV2", "rV3dva", "rV4v", "rV5", "rV6"]
+
+#ANATOMICAL ROIs
+roi_analysise_dir = os.path.join(fmridata_dir,'ROIRSA','AALandHCPMMP1')
+base_rois = ["HPC","vmPFC","V1","V2"]
+rois =  dict(zip([f"{x}_bilateral" for x in base_rois],
+                 [f"{x}_bilateral" for x in base_rois]))
+save_file_name = "roi_data_4r"
+
+
+########################################## EXTRACT DATA ##########################################
 maskdir = roi_analysise_dir
-
-
-
 beta_dir = {
     "navigation":[os.path.join(fmridata_dir,'unsmoothedLSA','LSA_stimuli_navigation')],
     "localizer": [os.path.join(fmridata_dir,'unsmoothedLSA','LSA_stimuli_localizer')],
@@ -73,14 +59,14 @@ cross_task_res_dir   = beta_dir["navigation"]*n_sess["navigation"] + beta_dir["l
 cross_task_res_fname = [f'resid_run{j+1}.nii.gz' for j in range(n_sess["navigation"])] + [f'resid_run{j+1}.nii.gz' for j in range(n_sess["localizer"])]
 
 config_modelrdm_ = {"nan_identity":False, "splitgroup":True}
-cross_task_beta_preproc = {"preproc":{"MVNN": [None]*2#,"ATOE": [None]*2
-                                      }, 
+cross_task_beta_preproc = {# here we skip the averaging step because decoding analysis will need runspecific data
+                           "preproc":{"MVNN": [None]*2 },
                            "distance_metric":"correlation"}
 
 data = {}
-with Parallel(n_jobs=10) as parallel:
-    for roi in rois:
-        print(roi)
+with Parallel(n_jobs=12) as parallel:
+    for roi,roifn in rois.items():
+        print(f"extracting ROI data from {roi}")
         data[roi] = []
         CrossTaskRSA = RSARunner(
                         participants=subid_list, fmribeh_dir=fmribeh_dir,
@@ -89,12 +75,13 @@ with Parallel(n_jobs=10) as parallel:
                         pmask_dir  = cross_task_vsmask_dir,  pmask_fname  = cross_task_vsmask_fname,
                         res_dir    = cross_task_res_dir, 
                         res_fname = cross_task_res_fname,
-                        anatmasks = [os.path.join(maskdir,f"{roi}.nii")],
+                        anatmasks = [os.path.join(maskdir,f"{roifn}.nii")],
                         taskname  = "both",
                         config_modelrdm  = config_modelrdm_,
                         config_neuralrdm = cross_task_beta_preproc)
         outputs =  parallel(delayed(CrossTaskRSA.get_neuralRDM)(subid) for subid in subid_list)
         for op,subid in zip(outputs,subid_list):
+            print(f"      organizing data for {subid}", end="\r", flush=True)
             preprocX, _, rawX  = op
             stimdf             = CrossTaskRSA.get_modelRDM(subid=subid).stimdf.copy()
             stimdf["taskname"] = ["localizer" if s==np.max(stimdf["stim_session"]) else "navigation" for s in np.array(stimdf["stim_session"])]
@@ -105,5 +92,5 @@ with Parallel(n_jobs=10) as parallel:
                 "stimdf":stimdf
             }
             data[roi].append(subdata)
-
-dump(data,os.path.join(roi_analysise_dir,"feature_gtloc_roi_data_4r.pkl"))
+        dump(data[roi],os.path.join(roi_analysise_dir,f"{save_file_name}_{roi}.pkl"))
+dump(data,os.path.join(roi_analysise_dir,f"{save_file_name}.pkl"))
