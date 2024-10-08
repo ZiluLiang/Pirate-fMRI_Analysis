@@ -29,7 +29,7 @@ Air-tissue interfaces lead to inhomogeneity of the $B_0$ field (the main magneti
 To correct for signal distortion, Voxel displacement map is first calculated based on the reoriented fieldmap images. This is done by calling [`calculateVDM`](calculateVDM.m) function and the defaults specified in [`pm_defaults_Prisma_CIMCYC`](pm_defaults_Prisma_CIMCYC.m). The resulting vdm image was then used by the [`realign_unwarp`](realign_unwarp.m) to perform distortion correction.
 For detailed explanation on distortion correction and how to set the pm_defaults files see:
 1. [Handbook of functional mri data analysis](https://www.cambridge.org/core/books/handbook-of-functional-mri-data-analysis/8EDF966C65811FCCC306F7C916228529) Chapter 3 section 3.4   
-2. [Acquiring and using field maps lewis center of neuro imaging](https://lcni.uoregon.edu/kb-articles/kb-0003)
+2. [Acquiring and using field maps lewis center of neuro imaging](https://lcni.uoregon.edu/wiki/acquiring-and-using-field-maps/)
 
 
 [`realign_unwarp`](realign_unwarp.m) also realigns the first scan of each run to the first scan of the first run, and realign the other scans to the first scan within each run. This is also performed on the reoriented images. One ``rp_*.txt`` file is generated for each run, this can be used as estimates of head motion in the scanner (for first level nuisance regressors or quality inspection). A mean EPI image of the first functional run (``mean*.nii``) is generated as well.
