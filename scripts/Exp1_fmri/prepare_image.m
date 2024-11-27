@@ -22,7 +22,7 @@ clear;clc
 wk_dir  = 'E:\pirate_fmri\Analysis';
 src_dir = fullfile(wk_dir,'src');
 
-raw_data_dir   = 'F:\MRI_Granada\CHRIS\ZILU';
+raw_data_dir   = 'F:\Exp1_fmri\raw';
 
 study_data_dir   = fullfile(wk_dir,'data','Exp1_fmri');
 study_script_dir = fullfile(wk_dir,'scripts','Exp1_fmri');
@@ -38,9 +38,9 @@ filepattern    = struct('fieldmap',         'gre_field_mapping_2.5mm',...
                         'piratenavigation', 'ep2d_bold_RUN_[1-4]',...
                         'localizer',        'ep2d_bold_RUN_[5]');
 % Step control
-img_convert  = false;
-img_organize = false;
-img_backup   = false;
+img_convert  = true;
+img_organize = true;
+img_backup   = true;
 
 %-------------------------- Do not modify ----------------------------%
 converted_dir      = fullfile(data_dir,'converted'); % directory of decompressed files
@@ -48,29 +48,31 @@ renamed_dir        = fullfile(data_dir,'renamed');   % directory of renamed file
 preprocess_dir     = fullfile(data_dir,'preprocess');% directory of files ready for preprocessing, files are copied from renamed_dir
 checkimg_output_fn = 'imagenumercheck.txt';
 
-add_path(src_dir,1)
-add_path(study_script_dir,1)
-add_path(SPM12_dir,0)
+addpath(genpath(src_dir))
+addpath(genpath(study_script_dir))
+addpath(SPM12_dir)
 
 %% Read subject list
 renamer = loadjson(renamer_fn);
-newids = fieldnames(renamer);
+allids = fieldnames(renamer);
+% only look for subids in the second batch otherwise set newids = allids
+newids = allids(cellfun(@(x) contains(string(x),'sub1'),allids)); 
 nsub = numel(newids);
 
 %% Convert images
 %converting dicom imgs to nii using dcm2nii command
 if img_convert
-    parfor isub = 1:nsub
+    for isub = 1:nsub
         new_id = newids{isub};
         old_id = renamer.(new_id){2};
         fprintf('converting sub %s from %s\n',new_id,old_id);
         
-        subimg_dir  = fullfile(raw_data_dir,old_id,'Mruz_Chris');
+        subimg_dir  = fullfile(raw_data_dir,old_id,'Mruz_Chris - 1');
         outimg_dir  = fullfile(converted_dir,new_id);
         checkdir(outimg_dir)
         cd (outimg_dir)
         
-        cmd = [dcm2niix_path,' -b y -ba y -g n -o ',['"',outimg_dir,'"'],' ',['"',subimg_dir,'"']]
+        cmd = [dcm2niix_path,' -b y -ba y -g n -o ',['"',outimg_dir,'"'],' ',['"',subimg_dir,'"']];
         %input key-value argument pair used in dcm2niix command
         % -g n: the output files will not be compressed
         % -b y -ba y: generate a BIDS file excluding subject's personal information
@@ -85,9 +87,9 @@ end
 %%!!!! check the for redundent images, delete redundant images and re-run
 %%!!!! this block before proceeding.
 renaming_pattern = struct('fieldmap','fmap-',...
-                             't1','anat-T1w',...
-                             'piratenavigation','task-piratenavigation_run-[1-4]',...
-                             'localizer','task-localizer_run-1');
+                          't1','anat-T1w',...
+                          'piratenavigation','task-piratenavigation_run-[1-4]',...
+                          'localizer','task-localizer_run-1');
 if img_organize
     fID = fopen(fullfile(data_dir,checkimg_output_fn),'w'); %#ok<*UNRCH>
     fprintf(fID,'%1$s\t%2$s\t%3$s\t%4$s\n','participant','scantype','n_runs','n_trs');
@@ -130,7 +132,7 @@ if img_backup
     copyfile(renamed_dir,preprocess_dir)
 end
 
-
+%% 
 function new_name = rename_converted_imgs(scan_type,old_name,new_id) %#ok<*DEFNU>
     renaming_pattern = struct('fieldmap',         'fmap-%s',...
                               't1',               'anat-T1w',...
@@ -148,7 +150,7 @@ function new_name = rename_converted_imgs(scan_type,old_name,new_id) %#ok<*DEFNU
             end
         case 'piratenavigation'
             parts = strsplit(old_name,'_');
-            new_name = sprintf(['sub-%s_',renaming_pattern.(scan_type)],new_id(4:end),parts{6});  
+            new_name = sprintf(['sub-%s_',renaming_pattern.(scan_type)],new_id(4:end),parts{8});  %% note that which part correspond to run no depends on the naming rule, double check before proceeding
         otherwise
             new_name = sprintf(['sub-%s_',renaming_pattern.(scan_type)],new_id(4:end));
     end

@@ -15,23 +15,29 @@ glm_names = {'sc_navigation','sc_localizer'};
 flag_runGLM = true;
 flag_getStat = true;
 
+addpath(genpath(fullfile(directory.projectdir,"scripts","Exp1_fmri")))
 %% run sanity check GLMs
 if flag_runGLM
     err_tracker   = struct(); %#ok<*UNRCH>
     for j = 1:numel(glm_names)
         glm_name = glm_names{j};
-        err_tracker.(glm_name) = glm_runner(glm_name);
+        steps  = struct('first', {{'specify','estimate','contrast'}});%, ...
+%                        'second',{{'specify','estimate','contrast','result'}});
+        glm_dir  = fullfile(directory.fmri_data,glm_name);
+        preproc_img_dir =  directory.smoothed;
+        subidlist       = participants.cohort2ids;
+        err_tracker.(glm_name) = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidlist);
     end
 end
 
 %% examine sanity check results - extract stats
-masks = {fullfile('E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\masks\anat','occipital_bilateral.nii'),...
+masks = {fullfile('E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\masks','HCPV1V2_bilateral.nii'),...
          fullfile('E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\masks','HMAT_Motor.nii')};
 if flag_getStat
     rangeCon = struct();
     meanResMS = struct();
     rangeStat = struct();
-    for j = 1:numel(glm_names)
+    for j = 1%:numel(glm_names)
         glm_name = glm_names{j};
         [rangeCon.(glm_name),meanCon.(glm_name),meanResMS.(glm_name),rangeStat.(glm_name),meanStat.(glm_name)] = extract_firstlvl_spmStat(glm_name,fullfile(directory.fmri_data,glm_name),masks);
         rangeStat.(glm_name).Properties.RowNames = participants.validids;

@@ -46,8 +46,8 @@ if any([cell2mat(struct2cell(preprocess_flags))',generate_nuisance,copy_preproce
     num_workers   = feature('NumCores')-3;
     poolobj       =  parpool(num_workers);%set up parallel processing
     %create temporary variables so that we can minimize the amount of data sent to different parallel workers
-    ids           = participants.ids;
-    nsub          = participants.nsub;
+    ids           = participants.validids;%cohort2ids;
+    nsub          = participants.nvalidsub;%ncohort2sub;
     preproc_dir   = directory.preprocess;
 end                        
 %% -----------------------  Preprocess data  ---------------------- 
@@ -76,19 +76,27 @@ end
 %% --------------  Generate Nuisance Regressor for head motion  -------------- 
 % gen nuisance regressor using head motion parameters and their first derivatives
 if generate_nuisance
-    err_tracker2 = cell(participants.nsub,1);
-    parfor isub = 1:participants.nsub
-        fprintf('creating head motion regressor for %s\n',participants.ids{isub});
+    err_tracker2 = cell(nsub,1);
+    nuisance_regs = cell(nsub,1);
+    parfor isub = 1:nsub
+        fprintf('creating head motion regressor for %s\n',ids{isub});
         try
-            subimg_dir  = fullfile(directory.preprocess,participants.ids{isub});
-            generate_nuisance_regressor(subimg_dir); 
+            subimg_dir  = fullfile(directory.preprocess,ids{isub});
+            [nuisance_regs{isub},~]=generate_nuisance_regressor(subimg_dir); 
+            
         catch err
             fprintf('Error generating nuisance regressor for %s %d/%d subject\n', ids{isub}, isub, nsub)
             err_tracker2{isub} = err;
         end
     end
 end
-
+% plot number of excluded volumes
+scrubbed_num = cellfun(@(x) structfun(@(t) size(t,2)-12,x)', nuisance_regs, 'UniformOutput', false);
+scrubbed_num = cat(1,scrubbed_num{:});
+scrubbed_ratio = scrubbed_num./[326,296,296,296,296];
+cs = {'orange','lightBlue'};
+formated_ids = cellfun(@(x) sprintf('\\color{%s} %s',cs{ismember(x,participants.generalizerids)+1},x),ids,'UniformOutput',false);
+figure;heatmap([fieldnames(nuisance_regs{1});{'mu-piratenavigation'}],formated_ids,[scrubbed_ratio*100,mean(scrubbed_ratio(:,2:end)*100,2)]);
 
 %% -----------------  Copy Files: UnSmoothed -------------------
 % After preprocessing is finished, create a copy of preprocessed files in a
