@@ -236,6 +236,22 @@ def wise_start_optimisation(objective_func,bounds,args,x0,minimize_args={}):
     res = minimize(objective_func,x0,args=args, bounds=bounds,**def_minimize_args)
     return res.x, res.fun
 
+def multi_start_presetgrid_optimisation(objective_func,bounds,args,preset_x0_grids=list,minimize_args={},
+                                 n_jobs=1):
+    rand_starts = preset_x0_grids
+    # set up minimize function
+    def_minimize_args = {}
+    def_minimize_args.update(minimize_args)
+    optim_func = lambda x0: minimize(objective_func,x0,args=args, bounds=bounds,**def_minimize_args)
+    
+    # multi-start grid search optimization
+    with Parallel(n_jobs=n_jobs) as parallel:
+        oplist = parallel(delayed(optim_func)(x0) for x0 in rand_starts)
+    objfun_vals,solutions = zip(*[(res.fun,res.x) for res in oplist])
+    optimal_solution      = solutions[numpy.argmin(objfun_vals)]
+    optimal_fval          = objfun_vals[numpy.argmin(objfun_vals)]
+    return optimal_solution, optimal_fval
+
 def multi_start_optimisation(objective_func:callable,bounds:tuple,args=(),Ns:int=10,nstart:int=None,n_jobs=1,
                              minimize_args = {}):
     """start over multiple grids within the parameter range to find the optimal parameters
