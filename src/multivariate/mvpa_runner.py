@@ -37,6 +37,7 @@ sys.path.append(os.path.join(project_path,'src'))
 from multivariate.mvpa_estimator import CompositionalRetrieval
 from multivariate.modelrdms import ModelRDM
 
+scanner_ave_perf = pd.read_csv(os.path.join(project_path,'data','Exp1_fmri',"scanner_average_LLR_wmapping.csv"))
 
 PREPROC_CATELOGUE = {
     "MVNN":normalise_multivariate_noise,
@@ -173,6 +174,8 @@ class RSARunner:
                     "session":np.concatenate([np.ones((n_stim[t],))*j for j,t in enumerate(task_seq)]),
                     "average_by":[[0,1,2,3]]
                 }
+            elif taskname == "localizer":
+                self.config_neuralrdm["preproc"].pop("ATOE")
 
         # define number of sessions based on preproc options        
         if taskname == "both":
@@ -512,6 +515,8 @@ class RSARunner:
         for j,subid in enumerate(self.participants):
             print(f'running searchlight in {j+1}/{len(self.participants)}: {subid}')
             
+            tam = np.sign(scanner_ave_perf[scanner_ave_perf.subid==subid].copy()[["countx_coef","county_coef"]].to_numpy()).prod()
+
             ## get neural data path 
             beta_imgs,vs_masks,proc_masks,res_imgs = self.get_imagedir(subid)
             mask_imgs = vs_masks + self.anatmasks
@@ -539,7 +544,20 @@ class RSARunner:
             ## loop over searchlight analyses
             for A in analyses:
                 if A["type"] == "regression":                
-                    m_regs = A["regressors"]
+                    orim_regs = A["regressors"]
+                    m_regs = []
+                    for x in orim_regs:
+                        if np.logical_and(np.logical_or("_TL" in x,"_TR" in x),'PTA_loc' in x):
+                            m_regs.append(x)
+                        else:
+                            if "PTA_locNomial" in x:
+                                PTAhigh_prim = "PTA_locNomial_TL" if tam==1 else "PTA_locNomial_TR"
+                                m_regs.append(x.replace('PTA_locNomial',PTAhigh_prim))
+                            elif "PTA_locEuc" in x:
+                                PTAlow_prim = "PTA_locEuc_TL" if tam==1 else "PTA_locEuc_TR"
+                                m_regs.append(x.replace('PTA_locEuc',PTAlow_prim))
+                            else:
+                                m_regs.append(x)
 
                     print(f'running regression searchlight {A["name"]}') 
                     if nsession>1: # if multiple runs do between run as well as within run and across run          
