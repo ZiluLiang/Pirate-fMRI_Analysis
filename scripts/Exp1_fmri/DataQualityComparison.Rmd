@@ -1,0 +1,158 @@
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+
+data_dir = file.path(project_dir, "data","Exp1_fmri", fsep="/")
+result_dir = file.path(project_dir, "results","Exp1_fmri", fsep="/")
+
+
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+```
+
+
+## Load data
+```{r loadDataset}
+fn = file.path(data_dir,"fmri","qualitycheck","QualityCheckLogBook.xlsx",fsep="/")
+hm_c1 = readxl::read_excel (fn, sheet = "headmotion_cohort1")
+hm_c2 = readxl::read_excel (fn, sheet = "headmotion_cohort2")
+
+tsnr_c1 = readxl::read_excel (fn, sheet = "tsnr_cohort1")
+tsnr_c2 = readxl::read_excel (fn, sheet = "tsnr_cohort2")
+
+
+hm   = rbind(hm_c1%>%mutate(cohort = "first cohort"),
+           hm_c2%>%mutate(cohort = "second cohort"))%>%
+  change_cols_name("mean absolute framewise displacement(mm)","afd")%>%
+  change_cols_name("percentage of outliers - framewise displacement (%)","pofd")%>%
+  mutate(boldrun = factor(paste0(taskname,taskrun),
+                          levels=c("maintask1","maintask2","maintask3","maintask4","localizer1")),
+         pofd = pofd*100)
+
+tsnr = rbind(tsnr_c1%>%mutate(cohort = "first cohort"),
+             tsnr_c2%>%mutate(cohort = "second cohort"))%>%
+  change_cols_name(c("HPC_bilateral.nii","V1_bilateral.nii", "V2_bilateral.nii", "mPFC_bilateral.nii", "vmPFC_bilateral.nii"),
+                   c("HPC", "V1","V2","mPFC","vmPFC"))%>%
+  dplyr::select(-c("mPFC"))%>%
+  mutate(boldrun = factor(paste0(taskname,taskrun),
+                          levels=c("maintask1","maintask2","maintask3","maintask4","localizer1")))
+
+tsnr_long = pivot_longer(tsnr,
+                         cols=c("HPC", "V1","V2","vmPFC"),
+                         values_to = "tsnr",
+                         names_to ="ROI")%>%
+  mutate(ROI =factor(ROI,levels=c("HPC","vmPFC", "V1","V2")))
+
+```
+
+## compare head movement
+```{r}
+hm_sum = hm%>%
+  aggregate_data(groupbyvars=c("cohort","boldrun","taskname","taskrun"),
+                 yvars=c("afd","pofd"),
+                 stats=c("mu","se"))
+
+p.hm = ggplot(data=hm_sum,
+       aes(x=boldrun,color=cohort,fill=cohort,group=cohort))+
+  geom_point(data=hm,aes(y=afd),
+             alpha=0.7,size=0.8,
+             position=position_jitterdodge(jitter.width = 0.15,dodge.width = 0.9))+
+  #geom_point(aes(y=mu_afd),position=position_dodge(0.9),
+  #           shape=18,size=4)+
+  geom_errorbar(aes(ymin=mu_afd-se_afd,ymax=mu_afd+se_afd),
+                width=0.5,position=position_dodge(0.9))+
+  geom_col(aes(y=mu_afd),
+           position=position_dodge(0.9),fill=NA)+
+  labs(y="mean absolute framewise displacement(mm)",x="functional run")+
+  theme(legend.position="top",
+        legend.direction="horizontal",
+        axis.text.x = element_text(angle=90),aspect.ratio = 0.8)+
+  stat_compare_means(data=hm,
+                     method = "t.test",
+                     hide.ns=F,
+                     aes(y=afd),
+                     label="p.format",
+                     p.adjust.method = "none")
+
+ggsave(file.path(data_dir,"fmri","qualitycheck","framewiseheadmovement.png",fsep="/"),
+       plot=p.hm)
+
+# ggplot(data=hm,
+#        aes(x=boldrun,color=cohort,fill=cohort))+
+#   geom_boxplot(data=hm,aes(y=afd),
+#              alpha=0.7,size=0.8,
+#              position=position_dodge(1),
+#              fill=NA)+
+#   labs(y="mean absolute framewise displacement(mm)",x="functional run")
+
+
+```
+
+```{r}
+p.hm2 = ggplot(data=hm_sum,
+       aes(x=boldrun,color=cohort,fill=cohort))+
+ #geom_boxplot(position=position_dodge(1),
+#              fill=NA)+
+  geom_point(data=hm,aes(y=pofd),
+             alpha=0.7,size=0.8,
+             position=position_jitterdodge(jitter.width = 0.15,dodge.width = 0.9))+
+  geom_errorbar(aes(ymin=mu_pofd-se_pofd,ymax=mu_pofd+se_pofd),
+                width=0.5,position=position_dodge(0.9))+
+  geom_col(aes(y=mu_pofd),
+           position=position_dodge(0.9),fill=NA)+
+  labs(y="percentage of absolute framewise displacement (%)",x="functional run")+
+  theme(legend.position="top",
+        legend.direction="horizontal",
+        axis.text.x = element_text(angle=90),aspect.ratio = 0.8)+
+  scale_y_continuous(trans = "sqrt")+
+  stat_compare_means(method = "t.test",
+                     dat=hm,aes(y=pofd),
+                     hide.ns=F,
+                     label="p.format",
+                     p.adjust.method = "none")
+
+ggsave(file.path(data_dir,"fmri","qualitycheck","framewiseheadmovement_percentage.png",fsep="/"),
+       plot=p.hm2)
+```
+
+
+## compare tSNR
+```{r}
+tsnr_sum = tsnr_long%>%
+  aggregate_data(groupbyvars=c("cohort","boldrun","taskname","taskrun","ROI"),
+                 yvars=c("tsnr"),
+                 stats=c("mu","se"))
+
+p.tsnr = ggplot(data=tsnr_sum,
+       aes(x=boldrun,color=cohort,fill=cohort))+
+  facet_grid(cols = vars(ROI),scales="free_y")+
+  geom_point(data=tsnr_long,aes(y=tsnr),
+             alpha=0.7,size=0.8,
+             position=position_jitterdodge(jitter.width = 0.15,dodge.width = 1))+
+  geom_errorbar(aes(ymin=mu_tsnr-se_tsnr,ymax=mu_tsnr+se_tsnr),
+                width=0.5,position=position_dodge(1))+
+  geom_col(aes(y=mu_tsnr),
+           position=position_dodge(1),fill=NA)+
+  labs(y="tSNR",x="functional run")+
+  theme(axis.text.x = element_text(angle=5),aspect.ratio = 0.5,
+        legend.position = "top", legend.direction = "horizontal") #+
+#  stat_compare_means(data=tsnr_long,
+#                     method = "t.test",hide.ns=TRUE,
+#                     aes(y=tsnr),
+#                     label="p.format")
+
+ggsave(file.path(data_dir,"fmri","qualitycheck","tSNR.png",fsep="/"),
+       plot=p.tsnr,width = 15,height=3)
+```
+
+```{r}
+model_tsnr = lmer("tsnr~cohort*taskrun+(1|subid/taskrun)",filter(tsnr_long,taskname=="maintask"))
+summary(model_tsnr)
+```
+

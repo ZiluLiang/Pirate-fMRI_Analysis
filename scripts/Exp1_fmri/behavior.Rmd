@@ -17,16 +17,18 @@ source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_globa
 ```
 
 
-
+## Load data
 ```{r loadDataset}
 fn = file.path(data_dir,"all_participants.csv",fsep="/")
-trialdata = read.table(fn, header = TRUE, sep = ",")
+trialdata = read.table(fn, header = TRUE, sep = ",")%>%
+  filter(subid!="sub031") # exclude this participant because fMRI data collection was incomplete
 
 data = trialdata%>%filter(ctrl_expt=="True"&ctrl_resp == 1)%>%
   dplyr::select(-c("ctrl_expt","ctrl_resp"))%>%
   group_by(subid,expt_session)%>%
   arrange(expt_block,expt_trial)%>%
-  mutate(expt_trial = row_number())
+  mutate(expt_trial = row_number(),
+         cohort = factor(cohort, levels=c(1,2), labels=c("first cohort", "second cohort")))
 
 #check if number of trials is correct:
 #nsub = length(unique(respdata$subid)) = 29
@@ -48,94 +50,28 @@ data = data%>%
          resp_x = round(2*resp_x/range_xy[1],digits = 3),
          resp_y = round(2*resp_y/range_xy[2],digits = 3))%>%
   mutate(resp_dist = sqrt((resp_x-stim_x)^2+(resp_y-stim_y)^2))
-```
 
-
-```{r}
 re_Assign_block = data%>%distinct(subid,stage,expt_block,.keep_all = T)%>%
   group_by(subid,stage,expt_session)%>%
   arrange(expt_block)%>%
   mutate(blocknumber_withinsess = row_number(),
          nblocks = n())%>%
   mutate(blocknumws_normalized = blocknumber_withinsess/nblocks)%>%
-  dplyr::select(c("subid","stage","expt_block","blocknumber_withinsess","blocknumws_normalized"))
+  dplyr::select(c("subid","stage","expt_block","nblocks","blocknumber_withinsess","blocknumws_normalized"))
 data = left_join(data,re_Assign_block)
 
-
+meanscanperf = data%>%
+  filter(expt_session==3)%>%
+  aggregate_data(groupbyvars = c("subid","stage","stim_id"),
+                 yvars=c("resp_x","resp_y","resp_xO","resp_yO"),
+                 additionalvars = c("session_str","cohort","stim_attrx","stim_attry",
+                                    "training","expt_session","expt_block","expt_trial",
+                                    "stim_x","stim_y", "stim_xO","stim_yO"),
+                 stats="mu")%>%
+  change_cols_name(oldnames = paste0("mu_",c("resp_x","resp_y","resp_xO","resp_yO")),
+                   newnames = c("resp_x","resp_y","resp_xO","resp_yO"))
+# meanscanperf should have 25*ntotoalsub rows
 ```
-
-## Response on screen
-### each sub
-```{r}
-for (pid in unique(data$subid)){
-  current_data = filter(data,subid == pid)%>%
-    mutate(stim_attrx = factor(stim_attrx),
-           stim_attry = factor(stim_attry),
-           stim_attryshape = factor(stim_attry,labels = x_shapes))
-  nb_train = length(unique(filter(current_data,stage=="train")$expt_block))
-  nb_test = length(unique(filter(current_data,stage=="test")$expt_block))
-  layoutmat = matrix(c(seq(1,10),
-                       seq(11,nb_train), rep(NA,20-nb_train),
-                       seq(nb_train+1,nb_train+nb_test)),
-                     3, 10, byrow = TRUE)
-  (p = current_data%>%
-    ggplot(aes(x=resp_x, y = resp_y, color = stim_attrx,fill = stim_attrx))+
-    facet_manual(vars(stage,session_str,blocknumber_withinsess),design = layoutmat,strip = strip_nested())+
-    #geom_text(aes(label = stim_attryshape))+
-    geom_point(aes(shape = stim_attry),size=4)+
-    scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+ #RColorBrewer::brewer.pal(5, "Dark2"))+
-    scale_shape_manual(values = x_shapes)+
-    guides(fill = "none")+
-    labs(title = pid,color = "x feature",shape = "y feature", x = "x", y = "y")+
-    theme(legend.position = "top"))
-  show(p)
-  ggsave(file.path(result_dir,'individualmaps',"participant_map_rescaled",paste0(pid,'.png')),plot = p,device = 'png',width = 16,height = 8)
-}
-```
-
-
-## Distance  plot all sub in curr dataset
-```{r}
-data_all = data
-data = data_all %>%
-   filter(subid %in% paste0('sub',formatC(seq(1,30,1),width = 3,flag = "0")))
-```
-
-```{r}
-blockdata_sub = aggregate_data(data,
-                           yvars = c("resp_dist"),
-                           groupbyvars = c("subid","stage","expt_session","blocknumber_withinsess"),
-                           stats = c("mu"),
-                           additionalvars = c("expt_session","session_str","training"))%>%
-  change_cols_name(oldnames = c("mu_resp_dist"),
-                   newnames = c("distance"))
-
-blockdata_sum = aggregate_data(blockdata_sub,
-                           yvars = c("distance"),
-                           groupbyvars = c("expt_session","stage","expt_session","blocknumber_withinsess"),
-                           additionalvars = c("session_str","training"),
-                           stats = c("mu","se","n"))
-
-(p=ggplot(data = blockdata_sum,
-       aes(x=blocknumber_withinsess,y=mu_distance))+
-  geom_line()+
-  geom_errorbar(aes(ymin = mu_distance - se_distance,
-                    ymax = mu_distance + se_distance),
-                width=0.4)+
-  facet_nested(cols =vars(training,session_str),
-               scales = "free_x",space = "free_x")+
-  scale_color_manual(values = fourlevel_colors)+
-  scale_x_continuous(breaks = seq(0,19,1))+
-  labs(x="block number",y="mean distance to goal (a.u.) rescaled",color = "curriculum",
-       title = "performance")+
-  theme(aspect.ratio = 8,panel.margin = unit(0, "lines")))
-
-ggsave(file.path(result_dir,paste0('rescaled_distance_withsess','.png')),plot = p,device = 'png',width = 12,height = 4)
-
-
-
-```
- 
 
 
 ## LLR
@@ -152,21 +88,12 @@ tryCatch(
 
 ### get LLR for each response
 ```{r}
-tryCatch(
-  expr = {
-    data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
-  },
-  error = function(e){
-    cl<- makeCluster(detectCores())
-    clusterExport(cl=cl,
-                  varlist = c("data","unique_stimloc","base","prob_df_list"),
-                  envir=environment())
-    new_rows <- pblapply(cl = cl,X = seq(1,nrow(data)),FUN = function(j){
+find_resp_probs = function(respdf,rowid,unique_stimloc,prob_df_list,base){
       library(dplyr)
-      sx = data$stim_x[j]
-      sy = data$stim_y[j]
-      rx = data$resp_x[j]
-      ry = data$resp_y[j]
+      sx = respdf$stim_x[rowid]
+      sy = respdf$stim_y[rowid]
+      rx = respdf$resp_x[rowid]
+      ry = respdf$resp_y[rowid]
 
       ind = filter(unique_stimloc,x == sx & y == sy)$loc_id
       search_df=prob_df_list[[ind]]
@@ -180,32 +107,50 @@ tryCatch(
         new_row[1, ] <- NA
         new_row = new_row%>%
         mutate(resp_x = rx, resp_y = ry,
-               subid = data$subid[j],
-               expt_session = data$expt_sess[j],
-               expt_block = data$expt_block[j],
-               expt_trial = data$expt_trial[j])
+               subid = respdf$subid[rowid],
+               expt_session = respdf$expt_sess[rowid],
+               expt_block = respdf$expt_block[rowid],
+               expt_trial = respdf$expt_trial[rowid])
       }else{
         new_row = new_row%>%
         mutate(resp_x = rx, resp_y = ry,
-               subid  = data$subid[j],
-               expt_session = data$expt_sess[j],
-               expt_block = data$expt_block[j],
-               expt_trial = data$expt_trial[j])
+               subid  = respdf$subid[rowid],
+               expt_session = respdf$expt_sess[rowid],
+               expt_block = respdf$expt_block[rowid],
+               expt_trial = respdf$expt_trial[rowid])
       }
       
       return(new_row)
-      })
+}
+
+tryCatch(
+  expr = {
+    data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+    meanscanperf_with_prob = loadRData(file.path(data_dir,"meanscannerdata_withprob_compo_lapse-0_01.RData"))
+  },
+  error = function(e){
+    cl<- makeCluster(detectCores()-1)
+    clusterExport(cl=cl,
+                  varlist = c("data","meanscanperf","unique_stimloc","base","prob_df_list","find_resp_probs"),
+                  envir=environment())
+    new_rows <- pblapply(cl = cl,X = seq(1,nrow(data)),
+                        FUN = function(j){find_resp_probs(data,j,unique_stimloc,prob_df_list,base)})
+    new_rowsmsd <- pblapply(cl = cl,X = seq(1,nrow(meanscanperf)),
+                        FUN = function(j){find_resp_probs(meanscanperf,j,unique_stimloc,prob_df_list,base)})
     stopCluster(cl)
     
-    a = do.call(rbind,new_rows)
+
+    data_with_prob = left_join(data,do.call(rbind,new_rows))
+    meanscanperf_with_prob = left_join(meanscanperf,do.call(rbind,new_rowsmsd))
+    save(data_with_prob, file   = file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+    save(meanscanperf_with_prob, file = file.path(data_dir,"meanscannerdata_withprob_compo_lapse-0_01.RData"))
     
-    data_with_prob = left_join(data,a)
-    save(data_with_prob, file = file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
   }
 )
 
+# filter out sub031 because withdrew from data collection and data was incomplete
 data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
-
+meanscanperf_with_prob = loadRData(file.path(data_dir,"meanscannerdata_withprob_compo_lapse-0_01.RData"))
 ```
 
 
@@ -217,7 +162,7 @@ data_with_prob = data_with_prob%>%
          error_y = abs(stim_y - resp_y))%>%
   mutate(binorm_lap = BND_compo_lap)%>%
   mutate(LR_trial = binorm_lap/uniform,
-         LRx_trial = UND_x_lap/uniform,
+         LRx_trial = UND_x_lap/uniform, 
          LRy_trial = UND_y_lap/uniform,)%>%
   mutate(LLR_trial = log(LR_trial),
          LLRx_trial = log(LRx_trial),
@@ -229,106 +174,321 @@ data_with_prob = data_with_prob%>%
     mutate(trialid_normalized = trialid_withinstage/ntrials)%>%
   ungroup()
 
+meanscanperf_with_prob = meanscanperf_with_prob%>%
+  mutate(error_x = abs(stim_x - resp_x),
+         error_y = abs(stim_y - resp_y))%>%
+  mutate(binorm_lap = BND_compo_lap)%>%
+  mutate(LR_trial = binorm_lap/uniform,
+         LRx_trial = UND_x_lap/uniform, 
+         LRy_trial = UND_y_lap/uniform,)%>%
+  mutate(LLR_trial = log(LR_trial),
+         LLRx_trial = log(LRx_trial),
+         LLRy_trial = log(LRy_trial))%>%
+  group_by(subid)%>%
+    arrange(stage)%>%
+    mutate(trialid_withinstage = row_number(),
+           ntrials = n())%>%
+    mutate(trialid_normalized = trialid_withinstage/ntrials)%>%
+  ungroup()
+
+
 sub_LLR_data = aggregate_data(data_with_prob,
-                              groupbyvars = c("subid","stage","expt_session","blocknumber_withinsess"),
-                              yvars = c("LLR_trial","LLRx_trial","LLRy_trial"),
+                              groupbyvars = c("cohort","subid","stage","expt_session","blocknumber_withinsess"),
+                              yvars = c("LLR_trial","LLRx_trial","LLRy_trial","resp_dist"),
                               stats = c("mu"),
                               additionalvars = c("expt_coordsys","expt_curricula","expt_session"))%>%
-  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial"),
-                   newnames = c("LLR","LLR_x","LLR_y"))
-
-dividesub = sub_LLR_data%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial","mu_resp_dist"),
+                   newnames = c("LLR","LLR_x","LLR_y","distance"))%>%
   dplyr::select(-c(starts_with("n_")))%>%
-  group_by(subid,stage)%>%
+  group_by(subid,expt_session,stage)%>%
   mutate(nblock = max(blocknumber_withinsess))%>%
-  aggregate_data(groupbyvars = c("subid","stage","expt_session"),
-                 yvars = c("LLR"),
-                 stats = c("sum"))
+  ungroup()
 
-learnerids = unique(filter(dividesub,expt_session==3&stage=="train"&sum_LLR>=0)$subid)
-generalizerids = unique(filter(dividesub,expt_session==3&stage=="test"&sum_LLR>=0)$subid)
-(nonlearnerids = unique(filter(dividesub,expt_session==3&stage=="train"&sum_LLR<0)$subid))
-(nongeneralizerids = unique(filter(dividesub,expt_session==3&stage=="test"&sum_LLR<0)$subid))
+meanscannerLLR = aggregate_data(meanscanperf_with_prob,
+                                groupbyvars = c("cohort","subid","stage"),
+                              yvars = c("LLR_trial","LLRx_trial","LLRy_trial"),
+                              stats = c("mu"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial"),
+                   newnames = c("LLR","LLR_x","LLR_y"))%>%
+  dplyr::select(-c(starts_with("n_")))
+
+## old way
+dividesub = sub_LLR_data%>%
+  filter(blocknumber_withinsess==nblock&expt_session!=2)#%>%
+#  aggregate_data(groupbyvars = c("subid","expt_session","stage"),
+#                 yvars = "LLR",
+#                 stats = "mu")%>%
+#  aggregate_data(groupbyvars = c("subid","stage"),
+#                 yvars = "mu_LLR",stats = "mu")%>%
+#  change_cols_name("mu_mu_LLR","LLR")
+learnerids = unique(filter(dividesub,expt_session==3&stage=="train"&LLR>=0)$subid)
+generalizerids = unique(filter(dividesub,expt_session==3&stage=="test"&LLR>=0)$subid)
+print("nonlearner")
+(nonlearnerids = unique(filter(dividesub,expt_session==3&stage=="train"&LLR<0)$subid))
+print("nongeneralizer")
+(nongeneralizerids = unique(filter(dividesub,expt_session==3&stage=="test"&LLR<0)$subid))
+
+
+#new way: by using the average performance of scanning
+learnerids = unique(filter(meanscannerLLR, stage=="train"&LLR>=0)$subid)
+generalizerids = unique(filter(meanscannerLLR,  stage=="test"&LLR>=0)$subid)
+print("nonlearner")
+(nonlearnerids = unique(filter(meanscannerLLR,  stage=="train"&LLR<0)$subid))
+print("nongeneralizer")
+(nongeneralizerids = unique(filter(meanscannerLLR, stage=="test"&LLR<0)$subid))
 
 data_with_prob = data_with_prob%>%
-  mutate(islearner = ifelse(subid%in%learnerids,1,0),
-         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))
+  mutate(islearner = factor(ifelse(subid%in%learnerids,1,0),
+                            levels = c(1,0),labels = c("learner","non-learner")),
+         isgeneralizer = factor(ifelse(subid%in%generalizerids ,1,0),
+                                levels = c(1,0),labels = c("generalizer","non-generalizer")))
+
+meanscanperf_with_prob = meanscanperf_with_prob%>%
+  mutate(islearner = factor(ifelse(subid%in%learnerids,1,0),
+                            levels = c(1,0),labels = c("learner","non-learner")),
+         isgeneralizer = factor(ifelse(subid%in%generalizerids ,1,0),
+                                levels = c(1,0),labels = c("generalizer","non-generalizer")))
 
 sub_LLR_data = sub_LLR_data%>%
-  mutate(islearner = ifelse(subid%in%learnerids,1,0),
-         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))
-```
-
-```{r}
-substimLLR = aggregate_data(data_with_prob,
-                              groupbyvars = c("subid","stage","expt_session","blocknumber_withinsess","stim_id"),
-                              yvars = c("LLR_trial","LLRx_trial","LLRy_trial"),
-                              stats = c("mu"),
-                              additionalvars = c("expt_coordsys","expt_curricula","expt_session"))%>%
-  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial"),
-                   newnames = c("LLR","LLR_x","LLR_y"))
-
-substimLLR_mean = data_with_prob%>%
-  dplyr::select(-c(starts_with("n_")))%>%
-  group_by(subid,stage)%>%
-  mutate(nblock = max(blocknumber_withinsess))%>%
-  aggregate_data(groupbyvars = c("subid","stage","expt_session","stim_id"),
-                 yvars = c("LLR_trial","LLRx_trial","LLRy_trial"),
-                 stats = c("mu"))%>%
-  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial"),
-                   newnames = c("mu_LLR","mu_LLRx","mu_LLRy"))
-
-write_csv(filter(substimLLR_mean,expt_session==3),
-          file.path(data_dir,"scanner_test_LLR.csv"))
-```
-
-
-## Plot learner data
-```{r}
-blockdata_sub = aggregate_data(data_with_prob,
-                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
-                           groupbyvars = c("subid","stage","expt_session","blocknumber_withinsess"),
-                           stats = c("mu"),
-                           additionalvars = c("islearner","isgeneralizer","session_str"))%>%
-  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
-                                "mu_resp_dist","mu_error_x","mu_error_y"),
-                   newnames = c("LLR","LLR_x","LLR_y",
-                                "distance","errorx","errory"))%>%
-  mutate(islearner = factor(islearner,levels = c(0,1),labels = c("non-learner","learner")),
-         isgeneralizer = factor(isgeneralizer,levels = c(0,1),labels = c("non-generalizer","generalizer")))
-
-
-blockdata_sum = aggregate_data(blockdata_sub,
-                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory"),
-                           groupbyvars = c("islearner","isgeneralizer","stage",
-                                           "expt_session","blocknumber_withinsess"),
-                           stats = c("mu","se","n"),
-                           additionalvars = c("session_str"))
+  mutate(islearner = factor(ifelse(subid%in%learnerids,1,0),
+                            levels = c(1,0),labels = c("learner","non-learner")),
+         isgeneralizer = factor(ifelse(subid%in%generalizerids ,1,0),
+                                levels = c(1,0),labels = c("generalizer","non-generalizer")))
 ```
 
 ```{r}
 nlearners = length(learnerids)
 ngeneralizers = length(generalizerids)
 nsub = length(unique(sub_LLR_data$subid))
-participant_count = blockdata_sub%>%
-  distinct(subid,islearner,isgeneralizer)%>%
-  group_by(islearner,isgeneralizer)%>%
-  summarise(n = n())
-participant_count = participant_count%>%
+participant_count = sub_LLR_data%>%
+  distinct(cohort,subid,islearner,isgeneralizer)%>%
+  group_by(cohort,islearner,isgeneralizer)%>%
+  summarise(n = n())%>%
   mutate(label = paste0(isgeneralizer, "\n n=",n))
-participant_count
+
+#participant_count
+
 labelling_func = function(row){
   l = row[1]
   g = row[2]
-  return(filter(participant_count,islearner==l&isgeneralizer==g)$label)
+  c = row[3]
+  return(filter(participant_count,islearner==l&isgeneralizer==g&cohort==c)$label)
 }
+
+theme_basic(as_huxtable(participant_count)%>%
+      set_align(1, everywhere, "center"))
 ```
 
+###Plot correlation between last block of training and test
+```{r}
+sub_LLR_data = sub_LLR_data%>%
+  group_by(subid,expt_session,stage)%>%
+  mutate(nblock = max(blocknumber_withinsess))%>%
+  ungroup()
+
+last_pretrain = filter(sub_LLR_data,expt_session==1&blocknumber_withinsess==nblock)%>%
+  dplyr::select(-c("nblock","expt_session","blocknumber_withinsess"))%>%
+  pivot_longer(cols=c("LLR","LLR_x","LLR_y"),
+               names_to = "performance_metric",
+               values_to = "lastpretrain")
+
+meanscanning  = meanscannerLLR%>%
+  mutate(islearner = factor(ifelse(subid%in%learnerids,1,0),
+                            levels = c(1,0),labels = c("learner","non-learner")),
+         isgeneralizer = factor(ifelse(subid%in%generalizerids ,1,0),
+                                levels = c(1,0),labels = c("generalizer","non-generalizer")))%>%
+  pivot_longer(cols=c("LLR","LLR_x","LLR_y"),
+               names_to = "performance_metric",
+               values_to = "scanning")
+
+pretrainscanner_behavsum_long = left_join(last_pretrain,meanscanning,by=c("cohort","subid","stage","islearner","isgeneralizer","performance_metric"))
+```
+
+```{r}
+annot_change <- data.frame(
+  label = c("nL\U2192L", "nG\U2192G","L\U2192nL", "G\U2192nG"),
+  stage = c("train","test","train","test"),
+  x     = c(-2.5,-2.5,2.5,2.5),
+  y     = c(2.5,2.5,-2.5,-2.5)
+)%>%
+  mutate(stage=factor(stage,levels=c("train","test"),
+                      labels=c("Training stimuli", "Test stimuli")))
+
+
+p_trsc_corr = pretrainscanner_behavsum_long %>%
+  filter(performance_metric=="LLR")%>%
+  mutate(outlierlabel=if_else(xor(scanning>0,lastpretrain>0),subid,""),
+         stage=factor(stage,levels=c("train","test"),
+                      labels=c("Training stimuli", "Test stimuli")))%>%
+  ggplot(aes(x=lastpretrain,y=scanning,color=isgeneralizer))+
+  facet_nested_wrap(vars(stage,cohort),nrow = 2,
+            remove_labels="none",axes="all",
+            )+
+  geom_point(alpha=0.5)+
+  geom_text(aes(label=outlierlabel),
+            fontface="bold",size=3)+
+  geom_text(data=annot_change,aes(x=x,y=y,label=label),
+            fontface="bold",inherit.aes=F,size=6)+
+  geom_abline(slope=1,intercept=0,linetype="dashed",color="grey")+
+  geom_vline(xintercept=0,linetype="dashed",color="grey")+
+  geom_hline(yintercept=0,linetype="dashed",color="grey")+
+  scale_color_manual(values=twolevel_colors)+
+  labs(x="last pretraining block LLR", y = "average LLR across scanning blocks",
+       title="Correlation between LLR in \nlast pretraining block and average across scanning blocks")+
+  theme(legend.position = "top",legend.direction = "horizontal")
+p_trsc_corr
+ggsave(file.path(result_dir,paste0('LLR_corr_pretrain2scan','.png')),plot = p_trsc_corr,device = 'png',width = 8,height = 9)
+
+
+p_trsc_corr2 = pretrainscanner_behavsum_long %>%
+  filter(performance_metric=="LLR"&cohort=="second cohort")%>%
+  mutate(outlierlabel=if_else(scanning<0&lastpretrain>0,subid,""),
+         stage=factor(stage,levels=c("train","test"),
+                      labels=c("Training stimuli", "Test stimuli")))%>%
+  ggplot(aes(x=lastpretrain,y=scanning,color=isgeneralizer))+
+  facet_nested_wrap(vars(stage),nrow = 1,
+            remove_labels="none",axes="all",
+            )+
+  geom_point(alpha=0.5)+
+  geom_text(aes(label=outlierlabel),
+            fontface="bold",size=3)+
+  geom_text(data=annot_change,aes(x=x,y=y,label=label),
+            fontface="bold",inherit.aes=F,size=6)+
+  geom_abline(slope=1,intercept=0,linetype="dashed",color="grey")+
+  geom_vline(xintercept=0,linetype="dashed",color="grey")+
+  geom_hline(yintercept=0,linetype="dashed",color="grey")+
+  scale_color_manual(values=twolevel_colors)+
+  labs(x="last pretraining block LLR", y = "average LLR across scanning blocks",
+       title="Correlation between LLR in \nlast pretraining block and average across scanning blocks")+
+  theme(legend.position = "top",legend.direction = "horizontal")
+p_trsc_corr2
+ggsave(file.path(result_dir,paste0('LLR_corr_pretrain2scan_cohort2only','.png')),plot = p_trsc_corr2,device = 'png',width = 10,height = 6)
+
+```
+
+### plot correlation between train and test
+```{r}
+trainperf  = sub_LLR_data%>%
+  filter(stage=="train")%>%
+  mutate(tmp_keeprow = if_else(expt_session==1&mod(blocknumber_withinsess,2)==1,0,
+                               if_else(expt_session==2,0,1)))%>%
+  filter(tmp_keeprow==1)%>%
+  pivot_longer(cols=c("distance","LLR","LLR_x","LLR_y"),
+               names_to = "performance_metric",
+               values_to = "train")%>%
+  mutate(cycle=if_else(expt_session==1,blocknumber_withinsess/2,blocknumber_withinsess+6))%>%
+  dplyr::select(-c("tmp_keeprow","blocknumber_withinsess","nblock","stage","expt_coordsys","expt_curricula"))
+
+testperf  = sub_LLR_data%>%
+  filter(stage=="test")%>%
+  pivot_longer(cols=c("distance","LLR","LLR_x","LLR_y"),
+               names_to = "performance_metric",
+               values_to = "test")%>%
+  mutate(cycle = if_else(expt_session==1,blocknumber_withinsess,blocknumber_withinsess+6))%>%
+  dplyr::select(-c("blocknumber_withinsess","nblock","stage","expt_coordsys","expt_curricula" ))
+
+traintest_behavsum_long = left_join(trainperf,testperf,
+                                    by=c("cohort","subid","expt_session",
+                                         "islearner","isgeneralizer",
+                                         "performance_metric","cycle")
+                                    )
+```
+
+```{r}
+p_trte_corr = traintest_behavsum_long %>%
+  filter(performance_metric=="LLR")%>%
+  ggplot(aes(x=train,y=test,color=isgeneralizer))+
+  facet_nested_wrap(vars(cohort,expt_session,cycle),nrow = 2,
+            remove_labels="none",axes="all",
+            )+
+  geom_point(alpha=0.7)+
+  #geom_text(aes(label=outlierlabel))+
+  geom_abline(slope=1,intercept=0,linetype="dashed",color="grey")+
+  geom_vline(xintercept=0,linetype="dashed",color="grey")+
+  geom_hline(yintercept=0,linetype="dashed",color="grey")+
+  scale_color_manual(values=twolevel_colors)+
+  theme(legend.position = "top",legend.direction = "horizontal")
+p_trte_corr
+ggsave(file.path(result_dir,paste0('LLR_corr_train2test','.png')),plot = p_trte_corr,device = 'png',width = 16,height = 9)
+```
+
+
+
+
+## Filter unreliable participants and get final group count
+```{r}
+#remove particiant in the second cohort who changed from G->nG
+data_with_prob = data_with_prob%>%
+  filter(!subid%in%c("sub027","sub113","sub119","sub126"))
+
+meanscanperf_with_prob = meanscanperf_with_prob%>%
+  filter(!subid%in%c("sub027","sub113","sub119","sub126"))
+
+# count subject again
+participant_count = data_with_prob%>%
+  distinct(cohort,subid,islearner,isgeneralizer)%>%
+  group_by(cohort,islearner,isgeneralizer)%>%
+  summarise(n = n())%>%
+  mutate(label = paste0(isgeneralizer, "\n n=",n))
+
+nonlearnerids = unique(filter(data_with_prob,islearner=="non-learner")$subid)
+nongeneralizerids = unique(filter(data_with_prob,isgeneralizer=="non-generalizer")$subid)
+learnerids = unique(filter(data_with_prob,islearner=="learner")$subid)
+generalizerids = unique(filter(data_with_prob,isgeneralizer=="generalizer")$subid)
+nlearners = length(learnerids)
+ngeneralizers = length(generalizerids)
+nsub = length(unique(sub_LLR_data$subid))
+
+#participant_count
+
+labelling_func = function(row){
+  l = row[1]
+  g = row[2]
+  c = row[3]
+  return(filter(participant_count,islearner==l&isgeneralizer==g&cohort==c)$label)
+}
+
+theme_basic(as_huxtable(participant_count)%>%
+      set_align(1, everywhere, "center"))
+```
+
+
+
+```{r}
+blockdata_sub = aggregate_data(data_with_prob,
+                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
+                           groupbyvars = c("cohort","subid","stage","expt_session","blocknumber_withinsess"),
+                           stats = c("mu"),
+                           additionalvars = c("islearner","isgeneralizer","session_str"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
+                                "mu_resp_dist","mu_error_x","mu_error_y"),
+                   newnames = c("LLR","LLR_x","LLR_y",
+                                "distance","errorx","errory"))
+
+
+blockdata_sum = aggregate_data(blockdata_sub,
+                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory"),
+                           groupbyvars = c("cohort","islearner","isgeneralizer","stage",
+                                           "expt_session","blocknumber_withinsess"),
+                           stats = c("mu","se","n"),
+                           additionalvars = c("session_str"))
+
+blockdata_sub$generalizer_label =
+apply(blockdata_sub[ , c("islearner","isgeneralizer","cohort")], 1, labelling_func)
+blockdata_sum$generalizer_label =
+apply(blockdata_sum[ , c("islearner","isgeneralizer","cohort")], 1, labelling_func)
+```
+
+
+
+## Plot learner data
 ### plot rescaled distance to goal of learned participants
 ```{r}
+# with data count
+
 (p = blockdata_sub%>%
   ggplot(aes(x=blocknumber_withinsess,y=distance))+
-  geom_point(alpha = 0.3,size = 2,stroke=0)+
+  geom_point(alpha = 0.1,size = 2,stroke=0)+
   geom_line(data = blockdata_sum,
             aes(x=blocknumber_withinsess,y=mu_distance))+
   geom_errorbar(data = blockdata_sum,
@@ -338,75 +498,23 @@ labelling_func = function(row){
                     ymax = mu_distance + se_distance),
                 width=0.4)+
   facet_nested(cols =vars(stage,session_str),
-               rows = vars(islearner,isgeneralizer),
-               scales = "free_x",space = "free_x")+
+               rows = vars(cohort,islearner,generalizer_label),
+               scales = "free_x",space = "free_x",
+               axes = "all")+
   scale_x_continuous(breaks = seq(1,12,1))+
-  labs(x="block number",y="mean distance to goal (a.u.) rescaled",color = "curriculum",
-       title = "performance of learners and generalizers")+
+  labs(x="block number",y="mean distance to goal (a.u.) rescaled",
+       title = "Distance to correct location")+
   theme(aspect.ratio = 6,legend.position = "top"))
 
-ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot = p,device = 'png',width = 10,height = 9)
-```
-
-
-```{r}
-# with data count
-blockdata_sub$generalizer_label =
-apply(blockdata_sub[ , c("islearner","isgeneralizer")], 1, labelling_func)
-blockdata_sum$generalizer_label =
-apply(blockdata_sum[ , c("islearner","isgeneralizer")], 1, labelling_func)
-(p = blockdata_sub%>%
-  ggplot(aes(x=blocknumber_withinsess,y=distance))+
-  geom_point(alpha = 0.3,size = 2,stroke=0)+
-  geom_line(data = blockdata_sum,
-            aes(x=blocknumber_withinsess,y=mu_distance))+
-  geom_errorbar(data = blockdata_sum,
-                aes(x=blocknumber_withinsess,
-                    y = mu_distance,
-                    ymin = mu_distance - se_distance,
-                    ymax = mu_distance + se_distance),
-                width=0.4)+
-  facet_nested(cols =vars(stage,session_str),
-               rows = vars(islearner,generalizer_label),
-               scales = "free_x",space = "free_x")+
-  scale_x_continuous(breaks = seq(1,12,1))+
-  labs(x="block number",y="mean distance to goal (a.u.) rescaled",color = "curriculum",
-       title = "Distance to correct location")+
-  theme(aspect.ratio = 5,legend.position = "top"))
-
-ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot = p,device = 'png',width = 10.5,height = 7)
+ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot = p,device = 'png',width = 11,height = 12)
 ```
 
 ### plot mean LLR of learned participants
 ```{r}
-(p = blockdata_sub%>%
-  ggplot(aes(x=blocknumber_withinsess,y=LLR))+
-  geom_point(alpha = 0.2,size = 2,stroke = 0)+
-   #geom_line(aes(group = subid),alpha = 0.4,size = 0.2)+
-  geom_line(data = blockdata_sum,
-            aes(x=blocknumber_withinsess,y=mu_LLR))+
-  geom_errorbar(data = blockdata_sum,
-                aes(x=blocknumber_withinsess,
-                    y = mu_LLR,
-                    ymin = mu_LLR - se_LLR,
-                    ymax = mu_LLR + se_LLR),
-                width=0.4)+
-  facet_nested(cols =vars(stage,session_str),
-               rows = vars(islearner,isgeneralizer),
-               scales = "free_x",space = "free_x")+
-  scale_x_continuous(breaks = seq(1,12,1))+
-  labs(x="block number",y="mean LLR",color = "curriculum",
-       title = "performance of learners and generalizers")+
-  theme(aspect.ratio = 6,legend.position = "top"))
-
-ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = 'png',width = 10,height = 9)
-```
-
-```{r}
 #withdatacount
 (p = blockdata_sub%>%
   ggplot(aes(x=blocknumber_withinsess,y=LLR))+
-  geom_point(alpha = 0.3,size = 2,stroke=0)+
+  geom_point(alpha = 0.1,size = 2,stroke=0)+
   geom_line(data = blockdata_sum,
             aes(x=blocknumber_withinsess,y=mu_LLR))+
   geom_errorbar(data = blockdata_sum,
@@ -416,18 +524,161 @@ ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = '
                     ymax = mu_LLR + se_LLR),
                 width=0.4)+
   facet_nested(cols =vars(stage,session_str),
-               rows = vars(islearner,generalizer_label),
-               scales = "free_x",space = "free_x")+
+               rows = vars(cohort,islearner,generalizer_label),
+               scales = "free_x",space = "free_x",axes = "all",remove_labels="none")+
   scale_x_continuous(breaks = seq(1,12,1))+
-  labs(x="block number",y="mean LLR",color = "curriculum",
+  labs(x="block number",y="mean LLR",
        title = "Log-Likelihood Ratio")+
-  theme(aspect.ratio = 5,legend.position = "top"))
+  theme(aspect.ratio = 6,legend.position = "top"))
 
-ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = 'png',width = 10.5,height = 7)
+ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = 'png',width = 15,height = 15)
 ```
 
-### plot individual LLR with map resp
+##Compare cohort
+###side by side comparison all blocks
+```{r}
+(p = blockdata_sub%>%
+   mutate(addtext=if_else(session_str=="refresher"&isgeneralizer=="generalizer"&stage=="train"&LLR<0,subid,""))%>%
+  ggplot(aes(x=blocknumber_withinsess,y=LLR,color=cohort))+
+  geom_point(alpha = 0.1,size = 2,stroke=0,
+                position=position_dodge(0.9))+
+  geom_line(data = blockdata_sum,
+            aes(x=blocknumber_withinsess,y=mu_LLR),
+                position=position_dodge(0.9))+
+  geom_errorbar(data = blockdata_sum,
+                aes(x=blocknumber_withinsess,
+                    y = mu_LLR,
+                    ymin = mu_LLR - se_LLR,
+                    ymax = mu_LLR + se_LLR),
+                width=0.4,
+                position=position_dodge(0.9))+
+   geom_text(aes(label=addtext,x=0.8*blocknumber_withinsess,y=0.8*LLR),size=2.5,fontface="bold")+
+  facet_nested(cols =vars(stage,session_str),
+               rows = vars(islearner,isgeneralizer),
+               scales = "free_x",space = "free_x",axes = "all",remove_labels="none")+
+  scale_x_continuous(breaks = seq(1,12,1))+
+  labs(x="block number",y="mean LLR",color = "cohort",
+       title = "Log-Likelihood Ratio")+
+  theme(aspect.ratio = 6,legend.position = "top"))
 
+ggsave(file.path(result_dir,paste0('LLR_classified_cohortsidebyside','.png')),plot = p,device = 'png',width = 10,height = 7)
+```
+
+```{r}
+(p = blockdata_sub%>%
+   #mutate(addtext=if_else(session_str=="refresher"&isgeneralizer=="generalizer"&stage=="train"&LLR<0,subid,""))%>%
+  ggplot(aes(x=blocknumber_withinsess,y=distance,color=cohort))+
+  geom_point(alpha = 0.1,size = 2,stroke=0,
+                position=position_dodge(0.9))+
+  geom_line(data = blockdata_sum,
+            aes(x=blocknumber_withinsess,y=mu_distance),
+                position=position_dodge(0.9))+
+  geom_errorbar(data = blockdata_sum,
+                aes(x=blocknumber_withinsess,
+                    y = mu_distance,
+                    ymin = mu_distance - se_distance,
+                    ymax = mu_distance + se_distance),
+                width=0.4,
+                position=position_dodge(0.9))+
+  #geom_text(aes(label=addtext,x=0.8*blocknumber_withinsess,y=0.8*distance),size=2.5,fontface="bold")+
+  facet_nested(cols =vars(stage,session_str),
+               rows = vars(islearner,isgeneralizer),
+               scales = "free_x",space = "free_x",axes = "all",remove_labels="none")+
+  scale_x_continuous(breaks = seq(1,12,1))+
+  labs(x="block number",y="mean distance to goal (a.u.) rescaled",color = "cohort",
+       title = "Distance to correct location")+
+  theme(aspect.ratio = 6,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('rescaled_distance_classified_cohortsidebyside','.png')),plot = p,device = 'png',width = 10,height = 7)
+```
+
+
+###average performance of last pretraining cycle to scanner learner only
+```{r}
+Lsub_lastpretrain2scan = blockdata_sub%>%
+  mutate(cycle = case_when(stage=="train"&expt_session==1~ceil(blocknumber_withinsess/2),
+                           stage=="test"&expt_session==1~blocknumber_withinsess,
+                           expt_session==2~blocknumber_withinsess+6,
+                           expt_session==3~blocknumber_withinsess+6+3))%>%
+  filter(islearner=="learner"&cycle>=6)%>%
+  aggregate_data(groupbyvars = c("cohort", "subid","stage","expt_session","cycle"),
+                 additionalvars = c("islearner","isgeneralizer","session_str","blocknumber_withinsess"),
+                 yvars = c("distance","LLR"),
+                 stats="mu")%>%
+  change_cols_name(paste0("mu_",c("distance","LLR")), c("distance","LLR"))
+Lsum_lastpretrain2scan = Lsub_lastpretrain2scan%>%
+  aggregate_data(groupbyvars = c("cohort", "islearner","isgeneralizer","stage","expt_session","cycle"),
+                 additionalvars = c("session_str","blocknumber_withinsess"),
+                 yvars = c("distance","LLR"),
+                 stats=c("mu","se"))
+  
+(p = Lsub_lastpretrain2scan%>%
+  ggplot(aes(x=cycle,y=LLR,color=cohort))+
+  geom_rect(aes(xmin=10-.5,xmax=13+.5,ymin=-Inf, ymax=+Inf),
+              fill='grey', color='lightgrey',alpha=0.01)+
+  geom_point(alpha = 0.2,size = 2,stroke=0,
+                position=position_dodge(0.9))+
+  geom_col(data = Lsum_lastpretrain2scan,
+            aes(x=cycle,y=mu_LLR),fill=NA,
+                position=position_dodge(0.9))+
+  geom_errorbar(data = Lsum_lastpretrain2scan,
+                aes(x=cycle,
+                    y = mu_LLR,
+                    ymin = mu_LLR - se_LLR,
+                    ymax = mu_LLR + se_LLR),
+                width=0.4,
+                position=position_dodge(0.9))+
+    geom_text(aes(x=11.5,
+                  y=if_else(isgeneralizer=="non-generalizer"&stage=="test",2,-2),
+                  label="scanning"),
+                  color="black",fontface="bold")+
+  facet_nested(cols =vars(stage),
+               rows = vars(isgeneralizer),
+               scales = "free_x",space = "free_x",axes="all",remove_labels="none")+
+  scale_x_continuous(breaks = seq(6,13,1))+
+  labs(x="block number",y="mean LLR",color = "cohort",
+       title = "Log-Likelihood Ratio")+
+  theme(aspect.ratio = 4,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('LLR_lastpretrain2scanning_cohortsidebyside','.png')),plot = p,device = 'png',width = 9,height = 6)
+```
+
+```{r}
+(p = Lsub_lastpretrain2scan%>%
+  ggplot(aes(x=cycle,y=distance,color=cohort))+
+  geom_point(alpha = 0.2,size = 2,stroke=0,
+                position=position_dodge(0.9))+
+  geom_rect(inherit.aes = F,aes(xmin=10-.5,xmax=13+.5,ymin=0, ymax=+Inf),
+              fill='grey', color='lightgrey',alpha=0.01)+
+  geom_col(data = Lsum_lastpretrain2scan,
+            aes(x=cycle,y=mu_distance),fill=NA,
+                position=position_dodge(0.9))+
+  geom_errorbar(data = Lsum_lastpretrain2scan,
+                aes(x=cycle,
+                    y = mu_distance,
+                    ymin = mu_distance - se_distance,
+                    ymax = mu_distance + se_distance),
+                width=0.4,
+                position=position_dodge(0.9))+
+    geom_text(aes(x=11.5,y=1.5,
+                  label="scanning"),
+                  color="black",fontface="bold")+
+  facet_nested(cols =vars(stage),
+               rows = vars(isgeneralizer),
+               scales = "free_x",space = "free_x",axes="all",remove_labels="none")+
+  scale_x_continuous(breaks = seq(6,13,1))+
+  scale_y_continuous(trans="sqrt")+
+  labs(x="block number",y="mean distance to goal (a.u.) rescaled",color = "cohort",
+       title = "Distance to goal")+
+  theme(aspect.ratio = 4,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('rescaled_distance_lastpretrain2scanning_cohortsidebyside','.png')),plot = p,device = 'png',width = 9,height = 6)
+```
+
+
+
+
+##Plot individual LLR with map resp
 #### 2D only
 ```{r}
 for (pid in unique(filter(data_with_prob)$subid)){
@@ -503,10 +754,10 @@ for (pid in unique(filter(data_with_prob)$subid)){
 ```{r}
 generalize_js = c("non-generalizer","generalizer")
 learn_ks = c("non-learner","learner")
-for (j in c(0,1)){
-  for (k in c(0,1)){
+for (j in c(1,2)){
+  for (k in c(2)){
     ave_resp_map_df = data_with_prob %>%
-    filter(isgeneralizer==j,islearner==k)%>%
+    filter(isgeneralizer==generalize_js[j],islearner==learn_ks[k])%>%
     aggregate_data(
       yvars = c("resp_x","resp_y"),
       groupbyvars = c("islearner","isgeneralizer","stage","expt_session","blocknumber_withinsess","stim_id"),
@@ -532,29 +783,27 @@ for (j in c(0,1)){
     scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+
     scale_shape_manual(values = x_shapes)+
     guides(fill = "none")+
-    labs(title =paste0("average response map: ", learn_ks[k+1],'_',generalize_js[j+1]),
+    labs(title =paste0("average response map: ", learn_ks[k],'_',generalize_js[j]),
       color = "y feature",shape = "x feature", x = "x", y = "y")+
     theme(legend.position = "top"))
   ggsave(file.path(result_dir,'individualmaps',"averagemaps",
-                   paste0(learn_ks[k+1],'_',generalize_js[j+1],'.png')),plot = p,width = 16,height = 9)
+                   paste0(learn_ks[k],'_',generalize_js[j],'.png')),plot = p,width = 16,height = 9)
   }
 }
 
 ```
 
 
-### response stability
-use correlation/ standard deviation of responses to quantify response stability
-1) correlation approach - for each two blocks how correlated are the response?
-2) std approach - within several blocks, the standard deviation of responses
+## response stability
+quantify response stability with correlation approach - for each two blocks how correlated are the response (and error)?
 
-#### running average approach
+#### response
 ```{r}
 stability_df = data.frame()
-subid_list = unique(data$subid)
+subid_list = unique(data_with_prob$subid)
 for (pid in subid_list){
   #pid = subid_list[1]
-  current_data = data%>%filter(subid==pid)
+  current_data = data_with_prob%>%filter(subid==pid)
   unique_train_blocknum = unique(filter(current_data,stage=="train")$expt_block)
   unique_test_blocknum = unique(filter(current_data,stage=="test")$expt_block)
   nb_train = length(unique_train_blocknum)
@@ -562,6 +811,7 @@ for (pid in subid_list){
   
   stability_trainx = c()
   stability_trainy = c()
+  stability_trainxy = c()
   for (i in seq(2,nb_train,1)){
     j=unique_train_blocknum[i-1]
     k=unique_train_blocknum[i]
@@ -572,14 +822,18 @@ for (pid in subid_list){
     
     stability_trainx = append(stability_trainx,cor(prev_x,curr_x))
     stability_trainy = append(stability_trainy,cor(prev_y,curr_y))
+    stability_trainxy = append(stability_trainxy,
+                             cor(c(prev_x,prev_y), c(curr_x,curr_y)))
   }
   train_stabdf = data.frame(stability_x = stability_trainx,
              stability_y=stability_trainy,
+             stability_xy = stability_trainxy,
              expt_block=unique_train_blocknum[2:nb_train])%>%
-    mutate(stage="train",subid=pid)
+    mutate(stage="train")
   
   stability_testx = c()
   stability_testy = c()
+  stability_testxy = c()
   for (i in seq(2,nb_test,1)){
     j=unique_test_blocknum[i-1]
     k=unique_test_blocknum[i]
@@ -592,14 +846,23 @@ for (pid in subid_list){
                              cor(prev_x, curr_x))
     stability_testy = append(stability_testy,
                              cor(prev_y, curr_y))
+    stability_testxy = append(stability_testxy,
+                             cor(c(prev_x,prev_y), c(curr_x,curr_y)))
   }
   test_stabdf = data.frame(stability_x = stability_testx,
              stability_y=stability_testy,
+             stability_xy = stability_testxy,
              expt_block=unique_test_blocknum[2:nb_test])%>%
-    mutate(stage="test",subid=pid)
+    mutate(stage="test")
+  
+  sdf = rbind(train_stabdf,test_stabdf)%>%mutate(
+    subid=pid,
+    cohort=unique(current_data$cohort),
+    islearner=unique(current_data$islearner),
+    isgeneralizer=unique(current_data$isgeneralizer))
   
   substab_df = left_join(filter(re_Assign_block,subid==pid,expt_block!=unique_train_blocknum[1],expt_block!=unique_test_blocknum[1]),
-                         rbind(train_stabdf,test_stabdf),
+                         sdf,
                          by = c("subid", "stage", "expt_block"))
   stability_df = rbind(stability_df,substab_df)
 }
@@ -609,41 +872,679 @@ for (pid in subid_list){
 
 ```{r}
 stability_df = stability_df %>%
-  mutate(islearner = ifelse(subid%in%learnerids,1,0),
-         isgeneralizer = ifelse(subid%in%generalizerids ,1,0),
-         session_str=factor(expt_session, levels = c(1,2,3),labels=c("pretraining","refresher","scanning")))
+  mutate(session_str=factor(expt_session, levels = c(1,2,3),labels=c("pretraining","refresher","scanning")))%>%
+  mutate(cycle = case_when(stage=="train"&expt_session==1~ceil(blocknumber_withinsess/2),
+                           stage=="test"&expt_session==1~blocknumber_withinsess,
+                           expt_session==2~blocknumber_withinsess+6,
+                           expt_session==3~blocknumber_withinsess+6+3))
+  
 stability_df_long =stability_df%>%
-  pivot_longer(cols=c("stability_x","stability_y"),names_to = "axis",values_to = "stability")
+  filter(cycle>=6)%>%
+  pivot_longer(cols=c("stability_x","stability_y","stability_xy"),names_to = "axis",values_to = "stability")%>%
+  filter(isgeneralizer=="generalizer"&axis=="stability_xy")%>%
+  mutate(stage=factor(stage,levels=c("train","test")))
 
 stability_df_long_sum = stability_df_long%>%
   aggregate_data(yvars = c("stability"),
-                 groupbyvars = c("islearner","isgeneralizer","stage",
-                                 "expt_session","blocknumber_withinsess","axis"),
+                 groupbyvars = c("cohort","islearner","isgeneralizer","stage",
+                                 "expt_session","cycle","axis"),
                  stats = c("mu","se","n"),
-                 additionalvars = c("session_str"))
+                 additionalvars = c("session_str","expt_block"))
 (p = stability_df_long%>%
-    #mutate(blocknumber_withinsess=factor(blocknumber_withinsess))%>%
-  ggplot(aes(x=blocknumber_withinsess,y=stability,color=axis))+
-  geom_point(alpha = 0.2,size = 2,stroke = 0,position=position_dodge(width=1))+
-  #geom_boxplot(position=position_dodge(width=1))+
+  ggplot(aes(x=cycle,y=stability,color=cohort))+
+  geom_point(alpha = 0.2,size = 2,stroke = 0,position=position_dodge(width=0.5))+
   geom_line(data = stability_df_long_sum,
-            aes(x=blocknumber_withinsess,y=mu_stability),position=position_dodge(width=1))+
+            aes(x=cycle,y=mu_stability),position=position_dodge(width=0.5))+
   geom_errorbar(data = stability_df_long_sum,
-                aes(x=blocknumber_withinsess,
+                aes(x=cycle,
                     y = mu_stability,
                     ymin = mu_stability - se_stability,
                     ymax = mu_stability + se_stability),
-                width=0.4,position=position_dodge(width=1))+
-  facet_nested(cols =vars(stage,session_str),
-               rows = vars(islearner,isgeneralizer),
+                width=0.4,position=position_dodge(width=0.5))+
+  facet_nested(cols = vars(session_str),
+               rows = vars(stage),drop=T,
+               independent="x",
+               scales = "free_x",space="free_x",axes="all",remove_labels="y")+
+  scale_x_continuous(breaks=seq(6,14))+
+  labs(x="block number",y="correlation with previous block",color = "cohort",
+       title = "response stability of generalizers")+
+  theme(aspect.ratio = 1.5,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('stability','.png')),plot = p,device = 'png',width = 8,height = 8)
+```
+
+#### response error
+```{r}
+err_stability_df = data.frame()
+subid_list = unique(data_with_prob$subid)
+for (pid in subid_list){
+  current_data = data_with_prob%>%filter(subid==pid)
+  unique_train_blocknum = unique(filter(current_data,stage=="train")$expt_block)
+  unique_test_blocknum = unique(filter(current_data,stage=="test")$expt_block)
+  nb_train = length(unique_train_blocknum)
+  nb_test = length(unique_test_blocknum)
+  
+  stability_trainx = c()
+  stability_trainy = c()
+  stability_trainxy = c()
+  for (i in seq(2,nb_train,1)){
+    j=unique_train_blocknum[i-1]
+    k=unique_train_blocknum[i]
+    prev_x = arrange(filter(current_data,stage=="train",expt_block==j),stim_id)$error_x
+    prev_y = arrange(filter(current_data,stage=="train",expt_block==j),stim_id)$error_y
+    curr_x = arrange(filter(current_data,stage=="train",expt_block==k),stim_id)$error_x
+    curr_y = arrange(filter(current_data,stage=="train",expt_block==k),stim_id)$error_y
+    
+    stability_trainx = append(stability_trainx,cor(prev_x,curr_x))
+    stability_trainy = append(stability_trainy,cor(prev_y,curr_y))
+    stability_trainxy = append(stability_trainxy,
+                             cor(c(prev_x,prev_y), c(curr_x,curr_y)))
+  }
+  train_stabdf = data.frame(stability_x = stability_trainx,
+             stability_y=stability_trainy,
+             stability_xy = stability_trainxy,
+             expt_block=unique_train_blocknum[2:nb_train])%>%
+    mutate(stage="train")
+  
+  stability_testx = c()
+  stability_testy = c()
+  stability_testxy = c()
+  for (i in seq(2,nb_test,1)){
+    j=unique_test_blocknum[i-1]
+    k=unique_test_blocknum[i]
+    prev_x = arrange(filter(current_data,stage=="test",expt_block==j),stim_id)$error_x
+    prev_y = arrange(filter(current_data,stage=="test",expt_block==j),stim_id)$error_y
+    curr_x = arrange(filter(current_data,stage=="test",expt_block==k),stim_id)$error_x
+    curr_y = arrange(filter(current_data,stage=="test",expt_block==k),stim_id)$error_y
+    
+    stability_testx = append(stability_testx,
+                             cor(prev_x, curr_x))
+    stability_testy = append(stability_testy,
+                             cor(prev_y, curr_y))
+    stability_testxy = append(stability_testxy,
+                             cor(c(prev_x,prev_y), c(curr_x,curr_y)))
+  }
+  test_stabdf = data.frame(stability_x = stability_testx,
+             stability_y=stability_testy,
+             stability_xy = stability_testxy,
+             expt_block=unique_test_blocknum[2:nb_test])%>%
+    mutate(stage="test")
+  
+  sdf = rbind(train_stabdf,test_stabdf)%>%mutate(
+    subid=pid,
+    cohort=unique(current_data$cohort),
+    islearner=unique(current_data$islearner),
+    isgeneralizer=unique(current_data$isgeneralizer))
+  
+  substab_df = left_join(filter(re_Assign_block,subid==pid,expt_block!=unique_train_blocknum[1],expt_block!=unique_test_blocknum[1]),
+                         sdf,
+                         by = c("subid", "stage", "expt_block"))
+  err_stability_df = rbind(err_stability_df,substab_df)
+}
+
+```
+
+
+```{r}
+err_stability_df = err_stability_df %>%
+  mutate(session_str=factor(expt_session, levels = c(1,2,3),labels=c("pretraining","refresher","scanning")))%>%
+  mutate(cycle = case_when(stage=="train"&expt_session==1~ceil(blocknumber_withinsess/2),
+                           stage=="test"&expt_session==1~blocknumber_withinsess,
+                           expt_session==2~blocknumber_withinsess+6,
+                           expt_session==3~blocknumber_withinsess+6+3))
+  
+errstability_df_long =err_stability_df%>%
+  filter(cycle>=6)%>%
+  pivot_longer(cols=c("stability_x","stability_y","stability_xy"),names_to = "axis",values_to = "stability")%>%
+  filter(isgeneralizer==1&axis!="stability_xy")
+
+errstability_df_long_sum = errstability_df_long%>%
+  aggregate_data(yvars = c("stability"),
+                 groupbyvars = c("cohort","islearner","isgeneralizer","stage",
+                                 "expt_session","cycle","axis"),
+                 stats = c("mu","se","n"),
+                 additionalvars = c("session_str","expt_block"))
+(p = errstability_df_long%>%
+  ggplot(aes(x=cycle,y=stability,color=cohort))+
+  geom_point(alpha = 0.2,size = 2,stroke = 0,position=position_dodge(width=0.8))+
+  geom_line(data = errstability_df_long_sum,
+            aes(x=cycle,y=mu_stability),position=position_dodge(width=0.8))+
+  geom_errorbar(data = errstability_df_long_sum,
+                aes(x=cycle,
+                    y = mu_stability,
+                    ymin = mu_stability - se_stability,
+                    ymax = mu_stability + se_stability),
+                width=0.4,position=position_dodge(width=0.8))+
+  geom_col(data = errstability_df_long_sum,
+           aes(x=cycle,y = mu_stability),fill=NA,
+             position=position_dodge(width=0.8),width=0.6)+
+  facet_nested(cols = vars(session_str,stage),
+               rows = vars(axis),
                scales = "free_x",space = "free_x")+
-  scale_x_continuous(breaks = seq(1,12,1))+
-  labs(x="block number",y="mean stability",color = "axis",
+  scale_x_continuous(breaks = seq(6,13,1))+
+  labs(x="block number",y="mean error stability",color = "cohort",
        title = "performance of learners and generalizers")+
   theme(aspect.ratio = 6,legend.position = "top"))
 
-ggsave(file.path(result_dir,paste0('stability','.png')),plot = p,device = 'png',width = 10,height = 9)
+ggsave(file.path(result_dir,paste0('errstability','.png')),plot = p,device = 'png',width = 10,height = 9)
 ```
+
+## effect of counting on RT
+```{r}
+interquatile_r = IQR(log(filter(data_with_prob,expt_session==3&stage=="test")$resp_rt),na.rm=T)
+q25 = quantile(log(filter(data_with_prob,expt_session==3&stage=="test")$resp_rt),0.25,na.rm=T)
+data_with_prob = data_with_prob%>%
+  mutate(resp_rt_rep18 = if_else(resp_rt<0.8,NA,resp_rt))%>% #exclude trials that are too fast
+  mutate(resp_rt_ms = resp_rt*1000)%>%
+  mutate(startdist = scale(sqrt((start_x-stim_x)**2 + (start_y-stim_y)**2)),
+         moveddist = scale(sqrt((start_x-resp_x)**2 + (start_y-resp_y)**2)),
+         x_order = as.integer(stim_x*2+3),
+         y_order = as.integer(stim_y*2+3),
+         resp_rtint = (resp_rt_ms+1000),
+         logrt = log(resp_rt_ms),
+         logrtint = log(resp_rtint))%>%
+  mutate(counting = x_order+y_order)
+
+if(!require(corrr)){
+    install.packages("corrr")
+}
+
+library(corrr)
+rt_corr_quickcheckdf = do.call(
+  rbind,
+  lapply(filter(data_with_prob, isgeneralizer=="generalizer"&expt_session==3&cohort=="second cohort") %>% 
+    group_split(subid),
+    function(d){d%>%correlate() %>%focus(resp_rt_ms,moveddist)})
+  )%>%
+  group_by(term)%>%
+  summarise(resp_rt_ms = mean(resp_rt_ms),
+            moveddist  = mean(moveddist))
+```
+
+```{r}
+hasConverged <- function (mm) {
+  
+  if ( !inherits(mm, "merMod")) stop("Error: must pass a lmerMod object")
+  
+  retval = NULL
+  
+  if(is.null(unlist(mm@optinfo$conv$lme4))) {
+    retval = 1
+  }
+  else {
+    if (isSingular(mm)) {
+      retval = 0
+    } else {
+      retval = -1
+    }
+  }
+  return(retval)
+}
+```
+
+
+
+
+```{r}
+#c1 = lmer(data = filter(data_with_prob,stage=="test"&expt_session==3&cohort=="first cohort"),
+#     "resp_rtint~isgeneralizer*counting+moveddist+LR_trial+(LLR_trial|subid)+(counting|subid)+(moveddis#t|subid)+(1|subid)")
+
+rt_countingformula = "resp_rt_ms~expt_trial+LR_trial+x_order+y_order+moveddist+(1|run:subid)+(1|subid)" # didnt add random slope bc lead to singular fit
+
+Gc1 = lmer(data = filter(data_with_prob,isgeneralizer=="generalizer"&stage=="test"&expt_session==3&cohort=="first cohort"),rt_countingformula)
+
+Gc2 = lmer(data = filter(data_with_prob,isgeneralizer=="generalizer"&stage=="test"&expt_session==3&cohort=="second cohort"),rt_countingformula)
+
+NGc1= lmer(data = filter(data_with_prob,isgeneralizer=="non-generalizer"&stage=="test"&expt_session==3&cohort=="first cohort"),rt_countingformula)
+
+NGc2= lmer(data = filter(data_with_prob,isgeneralizer=="non-generalizer"&stage=="test"&expt_session==3&cohort=="second cohort"),rt_countingformula)
+
+hasConverged(Gc1)
+hasConverged(Gc2)
+hasConverged(NGc1)
+hasConverged(NGc2)
+export_summs(Gc1,Gc2,NGc1,NGc2,
+             model.names = c("Generalizer\nFirst Cohort","Generalizer\nSecond Cohort",
+                             "Non-Generalizer\nFirst Cohort","Non-Generalizer\nSecond Cohort"))
+```
+
+```{r}
+rt_nocountingformula = "resp_rt_ms~expt_trial+LR_trial+moveddist+(1|run:subid)+(1|subid)"
+
+bGc1 = lmer(data = filter(data_with_prob,isgeneralizer=="generalizer"&stage=="test"&expt_session==3&cohort=="first cohort"),rt_nocountingformula)
+
+bGc2 = lmer(data = filter(data_with_prob,isgeneralizer=="generalizer"&stage=="test"&expt_session==3&cohort=="second cohort"),rt_nocountingformula)
+
+bNGc1= lmer(data = filter(data_with_prob,isgeneralizer=="non-generalizer"&stage=="test"&expt_session==3&cohort=="first cohort"),rt_nocountingformula)
+
+bNGc2= lmer(data = filter(data_with_prob,isgeneralizer=="non-generalizer"&stage=="test"&expt_session==3&cohort=="second cohort"),rt_nocountingformula)
+
+mc_tabnames = c("\n\nGeneralizer\nFirst Cohort","\n\nGeneralizer\nSecond Cohort",
+                "\n\nNon-Generalizer\nFirst Cohort","\n\nNon-Generalizer\nSecond Cohort")
+mc_dfs  = list(anova(bGc1,Gc1), anova(bGc2,Gc2),
+            anova(bNGc1,NGc1), anova(bNGc2,NGc2))
+for (j in seq(1,4)){
+  writeLines(mc_tabnames[j])
+  print(md_table(mc_dfs[[j]],format="simple",row.names=c("without counting","with counting")))
+  
+}
+print(sjPlot::tab_df(anova(bGc1,Gc1),title="Generalizer\nFirst Cohort"),use.viewer=F)
+print(sjPlot::tab_df(anova(bGc2, Gc2),title="Generalizer\nSecond Cohort"),use.viewer=F)
+print(sjPlot::tab_df(anova(bNGc1, NGc1),title="Non-Generalizer\nFirst Cohort"),use.viewer=F)
+print(sjPlot::tab_df(anova(bNGc2, NGc2),title="Non-Generalizer\nSecond Cohort"),use.viewer=F)
+
+```
+
+
+```{r}
+
+rt_countingformula = "resp_rt_ms~expt_trial+LR_trial+x_order+y_order+moveddist+(1|subid:run)+(-1+y_order|subid)+(-1+x_order|subid)+(1|subid)" # didnt add random slope bc lead to singular fit
+#isgeneralizer=="generalizer"
+G_C1C2 = lmer(data = filter(data_with_prob,isgeneralizer=="generalizer"&stage=="test"&expt_session==3),rt_countingformula)
+
+hasConverged((G_C1C2))
+
+ranef(G_C1C2)$subid
+```
+
+
+```{r}
+
+data_with_prob = data_with_prob%>%
+  mutate(cycle=case_when(expt_session==1&stage=="train"~ceil(blocknumber_withinsess/4),
+                         expt_session==1&stage=="test"~ceil(blocknumber_withinsess/2),
+                         expt_session==2~NA,
+                         expt_session==3&blocknumber_withinsess%in%c(1,3)~3+1,
+                         expt_session==3&blocknumber_withinsess%in%c(2,4)~3+1))
+cal_unexpvar = function(d,rtvar){
+  f = paste0(rtvar,"~moveddist+expt_trial+LR_trial")
+  m = lm(f,data=d)
+  uev = 1-summary(m)[["r.squared"]]
+  
+  return(list(resid=m[["residuals"]],uev=uev))
+}
+
+cal_counting_coef = function(d,rtvar){
+  f2 = paste0(rtvar,"~moveddist+expt_trial+LR_trial+x_order+y_order")
+  m2 = lm(f2,data=d)
+  m2_coef_sum = summary(m2)[["coefficients"]]
+  df = data.frame(m2_coef_sum)%>%
+    change_cols_name(c("Estimate","Std..Error","t.value","Pr...t.."),c("est","std","t","p"))
+  df[["IV"]] = unlist(lapply(row.names(df),function(x){str_remove_all(x,"[()]")}))
+  m2_coef_sum = df%>%pivot_longer(cols=c("est","std","t","p"),names_to="stat")
+  return(m2_coef_sum)
+}
+
+rtresid_dfs = lapply(
+  group_split(filter(data_with_prob,expt_session==3&stage=="test"),cohort,islearner,isgeneralizer,subid,stage), 
+  function(d){
+        d = d%>%dplyr::select(-c("Unnamed..0","X"))%>%filter(!is.na(resp_rt_ms))
+        if(nrow(d)>1){
+          resid_op = cal_unexpvar(d,"resp_rt_ms")
+          d[["rt_resid"]] = resid_op[["resid"]]
+        } 
+      return(d)  
+      }
+)
+rt_afterdist_resid_df = do.call(rbind,rtresid_dfs)
+
+substageblock_data_splits = group_split(filter(data_with_prob,!is.na(cycle)&stage=="test"),
+                                        subid,cycle,stage)
+rtcoef_dfs = lapply(
+  substageblock_data_splits, 
+  function(d){
+        d = d%>%dplyr::select(-c("Unnamed..0","X"))%>%filter(!is.na(resp_rt_ms))
+        if(nrow(d)>1){
+          coef_sum = cal_counting_coef(d,"resp_rt_ms")
+          iddf = d%>%distinct(cohort,islearner,isgeneralizer,subid,stage,cycle)
+          coef_sum = cbind(iddf[rep(1, each = nrow(coef_sum)), ],coef_sum)
+          return(coef_sum)  
+        } 
+      }
+)        
+rt_coef_df = do.call(rbind,rtcoef_dfs)
+
+```
+
+
+```{r,fig.width=6}
+rt_counting_coef_sub_cycle = rt_coef_df%>%
+  filter(IV%in%c("x_order","y_order")&stat=="est")%>%
+  mutate(IV = factor(IV,levels=c("x_order","y_order"),labels=c("x","y")))%>%
+  pivot_wider(id_cols = c("cohort","islearner","isgeneralizer","subid","stage","cycle"),
+              values_from = "value", names_from ="IV")%>%
+  mutate(tamapping = if_else(sign(x)==sign(y),1,-1))%>%
+  mutate(tamapping_weight = tamapping*0.5*((abs(x)+abs(y))))         
+
+rt_counting_coef_sub_cycle_wide = rt_counting_coef_sub_cycle%>%
+  pivot_wider(id_cols = c("cohort","islearner","isgeneralizer","subid","stage"),
+              values_from = "tamapping", names_from ="cycle",names_prefix = "tamapping_")
+
+rt_counting_coef_sub_cycle_wide%>%
+  mutate(lstr=if_else(sign(tamapping_3)!=sign(tamapping_4),subid,""),
+         jitterx = tamapping_3+runif(nrow(rt_counting_coef_sub_cycle_wide),-0.3,0.3),
+         jittery = tamapping_4+runif(nrow(rt_counting_coef_sub_cycle_wide),-0.3,0.3))%>%
+ggplot(aes(y=jitterx,x=jittery,color=cohort))+
+  facet_wrap2(vars(isgeneralizer),nrow=2,axes="all")+
+  #geom_jitter(width=0.4,height=0.4,alpha=0.8)+
+  geom_point(alpha=0.8)+
+  geom_hline(yintercept=0,linetype ="dashed")+
+  geom_vline(xintercept=0,linetype ="dashed")+
+  labs(y="scanning", x = "pretraining")+
+  scale_x_continuous(breaks=c(1,-1),labels=c("top-left","top-right"),limits = c(-1.5,1.5))+
+  scale_y_continuous(breaks=c(1,-1),labels=c("top-left","top-right"),limits = c(-1.5,1.5))+
+  theme(panel.border=element_rect(fill = NA),
+        legend.position = "top")+
+  geom_text(x=-0.8,y=0.31,label="inconsistent",color="darkgrey")+
+  geom_text(x=0.8,y=-0.31,label="inconsistent",color="darkgrey")+
+  geom_text(x=0.8,y=0.31,label="top-left",color="darkgrey")+
+  geom_text(x=-0.8,y=-0.31,label="top-right",color="darkgrey")#+
+#  geom_text(aes(label=lstr),size=2)
+
+
+training_axis_mapping = rt_counting_coef_sub_cycle_wide%>%
+  filter(stage=="test")%>%
+  mutate(tamapping = case_when(
+    tamapping_4==tamapping_3~tamapping_4, #(countx_p<0.05)&(county_p<0.05) 
+    tamapping_4!=tamapping_3~0)
+    )%>%
+  mutate(tamapping_str = factor(tamapping,levels=c(1,-1,0),labels=c("topleft","topright","inconsistent")))
+ggplot(training_axis_mapping,
+       aes(x=tamapping_str,color=cohort))+
+  facet_grid(cols=vars(isgeneralizer))+
+  geom_bar(position=position_dodge(),fill=NA)
+
+
+```
+
+
+```{r}
+rt_counting_coef_sub = rt_coef_df%>%
+  filter(IV%in%c("x_order","y_order")&stage=="test"&cycle==4)%>%
+  dplyr::select(-c("stage","cycle"))%>%
+  pivot_wider(id_cols = c("cohort","IV","islearner","isgeneralizer","subid"),
+              values_from = "value", names_from ="stat")%>%
+  change_cols_name("est","regcoef")
+
+rt_counting_coef_sum = rt_counting_coef_sub%>%
+  aggregate_data(groupbyvars = c("cohort","islearner","isgeneralizer","IV"),
+                 yvars = "regcoef",
+                 stats=c("mu"))
+
+rt_counting_coef_sub_wide = rt_counting_coef_sub%>%
+  pivot_wider(id_cols = c("cohort","islearner","isgeneralizer","subid"),
+              values_from = "regcoef",
+              names_from ="IV")
+ggplot(rt_counting_coef_sub_wide,aes(x=x_order  ,y=y_order  ,color=cohort))+
+  facet_grid(cols=vars(isgeneralizer))+
+  geom_point()+
+  geom_hline(yintercept=0,linetype="dashed")+
+  geom_vline(xintercept=0,linetype="dashed")+
+  labs(x="Beta_stimx",y="Beta_stimy")+
+  theme(legend.position="top")
+
+rt_counting_coefwithp_sub = rt_counting_coef_sub%>%
+  pivot_wider(id_cols=c("cohort","islearner","isgeneralizer","subid"),
+              values_from = c("regcoef","p"),
+              names_from = "IV")%>%
+  change_cols_name(c("regcoef_x_order","regcoef_y_order","p_x_order","p_y_order"),
+                   c("countx_coef","county_coef","countx_p","county_p"))
+
+#nrow(rt_coef_df_wide) == length(unique(scanning_beh$subid))
+#nrow(rt_counting_coefwithp_sub) == length(unique(scanning_beh$subid))
+
+training_axis_mapping = rt_counting_coefwithp_sub%>%
+  mutate(tamapping = case_when(
+    sign(countx_coef)==sign(county_coef)~1, #(countx_p<0.05)&(county_p<0.05) 
+    sign(countx_coef)!=sign(county_coef)~-1, # abs(countx_coef)>11.57369&abs(county_coef)>10.10267&
+    .default = 0)
+    )%>%
+  mutate(tamapping_str = factor(tamapping,levels=c(1,-1,0),labels=c("topleft","topright","orthogonal")),
+       ave_abs_count_coef = (abs(countx_coef)+abs(countx_coef))/2)%>%
+  dplyr::select(c("cohort","islearner","isgeneralizer","subid","tamapping","tamapping_str",
+                  "countx_coef","county_coef","ave_abs_count_coef","countx_p","county_p"))
+
+ggplot(training_axis_mapping,aes(x=tamapping_str,color=isgeneralizer))+geom_bar(position=position_dodge(),fill=NA)
+```
+
+
+
+
+
+```{r}
+rt_counting_coef_sub_long = rt_counting_coef_sub%>%
+  mutate(countaxis = factor(IV,levels=c("x_order","y_order"),labels=c("count x","count y")),
+         absregcoef = abs(regcoef))
+
+rt_counting_coef_sum_long = rt_counting_coef_sub_long%>%
+  aggregate_data(groupbyvars=c("cohort","isgeneralizer", "countaxis"),
+                 yvars=c("regcoef","absregcoef"),
+                 stats=c("mu","se"))
+
+ggplot(data=rt_counting_coef_sub_long,
+       aes(x=isgeneralizer,color=countaxis))+
+  facet_nested(cols=vars(cohort),
+               scale="free_x")+
+  geom_point(aes(y=regcoef),
+             alpha=0.5,
+             position=position_jitterdodge(jitter.width=0.2,dodge.width = 0.9)
+             #position=position_dodge(width=0.9)
+           )+
+  geom_col(data = rt_counting_coef_sum_long,
+           aes(y=mu_regcoef),
+           #method = "lm",se=F,na.rm = T,formula='y ~ x',
+           position=position_dodge(width=0.9),
+           fill=NA)+
+  geom_point(data = rt_counting_coef_sum_long, 
+           aes(y=mu_regcoef),
+           position=position_dodge(width=0.9)
+           )+
+  geom_errorbar(data = rt_counting_coef_sum_long, 
+           aes(ymin=mu_regcoef-se_regcoef,
+               ymax=mu_regcoef+se_regcoef),
+           position=position_dodge(width=0.9),
+           width=0.4)+
+  labs(y="regression coefficient of counting")+
+  theme(legend.position = "top",legend.direction = "horizontal",
+        aspect.ratio = 1)
+
+ggplot(data=rt_counting_coef_sub_long,
+       aes(x=isgeneralizer,color=countaxis))+
+  facet_nested(cols=vars(cohort),
+               scale="free_x")+
+  geom_point(aes(y=absregcoef),
+             alpha=0.5,
+             position=position_jitterdodge(jitter.width=0.2,dodge.width = 0.9)
+             #position=position_dodge(width=0.9)
+           )+
+  geom_col(data = rt_counting_coef_sum_long,
+           aes(y=mu_absregcoef),
+           #method = "lm",se=F,na.rm = T,formula='y ~ x',
+           position=position_dodge(width=0.9),
+           fill=NA)+
+  geom_point(data = rt_counting_coef_sum_long, 
+           aes(y=mu_absregcoef),
+           position=position_dodge(width=0.9)
+           )+
+  geom_errorbar(data = rt_counting_coef_sum_long, 
+           aes(ymin=mu_absregcoef-se_absregcoef,
+               ymax=mu_absregcoef+se_absregcoef),
+           position=position_dodge(width=0.9),
+           width=0.4)+
+  labs(y="abs regression coefficient of counting")+
+  theme(legend.position = "top",legend.direction = "horizontal",
+        aspect.ratio = 1)
+
+
+```
+
+
+
+
+
+```{r}
+scanning_beh = meanscanperf_with_prob%>%
+  dplyr::select(-c(starts_with("UND"),starts_with("BND"),starts_with("pnorm"),starts_with("binorm"),starts_with("uniform")))
+
+write_csv(scanning_beh,
+          file.path(data_dir,"scanner_stim_LLR.csv"))
+
+
+# rt_counting_coef_sub_long%>%
+#   filter(isgeneralizer=="generalizer")%>%
+#   aggregate_data(groupbyvars=c( "countaxis"),
+#                  yvars=c("absregcoef"),
+#                  stats=c("mu","se"))%>%
+#   mutate(criteria = se_absregcoef)
+# 
+# #ggplot(training_axis_mapping,aes(x=tamapping_str,color=isgeneralizer))+geom_bar(position=position_dodge(),fill=NA)
+
+
+scanning_aveperf = scanning_beh%>%
+  aggregate_data(groupbyvars = c("cohort","subid","stage"),
+                 yvars = "LLR_trial",
+                 stats="mu")%>%
+  change_cols_name("mu_LLR_trial","LLR")%>%
+  pivot_wider(id_cols=c("cohort","subid"),names_from = "stage",names_prefix="LLR_",values_from ="LLR")
+scanning_aveperf = left_join(training_axis_mapping,scanning_aveperf,
+                             by=c("cohort","subid"))
+write_csv(scanning_aveperf,
+          file.path(data_dir,"scanner_average_LLR_wmapping.csv"))
+
+```
+
+```{r}
+rt_countingformula = "resp_rt_ms~expt_trial+LR_trial+x_order+y_order+moveddist+(1|run:subid)+(-1+x_order|subid)+(-1+y_order|subid)" # didnt add random slope bc lead to singular fit
+rt_fitG = lmer(data = filter(data_with_prob,stage=="test"&expt_session==3&isgeneralizer=="generalizer"),rt_countingformula)
+rt_fitnG = lmer(data = filter(data_with_prob,stage=="test"&expt_session==3&isgeneralizer=="non-generalizer"),rt_countingformula)
+
+rt_countingformula = "resp_rt_ms~isgeneralizer+x_order+y_order+expt_trial+LR_trial+moveddist+(1|run:subid)+(-1+x_order|subid)+(-1+y_order|subid)" # didnt add random slope bc lead to singular fit
+rt_fitall = lmer(data = filter(data_with_prob,stage=="test"&expt_session==3),rt_countingformula)
+
+hasConverged(rt_fitG)
+hasConverged(rt_fitnG)
+hasConverged(rt_fitall)
+export_summs(rt_fitnG,rt_fitnG,model.names=c("Generalizers","nonGeneralizers"))
+
+rtcountxy_coef_df1 =  data.frame(ranef(rt_fitG)$subid)
+rtcountxy_coef_df1["subid"] = row.names(rtcountxy_coef_df1)
+rtcountxy_coef_df2 =  data.frame(ranef(rt_fitnG)$subid)
+rtcountxy_coef_df2["subid"] = row.names(rtcountxy_coef_df2)
+rtcountxy_coef_df = rbind(rtcountxy_coef_df1,rtcountxy_coef_df2)
+
+rtcountxy_coef_df =  data.frame(ranef(rt_fitall)$subid)
+rtcountxy_coef_df["subid"] = row.names(rtcountxy_coef_df)
+
+rtcountxy_coef_df = rtcountxy_coef_df%>%
+  mutate(isgeneralizer=if_else(subid%in%generalizerids,"generalizer","non-generalizer"),
+         cohort = if_else(str_starts(subid,"sub0"),"first cohort","second cohort"))
+
+ggplot(rtcountxy_coef_df,aes(x=x_order,y=y_order,color=cohort))+
+  facet_grid(cols=vars(isgeneralizer))+
+  geom_point()+
+  geom_vline(xintercept=0)+
+  geom_hline(yintercept=0)
+
+ggplot(rtcountxy_coef_df,aes(x=isgeneralizer,y=abs(x_order),color=cohort))+
+  geom_point()
+
+
+training_axis_mapping = rtcountxy_coef_df%>%
+  change_cols_name(c("x_order","y_order"),c("countx_coef","county_coef"))%>%
+  mutate(tamapping = case_when(
+    sign(countx_coef)==sign(county_coef)~1, #(countx_p<0.05)&(county_p<0.05) 
+    sign(countx_coef)!=sign(county_coef)~-1, # abs(countx_coef)>11.57369&abs(county_coef)>10.10267&
+    .default = 0)
+    )%>%
+  mutate(tamapping_str = factor(tamapping,levels=c(1,-1,0),labels=c("topleft","topright","orthogonal")),
+       ave_abs_count_coef = (abs(countx_coef)+abs(countx_coef))/2)%>%
+  dplyr::select(c("cohort","islearner","isgeneralizer","subid","tamapping","tamapping_str",
+                  "countx_coef","county_coef","ave_abs_count_coef","countx_p","county_p"))
+ggplot(training_axis_mapping,aes(x=tamapping_str,color=isgeneralizer))+geom_bar(position=position_dodge(),fill=NA)
+
+scanning_aveperf = scanning_beh%>%
+  aggregate_data(groupbyvars = c("cohort","subid","stage"),
+                 yvars = "LLR_trial",
+                 stats="mu")%>%
+  change_cols_name("mu_LLR_trial","LLR")%>%
+  pivot_wider(id_cols=c("cohort","subid"),names_from = "stage",names_prefix="LLR_",values_from ="LLR")
+scanning_aveperf = left_join(training_axis_mapping,scanning_aveperf,
+                             by=c("cohort","subid"))
+write_csv(scanning_aveperf,
+          file.path(data_dir,"scanner_average_LLR_wmapping.csv"))
+
+```
+
+
+```{r}
+rt_afterdist_resid_sub = rt_afterdist_resid_df%>%
+  mutate(cycle = case_when(stage=="train"&expt_session==1~ceil(blocknumber_withinsess/2),
+                           stage=="test"&expt_session==1~blocknumber_withinsess,
+                           expt_session==2~blocknumber_withinsess+6,
+                           expt_session==3~blocknumber_withinsess+6+3))%>%
+  filter(cycle>=6)%>%
+  #mutate(x_order=factor(x_order),
+         #y_order=factor(y_order),
+         #counting=factor(counting)
+  #       )%>%
+  aggregate_data(groupbyvars = c("cohort","islearner","isgeneralizer","subid",
+                                 "session_str",
+                                 "stage","counting"),
+                 yvars = c("rt_resid","rtint_resid","logrt_resid","logrtint_resid"),
+                 stats = c("mu","n"))%>%
+  change_cols_name(c("mu_rt_resid","mu_rtint_resid","mu_logrt_resid","mu_logrtint_resid"),
+                   c("rt_resid","rtint_resid","logrt_resid","logrtint_resid"))%>%
+  filter(session_str == "scanning"&stage=="test")
+
+rt_afterdist_resid_sum = rt_afterdist_resid_sub%>%
+  aggregate_data(groupbyvars = c("cohort","isgeneralizer",
+                                 "session_str",
+                                 "stage","counting"),
+                 yvars = c("rt_resid","rtint_resid","logrt_resid","logrtint_resid"),
+                 stats = c("mu","se"))
+
+ggplot(data=filter(rt_afterdist_resid_sub),
+       aes(x=counting,color=cohort))+
+  facet_nested(cols=vars(isgeneralizer),
+               rows=vars(stage),
+               scale="free_x")+
+  # geom_smooth(aes(y=rt_resid,group=subid),
+  #            alpha=0.01,linewidth=0.1,
+  #            method = "lm",se=F,na.rm = T,formula='y ~ x',
+  #             )+
+  geom_point(aes(y=rt_resid),
+             alpha=0.2,
+             #position=position_jitterdodge(jitter.width=0.2,dodge.width = 0.9)
+             position=position_dodge(width=0.6)
+           )+
+  geom_line(data = rt_afterdist_resid_sum,
+           aes(y=mu_rt_resid),
+           #method = "lm",se=F,na.rm = T,formula='y ~ x',
+           position=position_dodge(width=0.6)
+           )+
+  geom_point(data = rt_afterdist_resid_sum, 
+           aes(y=mu_rt_resid),
+           position=position_dodge(width=0.6)
+           )+
+  geom_errorbar(data = rt_afterdist_resid_sum, 
+           aes(ymin=mu_rt_resid-se_rt_resid,
+               ymax=mu_rt_resid+se_rt_resid),
+           position=position_dodge(width=0.6),
+           width=0.4)+
+  theme(legend.position = "top",legend.direction = "horizontal",
+        aspect.ratio = 2)
+  
+
+```
+
+
+
+
+
+
+
+
+
 
 
 

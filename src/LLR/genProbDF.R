@@ -70,7 +70,7 @@ for (k in unique_stimloc$loc_id){
   probability_df[["uniform"]] = p_unlist_normalized
 
   probability_df = probability_df%>%
-    mutate(truex = truex,truex = truey)
+    mutate(truex = truex,truey = truey)
   filename = file.path(llr_dir,"probdf_nolapse_csv",paste0("probdf",k,".csv"))
   write.csv(probability_df, filename, row.names=FALSE)
 

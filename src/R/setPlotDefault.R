@@ -13,7 +13,7 @@ theme_update(aspect.ratio = 1,
              strip.text = element_text(size = 12,face = "bold"))
 options(scipen=10)
 cond_colors = ggsci::pal_aaas()(3)
-twolevel_colors = ggsci::pal_aaas()(5)[4:5]
+twolevel_colors = c('#1f77b4', '#ff7f0e')
 fourlevel_colors = ggsci::pal_aaas()(6)[c(1,2,3,4)]
 y_colors = c("#00FFC1","#9E4F46","#8484FF","#005800","#FFD300") # Yellow,Quagmire,Blue,Wine,Jade
 x_shapes = c("\u2BC1","\U2605","\u25CF","\u25B2","\u25A0")# diamond, star, circle, triangle, square
