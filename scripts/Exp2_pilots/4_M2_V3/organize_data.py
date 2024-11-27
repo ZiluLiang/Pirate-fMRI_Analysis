@@ -49,8 +49,27 @@ valid_exptid = [
     "YEefouIzdevm",
     "Z48IBZ3Fij7e",
     "z5RhGaDBons6"
-    ]
-
+    ] + [
+    "7GwVNGkdVsDK",
+    "8AtUdWWUmBFp",
+    "9aalsELaRae9",
+    "9BQHf2AderIK",
+    "9FY4rFoKT89z",
+    "cyhLe9an72rd",
+    "d6RfFiALxFCj",
+    "dipeX0BtHt9H",
+    "EQhYFMuvsBDD",
+    "Ex4rLm1jp7pT",
+    "ghjUrn4eSzmZ",
+    "Gr70WOa8j0a1",
+    "h7Mejeatg34I",
+    "jWlPIlEjQYSy",
+    "mnlCIGBYpv2b",
+    "qtBQpyKpwXX7",
+    "SAD7MTK3Btsk",
+    "vw2v6FT1M96g",
+    "Yhikh0ss8jEs"
+]
 
 
 ######################################## CHECK THE LAYOUT OF THE STIMULI #######################################
@@ -128,6 +147,8 @@ for id in valid_exptid:
             subdfs.append(pd.DataFrame(data["sdata"]).assign(prolificid=data['edata']['expt_turker'],subid=id))
     subdf = pd.concat(subdfs).reset_index(drop=True)
     subdf["istraining"] = subdf["stim_group"] == "training"
+    subdf["x_axisset"]  = ["x1" if m in [0,2] else "x2" for m in subdf.expt_map.to_numpy()]
+    subdf["y_axisset"]  = ["y1" if m in [0,3] else "y2" for m in subdf.expt_map.to_numpy()]
     data_dfs.append(subdf)
 
 org_data = pd.concat(data_dfs).reset_index(drop=True).fillna(value=np.nan)

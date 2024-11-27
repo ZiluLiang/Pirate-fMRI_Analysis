@@ -83,7 +83,7 @@ expo_decay = function(params, x) {
 
 fit_decay = function(fit_x,fit_y){
   model.0 <- lm(log(y) ~ x, data=data.frame(x=fit_x,y=fit_y))
-  start <- list(N0=exp(coef(model.0)[1]), rate=coef(model.0)[2])
+  start <- list(N0=exp(coef(model.0)[1]), rate=-coef(model.0)[2])
   fitmodel <- nls(fit_y~expo_decay(c(N0,rate),fit_x), start = start,
                   control = list(maxiter = 5000))
   params=coef(fitmodel)

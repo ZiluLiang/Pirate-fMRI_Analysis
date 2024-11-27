@@ -171,14 +171,34 @@ criteria_df = cor_df%>%
 ```
 
 ```{r}
-compositional_ids = c('1dFS0Yn3T4pK',
+compositional_ids = c(
+ '1dFS0Yn3T4pK',
+ '9BQHf2AderIK',
  'B5AwicapL9Pk',
+ 'Gr70WOa8j0a1',
  'IbvB3PaXSFwS',
  'STM71Y6LPdw2',
  'YEefouIzdevm',
  'aZB1d5MjtO3X',
  'c1aPzh1gcCCI',
+ 'vw2v6FT1M96g',
  'z5RhGaDBons6')
+ 
+#'1dFS0Yn3T4pK',
+ #'9BQHf2AderIK',
+ #'B5AwicapL9Pk',
+ 'Gr70WOa8j0a1',
+ #'IbvB3PaXSFwS',
+ #'STM71Y6LPdw2',
+ #'YEefouIzdevm',
+ #'aZB1d5MjtO3X',
+ #'c1aPzh1gcCCI',
+ #'z5RhGaDBons6'
+
+  generalizerids
+ [1] "1dFS0Yn3T4pK" "aZB1d5MjtO3X" "B5AwicapL9Pk" "c1aPzh1gcCCI" "IbvB3PaXSFwS" "STM71Y6LPdw2" "YEefouIzdevm" "z5RhGaDBons6"
+ [9] "9BQHf2AderIK" "Ex4rLm1jp7pT" "vw2v6FT1M96g"
+
 noncompositional_ids = c(
  '77WTUkTd6vVM', 'aweyqilaLvli', 'kLbiHPqG1T3e'
 )

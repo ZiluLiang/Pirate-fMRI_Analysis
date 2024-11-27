@@ -95,7 +95,7 @@ fig.savefig(os.path.join(study_dir,"putative and actual resp.png"))
 run_fit = False
 # arena parameters
 arena_r = (5 + (1.42*60/53*1.1/2))*(2/range_stimxy[0])
-err_tol = 1.05*60/53 *(2/range_stimxy[0]) # take into account the pirate size
+err_tol = 1.05*60/53 *(2/range_stimxy[0])
 
 #double_check_subs = ['H4wAVOPtFkAT','YHFTln2WomAo']  #'G8yNoK8WMiwt','l5kKVclV7Cy9','UQoUjJ6BxXdi',
 #valid_exptid = double_check_subs
@@ -111,36 +111,36 @@ if run_fit:
         }
     model_paramnames = {
         "noncompo-random":[],
-        "compositional": ["sigma_x", "sigma_y", "lapse_rate"], # "betax", "betay", 
-        "1Dx-center":    ["sigma_x", "sigma_biasy", "lapse_rate"],
-        "1Dy-center":    ["sigma_y", "sigma_biasx", "lapse_rate"],
-        "1D-center":     ["sigma_x", "sigma_y", "sigma_biasx", "sigma_biasy", "lapse_rate"],
-        "1D-random":     ["sigma_x", "sigma_y", "lapse_rate"]
+        "compositional": ["sigma_x", "sigma_y", "lapse_rate", "lapse_rate_2D"], # "betax", "betay", 
+        "1Dx-center":    ["sigma_x", "sigma_biasy", "lapse_rate", "lapse_rate_2D"],
+        "1Dy-center":    ["sigma_y", "sigma_biasx", "lapse_rate", "lapse_rate_2D"],
+        "1D-center":     ["sigma_x", "sigma_y", "sigma_biasx", "sigma_biasy", "lapse_rate", "lapse_rate_2D"],
+        "1D-random":     ["sigma_x", "sigma_y", "lapse_rate", "lapse_rate_2D"]
     }
     #beta_bounds = (0.1,arena_r)
     #mu_bounds = (-arena_r,arena_r)
     lapse_bounds = (0,0.1)
 
-    sigma_bounds = (1e-20,err_tol) 
+    sigma_bounds = (1e-20,err_tol/2) 
     sigmabias_bounds = (1e-20,err_tol)     
     model_bounds = {
         "compositional": [sigma_bounds,sigma_bounds,lapse_bounds,lapse_bounds],
         "1Dx-center":    [sigma_bounds,sigmabias_bounds,lapse_bounds,lapse_bounds],
         "1Dy-center":    [sigma_bounds,sigmabias_bounds,lapse_bounds,lapse_bounds],
-        "1D-center":[sigma_bounds,sigma_bounds,sigmabias_bounds,sigmabias_bounds,lapse_bounds,lapse_bounds],
-        "1D-random":[sigma_bounds,sigma_bounds,lapse_bounds,lapse_bounds]
+        "1D-center":     [sigma_bounds,sigma_bounds,sigmabias_bounds,sigmabias_bounds,lapse_bounds,lapse_bounds],
+        "1D-random":     [sigma_bounds,sigma_bounds,lapse_bounds,lapse_bounds]
     }
     unique_param_names = np.unique(sum(list(model_paramnames.values()),[]))
 
     fixedparams = {     
                     "noncompo-random":{},
-                    "compositional":  {"betax":1,"betay":1,"lapse_rate_2D":0.05},
-                    "1Dx-center":     {"betax":1,"betay":np.nan,"biasy":0,"lapse_rate_2D":0.05},
-                    "1Dy-center":     {"betax":np.nan,"betay":1,"biasx":0,"lapse_rate_2D":0.05},
-                    "1D-center":      {"betax":1,"betay":1,"biasx":0, "biasy":0,"lapse_rate_2D":0.05},
-                    "1D-random":      {"betax":1,"betay":1,"biasx":0, "biasy":0,"lapse_rate_2D":0.05} # 
+                    "compositional":  {"betax":1,"betay":1},
+                    "1Dx-center":     {"betax":1,"betay":np.nan,"biasy":0},
+                    "1Dy-center":     {"betax":np.nan,"betay":1,"biasx":0},
+                    "1D-center":      {"betax":1,"betay":1,"biasx":0, "biasy":0},
+                    "1D-random":      {"betax":1,"betay":1,"biasx":0, "biasy":0} # 
                 }
-    all_param_names = np.array(list(unique_param_names) + ["betax", "betay","biasx","biasy","lapse_rate_2D"])
+    all_param_names = np.array(list(unique_param_names) + ["betax", "betay","biasx","biasy"])
 
 
     fit_param = []
@@ -159,18 +159,34 @@ if run_fit:
         bx,by = 1,1
         sig_x = np.power(fit_data[:,0] - bx*fit_data[:,2],2).mean()
         sig_y = np.power(fit_data[:,1] - by*fit_data[:,3],2).mean()
+        sig_x = min(max(sig_x,sigma_bounds[0]),sigma_bounds[1])
+        sig_y = min(max(sig_y,sigma_bounds[0]),sigma_bounds[1])
 
         sigbias_x = np.power(fit_data[:,0] - 0,2).mean()
         sigbias_y = np.power(fit_data[:,1] - 0,2).mean()
+        sigbias_x = min(max(sigbias_x,sigmabias_bounds[0]),sigmabias_bounds[1])
+        sigbias_y = min(max(sigbias_y,sigmabias_bounds[0]),sigmabias_bounds[1])
 
-        model_x0 = {
-            "compositional": [sig_x,sig_y,0.05,0.05],
-            "1Dx-center":    [sig_x,sigbias_y,0.05,0.0],
-            "1Dy-center":    [sig_y,sigbias_x,0.05,0.05],
-            "1D-center":     [sig_x,sig_y,sigbias_x,sigbias_y,0.05,0.05],
-            "1D-random":     [sig_x,sig_y,0.05,0.05]
+        # model_x0 = {
+        #     "compositional": [sig_x,sig_y,0.025,0.025],
+        #     "1Dx-center":    [sig_x,sigbias_y,0.025,0.025],
+        #     "1Dy-center":    [sig_y,sigbias_x,0.025,0.025],
+        #     "1D-center":     [sig_x,sig_y,sigbias_x,sigbias_y,0.025,0.025],
+        #     "1D-random":     [sig_x,sig_y,0.025,0.025]
+        # }
+        def gen_singleparam_x0s(Ns,bound):
+            rng = numpy.random.default_rng()
+            bw = (bound[1]-bound[0])/Ns
+            x0s = [rng.uniform(low=bound[0]+bw*k, high=bound[0]+bw*(k+1))  for k in range(Ns)]            
+            return x0s
+        Ns = 4
+        param_x0s = {
+            "compositional": [[sig_x],[sig_y],       gen_singleparam_x0s(Ns,lapse_bounds),gen_singleparam_x0s(Ns,lapse_bounds)],
+            "1Dx-center":    [[sig_x],[sigbias_y],   gen_singleparam_x0s(Ns,lapse_bounds),gen_singleparam_x0s(Ns,lapse_bounds)],
+            "1Dy-center":    [[sig_y],[sigbias_x],   gen_singleparam_x0s(Ns,lapse_bounds),gen_singleparam_x0s(Ns,lapse_bounds)],
+            "1D-center":     [[sig_x],[sig_y],[sigbias_x],[sigbias_y],                    gen_singleparam_x0s(Ns,lapse_bounds),gen_singleparam_x0s(Ns,lapse_bounds)],
+            "1D-random":     [[sig_x],[sig_y],       gen_singleparam_x0s(Ns,lapse_bounds),gen_singleparam_x0s(Ns,lapse_bounds)]
         }
-
         all_model_fit = []
         for mname, xystrategies in model_xystrategies.items():
             print(f"\nsub{j+1}/{np.size(valid_exptid)}: {id} {mname}")
@@ -179,11 +195,18 @@ if run_fit:
             #                         bounds=model_bounds[mname],
             #                         args=(model_paramnames[mname],xystrategies,fit_data,fixedparams[mname]),
             #                         Ns=20,n_jobs=10)
-            fit_output = wise_start_optimisation(compute_llr_across_trials,
-                                    bounds=model_bounds[mname],
-                                    args=(model_paramnames[mname],xystrategies,fit_data,arena_r,fixedparams[mname]),
-                                    x0=model_x0[mname],
-                                    minimize_args={})
+            # fit_output = wise_start_optimisation(compute_llr_across_trials,
+            #                         bounds=model_bounds[mname],
+            #                         args=(model_paramnames[mname],xystrategies,fit_data,arena_r,fixedparams[mname]),
+            #                         x0=model_x0[mname],
+            #                         minimize_args={})
+            
+            fit_output = multi_start_presetgrid_optimisation(compute_llr_across_trials,
+                                      bounds=model_bounds[mname],
+                                      args=(model_paramnames[mname],xystrategies,fit_data,arena_r,fixedparams[mname]),
+                                      preset_x0_grids=list(itertools.product(*param_x0s[mname])),
+                                      minimize_args={},
+                                      n_jobs=10)
             print(f"  fitted {model_paramnames[mname]} = {fit_output[0]}, nll = {fit_output[1]}")
             all_model_fit.append(fit_output)
         fit_param.append(all_model_fit)
@@ -193,7 +216,7 @@ if run_fit:
 
 
 ################# CHECK MODEL FIT ##############################
-check_fit = True
+check_fit = False
 if check_fit:
     fitted_data  = load(os.path.join(study_dir,f"{outout_fn}.pkl"))
     valid_exptid = fitted_data["subids"]
@@ -305,85 +328,89 @@ if check_fit:
     model_param_df["bestmodel_consistency"] = model_param_df["trainingmaps validation bestmodel"] == model_param_df["crossmaps noncenter-test bestmodel"]
     
     model_param_df.to_csv(os.path.join(study_dir,"model_fit_result.csv"))
-    compositional_ids = np.unique(model_param_df[model_param_df.iscompositional=="Compositional"].subid)
-    remove_sub = ["HWjuRibiOCvE","Z48IBZ3Fij7e","AGehrPWjRrg5","OyD5dzM26OCS"]
-    keep_sub = [id for id in valid_exptid if id not in remove_sub]
 
-    compositional_ids = [id for id in compositional_ids if id in keep_sub]
-    noncompositional_ids = [id for id in keep_sub if id not in compositional_ids]
-    sorted(compositional_ids,key=str.casefold)
+model_param_df = pd.read_csv(os.path.join(study_dir,"model_fit_result.csv"))
+compositional_ids = np.unique(model_param_df[model_param_df.iscompositional=="Compositional"].subid)
+remove_sub = ["HWjuRibiOCvE","Z48IBZ3Fij7e","d6RfFiALxFCj" "mnlCIGBYpv2b", # failed attention check
+              "AGehrPWjRrg5","OyD5dzM26OCS","dipeX0BtHt9H" "ghjUrn4eSzmZ" "qtBQpyKpwXX7" # non learners
+             ]
+keep_sub = [id for id in valid_exptid if id not in remove_sub]
 
-    best_fit_df = model_param_df[(model_param_df.modelnames==model_param_df["trainingmaps validation bestmodel"])&(~model_param_df.subid.isin(remove_sub))].copy().reset_index()
+compositional_ids = [id for id in compositional_ids if id in keep_sub]
+noncompositional_ids = [id for id in keep_sub if id not in compositional_ids]
+sorted(compositional_ids,key=str.casefold)
 
-    x_dsname = 'trainingmaps validation' 
-    compare_dsnames = ['trainingmaps training-and-center',
-                        'trainingmaps noncenter-test',
-                        'crossmaps center-test',
-                        'crossmaps noncenter-test']
-    compare_metrics = ["meantrialNLL","R2"]
+best_fit_df = model_param_df[(model_param_df.modelnames==model_param_df["trainingmaps validation bestmodel"])&(~model_param_df.subid.isin(remove_sub))].copy().reset_index()
 
-    fig_modelfit, axes_modelfit = plt.subplots(len(compare_metrics),len(compare_dsnames),figsize=(12,6))
-    for j, mtc in enumerate(compare_metrics):
-        for k, y_dsname in enumerate(compare_dsnames):
-            sns.scatterplot(best_fit_df,
-                            x = f"{x_dsname} {mtc}",
-                            y = f"{y_dsname} {mtc}",
-                            hue="iscompositional",
-                            ax = axes_modelfit[j,k])
-            axes_modelfit[j,k].set_xlabel(f"fitting dataset:\n{x_dsname} stimuli")
-            axes_modelfit[j,k].set_ylabel(f"CV dataset:\n{y_dsname} stimuli")
-            axes_modelfit[j,k].set_title(mtc)
-            metric_col = [col for col in best_fit_df if col.endswith(mtc)]
-            ax_lims = [np.min(best_fit_df[metric_col])*1.1,np.max(best_fit_df[metric_col])*1.1]
-            if mtc == "R2":
-                ax_lims[0] = min([0.5,ax_lims[0]])
-    
-            axes_modelfit[j,k].axline((ax_lims[0], ax_lims[0]), (ax_lims[1], ax_lims[1]), linewidth=2, color='r')
-            if np.logical_and(j == len(compare_metrics)-1,k == len(compare_dsnames)-1):
-                figlgdhandles, figlgdlabels = axes_modelfit[j,k].get_legend_handles_labels()
-            
-            axes_modelfit[j,k].get_legend().remove()
-            axes_modelfit[j,k].set_aspect(1)
-            axes_modelfit[j,k].set_xlim(ax_lims)
-            axes_modelfit[j,k].set_ylim(ax_lims)
-    
-    fig_modelfit.legend(figlgdhandles, figlgdlabels, loc='upper center',bbox_to_anchor=(0.5,1.1),
-                        ncol=2)
-    fig_modelfit.tight_layout()
+x_dsname = 'trainingmaps validation' 
+compare_dsnames = ['trainingmaps training-and-center',
+                    'trainingmaps noncenter-test',
+                    'crossmaps center-test',
+                    'crossmaps noncenter-test']
+compare_metrics = ["meantrialNLL","R2"]
 
-    pparams = ['sigma_x', 'sigma_y', 'lapse_rate']
-    fig_typedist, axes_typedist = plt.subplots(1,1+len(pparams),figsize=((1+len(pparams))*5,5))
+fig_modelfit, axes_modelfit = plt.subplots(len(compare_metrics),len(compare_dsnames),figsize=(12,6))
+for j, mtc in enumerate(compare_metrics):
+    for k, y_dsname in enumerate(compare_dsnames):
+        sns.scatterplot(best_fit_df,
+                        x = f"{x_dsname} {mtc}",
+                        y = f"{y_dsname} {mtc}",
+                        hue="iscompositional",
+                        ax = axes_modelfit[j,k])
+        axes_modelfit[j,k].set_xlabel(f"fitting dataset:\n{x_dsname} stimuli")
+        axes_modelfit[j,k].set_ylabel(f"CV dataset:\n{y_dsname} stimuli")
+        axes_modelfit[j,k].set_title(mtc)
+        metric_col = [col for col in best_fit_df if col.endswith(mtc)]
+        ax_lims = [np.min(best_fit_df[metric_col])*1.1,np.max(best_fit_df[metric_col])*1.1]
+        if mtc == "R2":
+            ax_lims[0] = min([0.5,ax_lims[0]])
+
+        axes_modelfit[j,k].axline((ax_lims[0], ax_lims[0]), (ax_lims[1], ax_lims[1]), linewidth=2, color='r')
+        if np.logical_and(j == len(compare_metrics)-1,k == len(compare_dsnames)-1):
+            figlgdhandles, figlgdlabels = axes_modelfit[j,k].get_legend_handles_labels()
+        
+        axes_modelfit[j,k].get_legend().remove()
+        axes_modelfit[j,k].set_aspect(1)
+        axes_modelfit[j,k].set_xlim(ax_lims)
+        axes_modelfit[j,k].set_ylim(ax_lims)
+
+fig_modelfit.legend(figlgdhandles, figlgdlabels, loc='upper center',bbox_to_anchor=(0.5,1.1),
+                    ncol=2)
+fig_modelfit.tight_layout()
+
+pparams = ['sigma_x', 'sigma_y', 'lapse_rate']
+fig_typedist, axes_typedist = plt.subplots(1,1+len(pparams),figsize=((1+len(pparams))*5,5))
+sns.histplot(best_fit_df,
+            x="trainingmaps validation bestmodel",
+            hue="modelnames",
+            ax=axes_typedist[0])
+for k,pp in enumerate(pparams):
     sns.histplot(best_fit_df,
-                x="trainingmaps validation bestmodel",
-                hue="modelnames",
-                ax=axes_typedist[0])
-    for k,pp in enumerate(pparams):
-        sns.histplot(best_fit_df,
-                x=pp,
-                hue="iscompositional",
-                ax=axes_typedist[k+1])
-        axes_typedist[k+1].set_title(pp)
-    fig_typedist.tight_layout()
+            x=pp,
+            hue="iscompositional",
+            ax=axes_typedist[k+1])
+    axes_typedist[k+1].set_title(pp)
+fig_typedist.tight_layout()
 
-    best_fit_df["sigma"] = [sx if np.isnan(sy) else sy if np.isnan(sx) else (sx+sy)/2 for sx,sy in best_fit_df[["sigma_x","sigma_y"]].to_numpy()]
-    gs_sigma = sns.relplot(
-        best_fit_df,
-        x="sigma",
-        y="trainingmaps noncenter-test meantrialNLL",
-        hue="iscompositional"
-        )
-    for ax in gs_sigma.axes.flatten():
-        ax.set_xlim([0,1.1*err_tol])
-        ax.set_ylim([0,1.1*np.max(best_fit_df["trainingmaps noncenter-test meantrialNLL"])])
-        #ax.axline(xy1=[0,0],xy2=[13,13],c="k")
+best_fit_df["sigma"] = [sx if np.isnan(sy) else sy if np.isnan(sx) else (sx+sy)/2 for sx,sy in best_fit_df[["sigma_x","sigma_y"]].to_numpy()]
+gs_sigma = sns.relplot(
+    best_fit_df,
+    x="sigma",
+    y="trainingmaps noncenter-test meantrialNLL",
+    hue="iscompositional"
+    )
+for ax in gs_sigma.axes.flatten():
+    ax.set_xlim([0,1.1*err_tol])
+    ax.set_ylim([0,1.1*np.max(best_fit_df["trainingmaps noncenter-test meantrialNLL"])])
+    #ax.axline(xy1=[0,0],xy2=[13,13],c="k")
 
-    fig_consistency,ax_consistency = plt.subplots(1,1)
-    sns.swarmplot(
-        best_fit_df,
-        x="iscompositional",
-        y="bestmodel_consistency",
-        hue="iscompositional",
-        ax=ax_consistency)
-    sns.move_legend(ax_consistency,
-                    loc="upper center",
-                    bbox_to_anchor=(0.5,1.01))
+fig_consistency,ax_consistency = plt.subplots(1,1)
+sns.swarmplot(
+    best_fit_df,
+    x="iscompositional",
+    y="bestmodel_consistency",
+    hue="iscompositional",
+    ax=ax_consistency)
+sns.move_legend(ax_consistency,
+                loc="upper center",
+                bbox_to_anchor=(0.5,1.01))
