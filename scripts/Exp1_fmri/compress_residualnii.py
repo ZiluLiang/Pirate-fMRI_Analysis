@@ -27,6 +27,7 @@ elif taskname=="localizer":
     cutoff_scan = np.array([0,326]).cumsum()
 
 for subid in subid_list:
+    print(f"compressing redisual nii for {subid}")
     firstlvl_dir = os.path.join(glm_dir,'first',subid)
     for krun in range(len(cutoff_scan)-1):
         s = cutoff_scan[krun]+1

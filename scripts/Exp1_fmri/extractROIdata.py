@@ -64,7 +64,7 @@ cross_task_beta_preproc = {# here we skip the averaging step because decoding an
                            "distance_metric":"correlation"}
 
 data = {}
-with Parallel(n_jobs=12) as parallel:
+with Parallel(n_jobs=10) as parallel:
     for roi,roifn in rois.items():
         print(f"extracting ROI data from {roi}")
         data[roi] = []

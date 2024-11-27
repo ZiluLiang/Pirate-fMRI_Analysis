@@ -82,19 +82,19 @@ class ModelRDM:
         self.stimsession = numpy.array(sessions).flatten()
 
         # for training stimuli - axis set and location
-        training_axloc = numpy.full((self.n_stim,),fill_value=numpy.nan)
-        training_axlocRev = numpy.full((self.n_stim,),fill_value=numpy.nan)
+        training_axlocTL = numpy.full((self.n_stim,),fill_value=numpy.nan)
+        training_axlocTR = numpy.full((self.n_stim,),fill_value=numpy.nan)
         training_axset = numpy.full((self.n_stim,),fill_value=numpy.nan)
         rev_mapping = dict(zip(numpy.sort(numpy.unique(self.stimloc[:,0])),
                                -numpy.sort(-numpy.unique(self.stimloc[:,0]))))
         for j,s in enumerate(self.stimgroup):
             if s == 1:
                 if numpy.logical_xor(self.stimloc[j,0] == 0, self.stimloc[j,1] == 0):
-                    training_axloc[j] = self.stimloc[j,1] if self.stimloc[j,0] == 0 else self.stimloc[j,0]
                     training_axset[j] = 1 if self.stimloc[j,0] == 0 else 0 # if stimx ==0. then training axis is y(coded as 0 in training_axset) else it would be training axis is x (coded as 1 in training_axset)
-                    training_axlocRev[j] = training_axloc[j] if training_axset[j]==0 else rev_mapping[training_axloc[j]]
+                    training_axlocTL[j] = self.stimloc[j,1] if self.stimloc[j,0] == 0 else self.stimloc[j,0]
+                    training_axlocTR[j] = training_axlocTL[j] if training_axset[j]==0 else rev_mapping[training_axlocTL[j]]
                     
-        self.training_axloc,self.training_axset, self.training_axlocRev = training_axloc, training_axset, training_axlocRev
+        self.training_axlocTL,self.training_axset, self.training_axlocTR = training_axlocTL, training_axset, training_axlocTR
 
         ############################# response location ############################# 
         if stimresploc is None:
@@ -132,8 +132,8 @@ class ModelRDM:
                 "resp_xdist":self.resploc_wrtcentre[:,0],            
                 "resp_ydist":self.resploc_wrtcentre[:,1],
                 "training_axset":self.training_axset,
-                "training_axloc":self.training_axloc,
-                "training_axlocRev": self.training_axlocRev
+                "training_axlocTL":self.training_axlocTL,
+                "training_axlocTR": self.training_axlocTR
             },                
         )
         
@@ -197,8 +197,8 @@ class ModelRDM:
         stim["resploc_xysign"] = numpy.array(self.stimdf[["resp_xsign","resp_ysign"]])
         stim["hierachical_wrtcentre"]= numpy.array(self.stimdf[["stim_xsign","stim_ysign","stim_xdist","stim_ydist"]])
         stim["hierachical_wrtlrbu"]= numpy.array(self.stimdf[["stim_xsign","stim_ysign","stim_lrbux","stim_lrbuy"]])
-        stim["training_axes"]   = numpy.array(self.stimdf[["training_axset","training_axloc"]])
-        stim["training_axesReV"]   = numpy.array(self.stimdf[["training_axset","training_axlocRev"]])
+        stim["training_axes_TL"]   = numpy.array(self.stimdf[["training_axset","training_axlocTL"]])
+        stim["training_axes_TR"]   = numpy.array(self.stimdf[["training_axset","training_axlocTR"]])
         
         
         
@@ -219,26 +219,26 @@ class ModelRDM:
                                "locwrtlrbu_localx","locwrtlrbu_localy","locwrtlrbu_localxy",  ## local features are encoded as from left-right and bottom-up
                                "hierachical_wrtcentre","hierachical_wrtlrbu",
                                # parallel training axes model (only valid for train-train distance)
-                               "PTA_locEuc","PTA_locRevEuc"
+                               "PTA_locEuc_TL","PTA_locEuc_TR"
                                ],
                               ["gtloc","stim_x","stim_y",
                                "stim_xsign","stim_ysign","stim_xysign",
                                "stim_xdist","stim_ydist","stim_xydist",
                                "stim_lrbux","stim_lrbuy","stim_lrbuxy",
                                "hierachical_wrtcentre","hierachical_wrtlrbu",
-                               "training_axloc","training_axlocRev"])) 
+                               "training_axlocTL","training_axlocTR"])) 
         for mname,col in euclidean_rdms.items():
             models[mname] = compute_rdm(stim[col],metric="euclidean")
 
         models["gtlocCityBlock"] = compute_rdm(stim["gtloc"],metric="cityblock")
 
-        nomial_rdms = dict(zip(["feature","PTA"],["features","training_axes"]))
+        nomial_rdms = dict(zip(["feature","PTA_TL","PTA_TR"],["features","training_axes_TL","training_axes_TR"]))
         for mname,col in nomial_rdms.items():
             models[mname] = compute_rdm_nomial(stim[col].squeeze())
 
         identity_rdms = dict(zip(
-                            ["feature_color","feature_shape","stimuli","stimuligroup","session","PTA_ax","PTA_locNomial","PTA_locRevNomial"],
-                            ["stim_color","stim_shape","stim_id","stim_group","stim_session","training_axset","training_axloc","training_axlocRev"]
+                            ["feature_color","feature_shape","stimuli","stimuligroup","session","PTA_ax","PTA_locNomial_TL","PTA_locNomial_TR"],
+                            ["stim_color","stim_shape","stim_id","stim_group","stim_session","training_axset","training_axlocTL","training_axlocTR"]
         ))
         for mname,col in identity_rdms.items():
             models[mname] = compute_rdm_identity(stim[col].squeeze())
