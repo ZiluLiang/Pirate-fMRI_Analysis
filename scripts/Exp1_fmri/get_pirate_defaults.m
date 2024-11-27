@@ -87,14 +87,22 @@ function pirate_defaults = setdefaults
     renamer_fn = fullfile(pirate_defaults.directory.studydir,'renamer.json');
     renamer    = loadjson(renamer_fn);
     
-    pirate_defaults.participants.ids     = fieldnames(renamer);
-    pirate_defaults.participants.nsub    = numel(pirate_defaults.participants.ids);
-    %%%%%TODO add valid participants list
-    pirate_defaults.participants.validids  = pirate_defaults.participants.ids([1:26,28:30]); % exclude sub 31 due to incomplete scans and exclude sub027 due to wierd performance
+    pirate_defaults.participants.ids         = fieldnames(renamer);
+    pirate_defaults.participants.cohort1ids  = pirate_defaults.participants.ids(cellfun(@(x) contains(string(x),'sub0'),pirate_defaults.participants.ids));
+    pirate_defaults.participants.cohort2ids  = pirate_defaults.participants.ids(cellfun(@(x) contains(string(x),'sub1'),pirate_defaults.participants.ids));
+    pirate_defaults.participants.nsub        = numel(pirate_defaults.participants.ids);
+    pirate_defaults.participants.ncohort1sub = numel(pirate_defaults.participants.cohort1ids);
+    pirate_defaults.participants.ncohort2sub = numel(pirate_defaults.participants.cohort2ids);
+    
+    %%%%%TODO add valid participants list for second cohort
+    exclude_ids = {'sub031','sub027','sub119','sub113','sub126'}; %exclude sub 31 due to incomplete scans and exclude others due to wierd inconsistent performance
+    keepids = cellfun(@(x) ~ismember(x,exclude_ids),pirate_defaults.participants.ids);
+    pirate_defaults.participants.validids  = pirate_defaults.participants.ids(keepids);
     pirate_defaults.participants.nvalidsub = numel(pirate_defaults.participants.validids);% exclude sub 31 due to incomplete scans and exclude sub027 due to wierd performance
     
     pirate_defaults.participants.nonlearnerids     = {'sub010','sub012','sub013','sub017'}'; 
-    pirate_defaults.participants.nongeneralizerids = {'sub010','sub012','sub013','sub004','sub023','sub002','sub014','sub021','sub017'}';
+    pirate_defaults.participants.nongeneralizerids = {'sub010','sub012','sub013','sub004','sub023','sub002','sub014','sub021','sub017',...
+                                                      'sub101','sub105','sub106', 'sub118', 'sub121','sub122'}';
     pirate_defaults.participants.learnerids        = pirate_defaults.participants.validids(~ismember(pirate_defaults.participants.validids, pirate_defaults.participants.nonlearnerids));
     % we only keep learners & generalizers here
     pirate_defaults.participants.generalizerids    = pirate_defaults.participants.learnerids(~ismember(pirate_defaults.participants.learnerids,pirate_defaults.participants.nongeneralizerids));
@@ -138,7 +146,7 @@ function pirate_defaults = setdefaults
     %% --------------  scanning parameters and preprocessing defaults ------------------
     pirate_defaults.fmri.voxelsize = 2.5; % voxel size in mm
     pirate_defaults.fmri.tr        = 1.73;% TR in seconds
-    pirate_defaults.fmri.nuisance_terms = {'raw','fw'}; 
+    pirate_defaults.fmri.nuisance_terms = {'raw','fw','outlier-fw'}; 
 
     %% --------------  experiment design ------------------
     pirate_defaults.exp.allstim      = 0:24;
