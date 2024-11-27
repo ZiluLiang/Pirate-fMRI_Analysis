@@ -1,4 +1,4 @@
-function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,terms,saving_dir)
+function [nuisance_regs,nN] = generate_nuisance_regressor(subimg_dir,flag_save,terms,saving_dir)
 % This function generates the nuisance regressor for first level GLM
 % analysis from the rp_*.txt files generated in the spm realignment
 % process. 
@@ -18,7 +18,7 @@ function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,te
 %    - saving_dir: the directory where the nuisance regressor files are
 %    saved
 % OUTPUT:
-%    - nuisance_reg: the matrix of nuisance regressors
+%    - nuisance_regs: the matrices of nuisance regressors stored in struct
 %    - nN: number of nuisance regressors
 % -----------------------------------------------------------------------    
 % Author: Zilu Liang
@@ -40,6 +40,7 @@ function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,te
     % setup headmotion regressors
     n_sessions = numel(rp_files);
     tasknames = cell(n_sessions,1);
+    nuisance_regs = struct();
     for j = 1:n_sessions
         [~,tasknames{j},~] = fileparts(rp_files{j});
         tasknames{j} = regexprep(tasknames{j},filepattern.preprocess.motionparam,'');
@@ -58,13 +59,20 @@ function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,te
         % get outliers - create nvol*nvol matrix OFW, for volume j with
         % fw>voxelsize, set OFW(j,j) = 1
         nvol = size(D,1);
-        OFW = zeros(nvol);
         FW_mm = FW;
         FW_mm(:,4:6) = FW_mm(:,4:6).*50;
-        FW_mm = arrayfun(@(x) sum(abs(FW_mm(x,:))),1:size(FW_mm));
-        OFW(FW_mm>fmri.voxelsize,FW_mm>fmri.voxelsize) = 1;
-        OFW = OFW.* eye(nvol);        
+        FW_mm = arrayfun(@(x) max(abs(FW_mm(x,:))),1:size(FW_mm)); % should use sum or max instead?
         
+        OFW0 = zeros(nvol);
+        OFW0(sub2ind(size(OFW0), find(FW_mm>fmri.voxelsize), find(FW_mm>fmri.voxelsize))) = 1;
+        OFW0 = OFW0(:,~all(OFW0==0,1)); % volumes when excessive hm occur
+        OFW_pre1  = [OFW0(2:end,:);zeros(1,size(OFW0,2))]; % 1 volume before ehm occur
+        OFW_post1 = [zeros(1,size(OFW0,2));OFW0(1:end-1,:)]; % 1 volume after ehm occur
+        OFW_post2 = [zeros(2,size(OFW0,2));OFW0(1:end-2,:)]; % 2nd volume after ehm occur
+        
+        OFWtmp = [OFW0,OFW_pre1,OFW_post1,OFW_post2];
+        OFW = unique(OFWtmp.','rows').';
+
         % set up nuisance regressors
         nuisance_reg = [];
         if ismember('raw',terms), nuisance_reg = [nuisance_reg,D]; end %#ok<*AGROW>
@@ -73,6 +81,9 @@ function [nuisance_reg,nN] = generate_nuisance_regressor(subimg_dir,flag_save,te
         if ismember('squared-fw',terms),  nuisance_reg = [nuisance_reg,FW2]; end
         if ismember('outlier-fw',terms),  nuisance_reg = [nuisance_reg,OFW]; end
         
+        nuisance_regs.(strrep(regexprep(tasknames{j},'sub-.*_task-',''),'_run-','')) = nuisance_reg;
+        %disp(size(OFW))
+        %disp(size(nuisance_reg))
         if flag_save
             checkdir(saving_dir)
             prefix = strrep(filepattern.preprocess.nuisance,'^','');
