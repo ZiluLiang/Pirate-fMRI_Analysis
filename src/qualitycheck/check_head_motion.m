@@ -62,8 +62,7 @@ function [T,f] = check_head_motion(subimg_dir,rp_range,rp_thres,flag_animate,fla
         % convert rotational displacements from radians to millimeters by calculating displacement on the surface of a sphere of radius 50 mm
         D(:,4:6)  = array2table(table2array(D(:,4:6))*50,'VariableNames',yvars(4:6));        
         FW(:,4:6) = array2table(table2array(FW(:,4:6))*50,'VariableNames',yvars(4:6));       
-        rp_tables{j,1} = D;
-        rp_tables{j,2} = FW;
+        
         % summaries of metrics
         sum_FW = rowfun(@(varargin) sum(cellfun(@(x) abs(x),varargin),'all'),FW,'OutputFormat','uniform');
         sum_D  = rowfun(@(varargin) sum(cellfun(@(x) abs(x),varargin),'all'),D,'OutputFormat','uniform');
@@ -73,6 +72,11 @@ function [T,f] = check_head_motion(subimg_dir,rp_range,rp_thres,flag_animate,fla
                   mean(sum_FW),...
                   sum(sum_FW>rp_thres),...
                   sum(sum_FW>rp_thres)/numel(sum_FW)];
+        % save for plotting
+        rp_tables{j,1} = D;
+        FW.FD = sum_FW;
+        rp_tables{j,2} = FW;
+        
     end
     T = array2table(T,'VariableNames',metrics);
     
@@ -86,31 +90,46 @@ end
 
 function f = plot_rp(rp_tables,tasknames,tablenames,rp_range,rp_thres,flag_showmotion)
     yvars = {'x','y','z','pitch','yaw','roll'};
+    ltitles = {'FD','x','y','z','pitch','yaw','roll'};
     n_sessions = size(rp_tables,1);
     
     f = figure;
     if ~flag_showmotion
         set(gcf,'Visible', 'off');
     end
-    tiledlayout(size(rp_tables,1),size(rp_tables,2))
+    tiledlayout(n_sessions,size(rp_tables,2),'TileSpacing','compact')
     
+    paspect_ratio = 4.5;% axis width/height in plot
     for j = 1:n_sessions
         for t = 1:numel(tablenames)
             nexttile
-            for k = 1:numel(yvars)
-                plot(1:size(rp_tables{j,t},1),rp_tables{j,t}.(yvars{k}))
-                yline(rp_thres,'r--')
-                yline(-rp_thres,'r--')
-                ylim(rp_range)
+            xs = 1:size(rp_tables{j,t},1);
+            if any(contains(rp_tables{j,t}.Properties.VariableNames,'FD'))
+                plot(xs,rp_tables{j,t}.('FD'),'DisplayName', 'FD','LineWidth',2)
                 hold on
             end
+            for k = 1:numel(yvars)
+                plot(xs,rp_tables{j,t}.(yvars{k}),'DisplayName', yvars{k})
+                hold on
+            end
+            ylim(rp_range)
+            pbaspect([paspect_ratio 1 1])
+            yline(rp_thres,'k--','DisplayName',sprintf('%.2fmm',1.25))
+            yline(-rp_thres,'k--','DisplayName',sprintf('%.2fmm',1.25))
             title(strjoin({tablenames{t},tasknames{j}},'\n'),'Interpreter','none')
         end
     end
-    hL = legend(yvars{:});
+    hL = legend(cat(2,ltitles,{sprintf('%.2fmm',1.25),''}));
     hL.Layout.Tile = 'North';
     hL.Orientation = 'horizontal';
-    f.Position = get(0, 'ScreenSize');
+    new_h      = 1/n_sessions;
+    new_w      = new_h*paspect_ratio;
+    new_w      = min([new_w,1]);
+    new_h      = new_w/paspect_ratio;
+    set(f, 'Units', 'Normalized', 'OuterPosition', [0,0, new_w*numel(tablenames), new_h*n_sessions]);
+    
+    %f.Position = newPosition;
+    
     sgtitle(sprintf('rotational displacements converted from radians to mm \n by calculating displacement on the surface of a 50mm-radius sphere'),...
         'FontSize',8)
 end
