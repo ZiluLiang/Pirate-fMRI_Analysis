@@ -1,0 +1,283 @@
+---
+title: "3_clusterTask"
+output: html_document
+date: "2024-03-20"
+---
+
+```{r setup, include=FALSE}
+
+rm(list = ls())
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE,fig.height = 5,fig.width = 8)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+#load(file.path(data_dir,"allexpdata_compo_lapse-0_01.RData"))
+#load(file.path(bhavdata_dir,"allexpdata_reclassify.RData"))
+
+simulation_dir = "E:/compositionality_theories/NeuralNetworkModel"
+studyname = 'pirate_1map_PH_pretrainfeature_nobias_rich_lrpoint5_axiscenteratzero'
+result_dir = file.path(simulation_dir, "analysis",studyname, fsep="/")
+
+```
+
+```{r}
+fitted_param_df = read.csv(file.path(result_dir,"transfer experiment","model_fit_timecourse.csv"))%>%
+  mutate(trainorevaluate=factor(stage,
+                                levels=c("ts_training","ts_evaluation"),
+                                labels=c("training","evaluation")),
+         synctransfer = factor(
+           if_else(xtransfer==ytransfer,"sync","async"),
+           levels=c("sync","async"))
+         )%>%
+  filter(xtransfer==ytransfer)
+
+head(fitted_param_df)
+
+
+```
+
+
+
+```{r,fig.height = 4,fig.width = 6}
+fitted_param_df = fitted_param_df%>%
+  filter(yvar!="loss")
+
+fitted_param_df_sum = fitted_param_df%>%
+  aggregate_data(groupbyvars = c("procedure","transfer_test","trainorevaluate","yvar"),
+                 yvars = c("N0","rate","r2"),
+                 stats = c("mu","se"),
+                 additionalvars = c("synctransfer","xtransfer","ytransfer"))
+
+# ggplot(data=fitted_param_df_sum,
+#        aes(x=autoweight,group=transfer_test,color=transfer_test))+
+#   facet_grid(col=vars(trainorevaluate))+
+#   geom_point(aes(y=mu_N0),position=position_dodge(0),fill=NA)+
+#   geom_errorbar(aes(ymin=mu_N0-se_N0,
+#                     ymax=mu_N0+se_N0),
+#                 position=position_dodge(0),
+#                 width=0.3)+
+#   geom_point(
+#     data=fitted_param_df,
+#     aes(y=N0),
+#     position=position_dodge(1),
+#     alpha=0.8
+#   )
+  
+ggplot(data=fitted_param_df_sum,
+       aes(x=procedure,group=transfer_test,color=transfer_test))+
+  facet_nested_wrap(vars(trainorevaluate, yvar),nrow=2,axes="all")+
+  geom_point(aes(y=mu_rate),position=position_dodge(1),fill=NA)+
+  geom_col(aes(y=mu_rate),position=position_dodge(1),fill=NA)+
+  geom_errorbar(aes(ymin=mu_rate-se_rate,
+                    ymax=mu_rate+se_rate),
+                position=position_dodge(1),
+                width=0.1)+
+  geom_point(
+      data=fitted_param_df,
+      aes(y=.data[["rate"]]),
+      position=position_dodge(1),
+      alpha=0.7,
+      size=1
+    )+
+  labs(y=bquote("Decay Rate (" ~ alpha ~ ")"))+
+  theme(aspect.ratio = 0.3,legend.position = "top", legend.direction = "horizontal")
+```
+```{r}
+ggplot(data=fitted_param_df_sum,
+       aes(x=procedure,group=transfer_test,color=transfer_test))+
+  facet_nested_wrap(vars(trainorevaluate, yvar),nrow=2,axes="all")+
+  geom_point(aes(y=mu_r2),position=position_dodge(1),fill=NA)+
+  geom_col(aes(y=mu_r2),position=position_dodge(1),fill=NA)+
+  geom_errorbar(aes(ymin=mu_r2-se_r2,
+                    ymax=mu_r2+se_r2),
+                position=position_dodge(1),
+                width=0.1)+
+  labs(y=bquote("Decay Rate (" ~ alpha ~ ")"))+
+  theme(aspect.ratio = 0.3,legend.position = "top", legend.direction = "horizontal")
+```
+
+
+```{r,fig.height = 4,fig.width = 16}
+fitted_param_df_sum = fitted_param_df%>%
+  aggregate_data(groupbyvars = c("autotype","autoweight","transfer_test","trainorevaluate"),
+                 yvars = c("N0","rate","r2"),
+                 stats = c("mu","se"))%>%
+  mutate(autoweight=factor(autoweight))
+
+ggplot(data=fitted_param_df_sum,
+       aes(x=autoweight,group=transfer_test,color=transfer_test))+
+  facet_grid(col=vars(trainorevaluate))+
+  geom_col(aes(y=mu_N0),position=position_dodge(1),fill=NA)+
+  geom_errorbar(aes(ymin=mu_N0-se_N0,
+                    ymax=mu_N0+se_N0),
+                position=position_dodge(1),
+                width=0.3)+
+  geom_point(
+    data=fitted_param_df%>%mutate(autoweight=factor(autoweight)),
+    aes(y=N0),
+    position=position_dodge(1),
+    alpha=0.8
+  )
+  
+ggplot(data=fitted_param_df_sum,
+       aes(x=autoweight,group=transfer_test,color=transfer_test))+
+  facet_grid(col=vars(trainorevaluate))+
+  geom_col(aes(y=mu_rate),position=position_dodge(1),fill=NA)+
+  geom_errorbar(aes(ymin=mu_rate-se_rate,
+                    ymax=mu_rate+se_rate),
+                position=position_dodge(1),
+                width=0.3)+
+  geom_point(
+    data=fitted_param_df%>%mutate(autoweight=factor(autoweight)),
+    aes(y=rate),
+    position=position_dodge(1),
+    alpha=0.5
+  )+
+  theme(aspect.ratio = 0.5)
+```
+
+## weight change
+```{r}
+weight_rgb_pal = list(c(0.7126489811610919, 0.10711264898116109, 0.28081507112648985),
+                      c(0.8141484044598232, 0.2196847366397539, 0.3048058439061899),
+                      c(0.8758169934640523, 0.3045751633986928, 0.29411764705882354),
+                      c(0.9330257593233372, 0.3913110342176086, 0.27197231833910035),
+                      c(0.9665513264129182, 0.49742406766628217, 0.295040369088812),
+                      c(0.9817762399077278, 0.6073817762399076, 0.3457900807381776),
+                      c(0.9928489042675894, 0.716955017301038, 0.40945790080738165),
+                      c(0.9946943483275663, 0.8092272202998846, 0.48696655132641287),
+                      c(0.9963860053825452, 0.8879661668589004, 0.5610918877354863),
+                      c(0.9982314494425221, 0.9451749327181853, 0.6570549788542868),
+                      c(0.998077662437524, 0.9992310649750096, 0.7460207612456747),
+                      c(0.9557862360630527, 0.9823144944252211, 0.6800461361014996),
+                      c(0.9096501345636295, 0.9638600538254518, 0.6080738177623992),
+                      c(0.8202998846597465, 0.9275663206459055, 0.6126874279123413),
+                      c(0.7114186851211075, 0.8832756632064592, 0.6348327566320646),
+                      c(0.5910034602076126, 0.835524798154556, 0.6442906574394464),
+                      c(0.47427912341407163, 0.7898500576701268, 0.6459823144944252),
+                      c(0.3600153787004998, 0.7161860822760476, 0.6655132641291811),
+                      c(0.26405228758169935, 0.6091503267973857, 0.7098039215686275),
+                      c(0.21299500192233756, 0.5114186851211072, 0.730795847750865),
+                      c(0.2941945405613224, 0.4062283737024224, 0.680968858131488))
+
+weight_hex_pal = unlist(lapply(weight_rgb_pal, function(arr){do.call(rgb,as.list(arr))}))
+
+```
+
+
+```{r}
+weightchange_df = read.csv(file.path(result_dir,"transfer experiment","weightchange.csv"))%>%
+  mutate(autoweight_type=factor(autoweight_type,
+                                levels=c("no auto",
+                                         "auto+hetero",
+                                         "no hetero")),
+         weightchangetype=factor(weightchangetype),
+         changefrom = factor(changefrom,
+                             levels=c("init_to_learned","learned_to_derangement-derangement","learned_to_reversal-reversal" ),
+                             labels=c("init to learned","learned to derangement","learned to reversal")),
+         layer     = factor(layer,levels=c("encoding","decoding")))
+
+
+```
+
+
+```{r,fig.width=6,fig.height=3}
+wcmetrics = c("weightchange","relativeweightchange")
+weightchange_df_aw01 = filter(weightchange_df, autoweight%in%c(0,1))%>%
+  aggregate_data(groupbyvars = c("autotype","autoweight_type","layer","changefrom","run") ,
+                 yvars = wcmetrics,
+                 additionalvars = c("weightchangetype"),
+                 stats = c("mu"))%>%
+  change_cols_name(oldnames = paste("mu",wcmetrics,sep="_"),
+                   newnames = wcmetrics)
+weightchange_df_awmixed = filter(weightchange_df, !autoweight%in%c(0,1))%>%
+  aggregate_data(groupbyvars = c("autotype","autoweight_type","layer","changefrom","run") ,
+                 yvars = wcmetrics,
+                 additionalvars = c("weightchangetype"),
+                 stats = c("mu"))%>%
+  change_cols_name(oldnames = paste("mu",wcmetrics,sep="_"),
+                   newnames = wcmetrics)
+
+weightchange_df_grouped = rbind(weightchange_df_aw01,weightchange_df_awmixed)%>%
+  mutate(autoweight_type=factor(autoweight_type,
+                                levels=c("no auto",
+                                         "auto+hetero",
+                                         "no hetero")))%>%
+  filter(changefrom!="init to learned")
+
+weightchange_df_grouped_sum = weightchange_df_grouped%>%
+  aggregate_data(
+    groupbyvars = c("autotype","autoweight_type","layer","changefrom"),
+    yvars = wcmetrics,
+    additionalvars = c("weightchangetype"),
+    stats=c("mu","se")
+  )
+
+
+yvar_names = list(weightchange = bquote("Weight Change (" ~ Delta ~ w == w[2]-w[1] ~ ")"),
+                  relativeweightchange = bquote("Relative Weight Change (" ~ Delta ~ w ~ "/||" ~ w[1] ~"||)"))
+
+for (yvar in wcmetrics){
+  muvar = paste0("mu_",yvar)
+  sevar = paste0("se_",yvar)
+  p = ggplot(weightchange_df_grouped_sum,aes(x=layer,color=changefrom,group=interaction(changefrom)))+
+    facet_nested_wrap(vars(autoweight_type))+
+    geom_point(data=weightchange_df_grouped,aes(y=.data[[yvar]],group=interaction(changefrom)),
+               position=position_dodge(1),alpha=0.5,linewidth=0.4)+
+    geom_point(aes(y=.data[[muvar]]),position=position_dodge(1),size=2)+
+    geom_line(aes(y=.data[[muvar]]),position=position_dodge(1),linewidth=0.8)+
+    geom_errorbar(aes(ymin=.data[[muvar]] - .data[[sevar]],
+                      ymax=.data[[muvar]] + .data[[sevar]]),
+                  width=0.1,position=position_dodge(1),linewidth=0.8)+
+    theme(aspect.ratio = 1,legend.position = "top",legend.direction = "horizontal") + 
+    labs(y=yvar_names[[yvar]])+
+    scale_y_continuous(trans="sqrt")
+  show(p)
+}
+```
+
+
+```{r,fig.width=7,fig.height=4}
+weight_hex_pal
+transferweightchange_df = weightchange_df%>%
+  mutate(autoweight=factor(autoweight))%>%
+  filter(changefrom!="init to learned")
+transferweightchange_df_sum = transferweightchange_df%>%
+  aggregate_data(
+    groupbyvars = c("autotype","autoweight","layer","changefrom"),
+    yvars = c("weightchange","relativeweightchange"),
+    additionalvars = c("weightchangetype","autoweight_type"),
+    stats=c("mu","se")
+  )
+
+
+yvar_names = list(weightchange = bquote("Weight Change (" ~ Delta ~ w == w[2]-w[1] ~ ")"),
+                  relativeweightchange = bquote("Relative Weight Change (" ~ Delta ~ w ~ "/||" ~ w[1] ~"||)"))
+
+
+for (yvar in c("weightchange","relativeweightchange")){
+  muvar = paste0("mu_",yvar)
+  sevar = paste0("se_",yvar)
+  p = ggplot(transferweightchange_df_sum,aes(x=layer,color=autoweight,group=interaction(autoweight)))+
+    facet_nested_wrap(vars(changefrom))+
+    geom_line(data=transferweightchange_df,aes(y=.data[[yvar]],group=interaction(autoweight,run)),alpha=0.1,linewidth=0.4)+
+    geom_point(aes(y=.data[[muvar]]),size=2)+
+    geom_line(aes(y=.data[[muvar]]),linewidth=1)+
+    geom_errorbar(aes(ymin=.data[[muvar]] - .data[[sevar]],
+                      ymax=.data[[muvar]] + .data[[sevar]]),
+                  width=0.1,linewidth=0.8)+
+    scale_color_manual(values=weight_hex_pal)+
+    guides(colour = guide_legend(nrow = 2))+
+    labs(y=yvar_names[[yvar]])+
+    scale_y_continuous(trans="sqrt",breaks=c(0,0.5,1,1.5))+
+    theme(aspect.ratio = 1,legend.position = "top",legend.direction = "horizontal")
+  show(p)
+}
+
+```
+
