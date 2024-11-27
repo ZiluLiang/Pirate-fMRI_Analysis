@@ -180,6 +180,14 @@ function multi = gen_multiconditions(data,cond_names,pmod_names,custom_cfg)
 
     end
     
+    % we filter out empty columns
+    nonempty_conds = cellfun(@(x) ~isempty(x),onsets);
+    cond_names  = cond_names(nonempty_conds);
+    onsets      = onsets(nonempty_conds);
+    durations   = durations(nonempty_conds);
+    orth        = orth(nonempty_conds);
+    tmod        = tmod(nonempty_conds);
+    pmod        = pmod(nonempty_conds);
     multi = cell2struct({cond_names,onsets,durations,orth,tmod,pmod}',...
                         {'names','onsets','durations','orth','tmod','pmod'});
 end
