@@ -14,6 +14,7 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
 % - groupglm_cov: covariate for group level glm. should be like:
 %                   struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}) or
 %                   struct('files', {}, 'iCFI', {}, 'iCC', {})
+% - flag_savers: save residuals?
 % OUTPUT:
 % - error_tracker: this function do not pause when spm job runs into error,
 %                  errors are returned for tracking which participants' 
@@ -56,7 +57,7 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
     if isfield(steps,'first') && ~isempty(steps.first)
         %parfor isub = 1:nsub
         for isub = 1:nsub
-            err_tracker_1st(isub) = run_firstlevel(subidlist{isub},glm_name,glm_dir,preproc_img_dir,steps.first);
+            err_tracker_1st(isub) = run_firstlevel(subidlist{isub},glm_name,glm_dir,preproc_img_dir,steps.first,flag_saveres);
         end
         err_tracker{1} = err_tracker_1st;
     end
@@ -68,7 +69,7 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
 end
 
 %==========================First Level=====================
-function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,steps)
+function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,steps,flag_saveres)
     subimg_dir  = fullfile(preproc_img_dir,subid);
     glm_config  = glm_configure(glm_name);    
     output_dir  = fullfile(glm_dir,'first',subid);
@@ -99,10 +100,11 @@ function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,s
             if ~isempty(glm_config.contrasts)
                 fprintf('%s: Computing first-level contrast for %s \n', glm_name, subid)
                 contrast_weights = cellfun(@(v) gen_contrast_matrix(fullfile(output_dir,'SPM.mat'),v),{glm_config.contrasts.wvec},'uni',0);
-    
+                keep_contrasts = cellfun(@(x) any(x),contrast_weights);
+
                 glm_contrast(output_dir,...
-                             {glm_config.contrasts.name},...
-                             contrast_weights);
+                             {glm_config.contrasts(keep_contrasts).name},...
+                             contrast_weights(keep_contrasts));
                 fprintf('%s: Completed first-level contrast for %s \n',glm_name,subid)
             end
         end

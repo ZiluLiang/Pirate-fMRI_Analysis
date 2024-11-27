@@ -43,14 +43,16 @@ function w_mat = gen_contrast_matrix(subSPM,weights,flag_rescale)
         % This is a SUPER BAD solution to deal with constraints in struct field naming, need to come up with cleaner solution
         reg_pattern = cellfun(@(x) regexpPattern(strrep(x,'_','.*')),weighted_regressors,'uni',0);
         if ~all(cellfun(@(x) any(contains(subSPM.xX.name,x)),reg_pattern))
-            error('the following regressors are not found in the model: %s', ...
-                strjoin(weighted_regressors(cellfun(@(x) ~ismember(x,subSPM.xX.name),reg_pattern)),', ') ...
+            warning('the following regressors are not found in the model and will be removed: %s', ...
+                strjoin(weighted_regressors(cellfun(@(x) ~any(contains(subSPM.xX.name,x)),reg_pattern)),', ') ...
                 )
+            weighted_regressors = weighted_regressors(cellfun(@(x) any(contains(subSPM.xX.name,x)),reg_pattern));
         end        
-        w_mat = zeros(numel(weights),numel(subSPM.xX.name));
+        Nrows = numel(weights);
+        w_mat = zeros(Nrows,numel(subSPM.xX.name));
         for j = 1:numel(weighted_regressors)
             reg_idx = find_regressor_idx(subSPM,reg_pattern{j});
-            w_col   = reshape([weights.(weighted_regressors{j})],numel(weights),1) ./ (numel(reg_idx)^flag_rescale);
+            w_col   = reshape([weights.(weighted_regressors{j})],Nrows,1) ./ (numel(reg_idx)^flag_rescale);
             w_mat(:,reg_idx) = repmat(w_col,1,numel(reg_idx));
         end
     end    
