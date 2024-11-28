@@ -1,6 +1,6 @@
 """
-This module contains class that wraps up RSA analysis in ROI or whole brain into a pipeline.
-The runner class is dependent on the file structure as specified in `FILESTRUCTURE.md`
+This module contains class that wraps up MVPA analysis in ROI or whole brain into a pipeline, specific to study 1 of the pirate project.
+The runner class is dependent on the file structure as specified in `FILESTRUCTURE.md` and the participant data
 
 Zilu Liang @HIPlab Oxford
 2023
@@ -384,117 +384,8 @@ class RSARunner:
         preproc_func = chain_steps(*list(preproc.values()))
         activitypattern = preproc_func(X)
         return activitypattern, compute_rdm(activitypattern,self.config_neuralrdm["distance_metric"]), X
-        
-############################################### SINGLE PARTICIPANT LEVEL ANALSYSIS METHODS ###################################################
-    def _singleparticipant_ROIRSA(self, subid,
-               analyses:list=[],
-               returnX=False,
-               verbose:bool=False):
-        if verbose:
-            sys.stderr.write(f"{subid}\r")
-        
-        ## compute model rdm
-        modelrdm  = self.get_modelRDM(subid)        
-
-        ## get neural data
-        activitypattern, neural_rdm, _ = self.get_neuralRDM(subid)
-        neuralrdmdf = modelrdm.rdm_to_df(modelnames="neural",rdms=neural_rdm)
-        neuralrdmdf = neuralrdmdf.assign(subid=subid)
-
-        nsession = np.sum(self.nsession)
-
-        res_df_list = []
-        for A in analyses:
-            if A["type"] == "regression":                
-                m_regs = A["regressors"]
-                if nsession>1: # if multiple runs do between and within run as well
-                    if verbose:
-                        sys.stderr.write(f'running regression in ROI {A["name"]} - betweenrun\r')
-                    m_regs = [f'between_{x}' for x in A["regressors"]]
-                    if not all([x in modelrdm.models.keys() for x in m_regs]):
-                        warnings.warn("this analysis contains invalid regressor so it will be skipped")
-                    else:
-                        regress_models = [modelrdm.models[m] for m in m_regs]
-                        reg_estimator = MultipleRDMRegression(activitypattern,
-                                                modelrdms=regress_models,
-                                                modelnames=m_regs,
-                                                standardize=True,
-                                                rdm_metric=self.config_neuralrdm["distance_metric"])
-                        reg_estimator.fit()
-                        mrdm_name_dict = dict(zip(range(len(m_regs)),m_regs))
-                        reg_df = pd.DataFrame(reg_estimator.result).T.rename(columns = mrdm_name_dict).assign(analysis=A["name"],subid=subid)
-                        res_df_list.append(reg_df)
-                else:
-                    if verbose:
-                        sys.stderr.write(f'running regression in ROI {A["name"]} - all\r')                                        
-                    if not all([x in modelrdm.models.keys() for x in m_regs]):
-                        warnings.warn("this analysis contains invalid regressor so it will be skipped")
-                    else:
-                        regress_models = [modelrdm.models[m] for m in m_regs]
-                        reg_estimator = MultipleRDMRegression(activitypattern,
-                                                    modelrdms=regress_models,
-                                                    modelnames=m_regs,
-                                                    standardize=True,
-                                                    rdm_metric=self.config_neuralrdm["distance_metric"])
-                        reg_estimator.fit()
-                        regmrdm_name_dict = dict(zip(range(len(m_regs)),m_regs))
-                        reg_df = pd.DataFrame(reg_estimator.result).T.rename(columns = regmrdm_name_dict).assign(analysis=A["name"],subid=subid)
-                        res_df_list.append(reg_df)
-                    
-            elif A["type"] == "correlation":
-                assert "modelrdms" in A.keys(), "must specify the model rdms to run correlation with!"
-                corr_rdm_names = deepcopy(A["modelrdms"])
-                
-                if nsession>1: # if multiple runs do between and within run as well
-                    corr_rdm_names = corr_rdm_names + [f'between_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()] + [f'within_{x}' for x in A["modelrdms"] if x in modelrdm.models.keys()]
-                
-                corr_rdm_names = [x for x in A["modelrdms"] if x in modelrdm.models.keys()]
-
-                corr_rdm_vals = [modelrdm.models[m] for m in corr_rdm_names]
-
-                # run analysis
-                if verbose:
-                    sys.stderr.write(f"running correlation in ROI {A['name']}\r")
-                corr_estimator = PatternCorrelation(activitypattern,
-                                   modelrdms=corr_rdm_vals, 
-                                   modelnames=corr_rdm_names,
-                                   type="spearman",
-                                   rdm_metric=self.config_neuralrdm["distance_metric"])
-                corr_estimator.fit()
-                mrdm_name_dict = dict(zip(range(len(corr_rdm_names)),corr_rdm_names))
-                corr_df = pd.DataFrame(corr_estimator.result).T.rename(columns = mrdm_name_dict).assign(analysis=A["name"],subid=subid)
-                res_df_list.append(corr_df)
-                
-            elif A["type"] == "representation_stability":
-                groups = np.concatenate([np.ones((25,))*j for j in range(nsession)])
-
-                # run analysis
-                if verbose:
-                    sys.stderr.write(f"running correlation in ROI {A['name']}")
-                ns_estimator = NeuralRDMStability(activitypattern,
-                                   groups=groups,
-                                   type="spearman")
-                ns_estimator.fit()
-                ns_df = pd.DataFrame(ns_estimator.result,index=[0]).T.rename(columns = {0:"neuralstability"}).assign(analysis=A["name"],subid=subid)
-                res_df_list.append(ns_df)
-
-        if returnX:
-            return pd.concat(res_df_list,axis=0).reset_index(drop=True),neuralrdmdf, activitypattern    
-        else:
-            return pd.concat(res_df_list,axis=0).reset_index(drop=True),neuralrdmdf
-        
+               
 ############################################### RUN SINGLE PARTICIPANT LEVEL ANALYSIS IN BATCH ###################################################   
-    def run_ROIRSA(self,njobs:int=1,corr_rdm_names=None,analyses=[],returnX=False,verbose=False):
-        with Parallel(n_jobs=njobs) as parallel:
-            op_list = parallel(
-                delayed(self._singleparticipant_ROIRSA)(subid,corr_rdm_names,analyses,returnX=returnX,verbose=verbose) for subid in self.participants)
-        corr_df = pd.concat([x[0] for x in op_list],axis=0) 
-        rdm_df = pd.concat([x[1] for x in op_list],axis=0)
-        if returnX:
-            ROIX = [x[2] for x in op_list]
-            return corr_df,rdm_df,ROIX
-        else:
-            return corr_df,rdm_df   
 
     def run_SearchLight(self,radius:float,outputdir:str,njobs:int=cpu_count()-1,
                            analyses:dict={}):

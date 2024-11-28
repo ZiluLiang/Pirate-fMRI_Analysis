@@ -147,7 +147,7 @@ def plot_rdm_withlabel(rdm_mat:np.ndarray,
 
 def plot_rdm_mds(rdm:np.ndarray,ncompo:int,
                  stimdf:pd.DataFrame,gcol:str,huecol:str,
-                 stylecol:str,stim_namer:callable=None,plot_3d=True):
+                 stylecol:str,stim_namer:callable=None,plot = True,plot_3d=True,mds_seed=None):
     """plot rdm and mds based on rdm
 
     Parameters
@@ -172,14 +172,13 @@ def plot_rdm_mds(rdm:np.ndarray,ncompo:int,
     tuple
         fig, np.array([ax1,ax2]), X_df
     """
-    fig = plt.figure(figsize=(7,3))
     if np.logical_and(plot_3d,ncompo<3):
         plot_3d = False
 
-    ax1 = fig.add_subplot(121)
-    mds_rdm = deepcopy(rdm)
-    eng = matlab.engine.start_matlab()
-    X_transformed = np.array(eng.cmdscale(rdm,ncompo)) # MDS(n_components=ncompo,metric=True,dissimilarity='precomputed').fit_transform(rdm)
+    matlabeng = matlab.engine.start_matlab()
+    X_transformed = np.array(matlabeng.cmdscale(rdm,ncompo)) 
+    matlabeng.quit()
+    #X_transformed =  MDS(n_components=ncompo,metric=False,dissimilarity='precomputed',normalized_stress='auto', n_init=500, random_state=mds_seed).fit_transform(rdm)
     if ncompo>X_transformed.shape[1]:
         print("MDS returning fewer components than required, remaining dimensions are filled with zero")
         fill_zeros = np.zeros((X_transformed.shape[0],ncompo-X_transformed.shape[1]))
@@ -197,31 +196,106 @@ def plot_rdm_mds(rdm:np.ndarray,ncompo:int,
     else:
         X_df["stim_name"] = [stim_namer(x,y) for x,y in zip(np.array(X_df[huecol]),np.array(X_df[stylecol]))]
 
-    plot_rdm_withlabel(rdm,lower_tri_only=True,stimgroups=lg,
-                            xticks=np.arange(rdm.shape[0])+.5,yticks=np.arange(rdm.shape[0])+.5,
-                            stimlabels_x=np.array(X_df["stim_name"]),
-                            stimlabels_y=np.array(X_df["stim_name"]),
-                            colors=lg_palette,ax=ax1)
-    if plot_3d:
-        ax2 = fig.add_subplot(122,projection='3d')
-        plt_arr = np.array(X_df[["MDS ax1","MDS ax2","MDS ax3",gcol,"stim_name"]])
-        for j,arr in enumerate(plt_arr):
-            m1,m2,m3,sg,sname = arr
-            ax2.text(m1,m2,m3,sname, color=lg_palette[sg])
-        ax2.set_xlabel("MDS ax1")
-        ax2.set_ylabel("MDS ax2")
-        ax2.set_zlabel("MDS ax3")
-        axlim_x = np.min(plt_arr[:,:2]), np.max(plt_arr[:,:2])
-        axlim_y = np.min(plt_arr[:,:2]), np.max(plt_arr[:,:2])
-        axlim_z = np.min(plt_arr[:,:2]), np.max(plt_arr[:,:2])
-        ax2.set_xlim(*axlim_x)
-        ax2.set_ylim(*axlim_y)
-        ax2.set_zlim(*axlim_z)
-        #plt.legend(*sc.legend_elements(),loc="center",bbox_to_anchor=(1.1,0.5))
+    if plot:
+        fig = plt.figure(figsize=(10,4))
+        ax1 = fig.add_subplot(121)
+
+        plot_rdm_withlabel(rdm,lower_tri_only=True,stimgroups=lg,
+                                xticks=np.arange(rdm.shape[0])+.5,yticks=np.arange(rdm.shape[0])+.5,
+                                stimlabels_x=np.array(X_df["stim_name"]),
+                                stimlabels_y=np.array(X_df["stim_name"]),
+                                colors=lg_palette,ax=ax1)
+        if plot_3d:
+            ax2 = fig.add_subplot(122,projection='3d')
+            plt_arr = np.array(X_df[["MDS ax1","MDS ax2","MDS ax3",gcol,"stim_name"]])
+            for j,arr in enumerate(plt_arr):
+                m1,m2,m3,sg,sname = arr
+                ax2.text(m1,m2,m3,sname, color=lg_palette[sg])
+            ax2.set_xlabel("MDS ax1")
+            ax2.set_ylabel("MDS ax2")
+            ax2.set_zlabel("MDS ax3")
+            axlim_x = np.min(plt_arr[:,:2]), np.max(plt_arr[:,:2])
+            axlim_y = np.min(plt_arr[:,:2]), np.max(plt_arr[:,:2])
+            axlim_z = np.min(plt_arr[:,:2]), np.max(plt_arr[:,:2])
+            ax2.set_xlim(*axlim_x)
+            ax2.set_ylim(*axlim_y)
+            ax2.set_zlim(*axlim_z)
+            #plt.legend(*sc.legend_elements(),loc="center",bbox_to_anchor=(1.1,0.5))
+        else:
+            ax2 =fig.add_subplot(122)
+            sns.scatterplot(X_df,x="MDS ax1",y="MDS ax2", hue=huecol,style=stylecol,ax=ax2)
+            sns.move_legend(ax2,loc="center",bbox_to_anchor=(1.4,0.5))
+        fig.tight_layout()
+        return fig, np.array([ax1,ax2]), X_df
     else:
-        ax2 =fig.add_subplot(122)
-        sns.scatterplot(X_df,x="MDS ax1",y="MDS ax2", hue=huecol,style=stylecol,ax=ax2)
-        sns.move_legend(ax2,loc="center",bbox_to_anchor=(1.3,0.5))
+        return X_df
+
+def gen_pval_annot(p,show_pval=0.1):
+    asterisks = np.array(["","*","**","***"])
+    plevel    = [p>=0.05,all([p<0.05,p>=0.01]),all([p<0.01,p>=0.001]),p<0.001]
+    if type(show_pval) == bool:
+        if show_pval:
+            showpths = 0.1 if show_pval else 0
+    elif isinstance(show_pval,float):
+        showpths = show_pval           
+    else:
+        raise Exception("`show_pval` must be float or boolean")
+    annot = 'p=%.3f%s' % (p,asterisks[plevel][0]) if p<showpths else asterisks[plevel][0]  
+    return annot
+
+def grouped_barscatter_withstats(datadf,
+                                 facet_vars,xvar, gvar, yvar, 
+                                 prows,pcols,hrow=6,wcol=7,hues=None,
+                                 yvartest=None, statfunc=None,
+                                 ):
+    assert prows*pcols>=len(list(enumerate(datadf.groupby(facet_vars))))
+    yvartest = yvar if yvartest is None else yvartest
+    assert all([x in datadf.columns for x in [xvar, gvar, yvar, yvartest]])
+
+    if not isinstance(datadf[gvar].dtype, pd.api.types.CategoricalDtype):
+        datadf[gvar] = pd.Categorical(datadf[gvar],categories=np.unique(datadf[gvar]))
+    group_names = datadf[gvar].cat.categories
+    if isinstance(hues, list):
+        hue_dict = dict(zip(group_names,hues))
+    elif isinstance(hues,dict):
+        hue_dict = hues
+    else:
+        hue_dict = dict(zip(group_names,sns.color_palette(None,len(group_names))))
+
+    if statfunc is None:
+        statfunc = lambda yt: scipy.stats.wilcoxon(yt,alternative="greater").pvalue
+    
+    fig,axes = plt.subplots(prows,pcols,figsize=(wcol*pcols,hrow*prows))
+    y_lim = np.array([np.min(datadf[yvar]),np.max(datadf[yvar])])*1.1
+        
+    for ifacet,(facet_val,facet_df) in enumerate(datadf.groupby(facet_vars)):
+        xr = 0.3
+        n_group = len(group_names)
+        bw = xr*2/n_group
+        dodge_r = xr-bw/2
+        xdev = list(np.linspace(-dodge_r,dodge_r,n_group,endpoint=True))
+        x_centers=np.arange(np.unique(facet_df[xvar]).size)
+        x_names = facet_df[xvar].cat.categories
+        for kg,(gname,g_df) in enumerate(facet_df.groupby(gvar)):
+            x_locs = dict(zip(x_names ,x_centers+xdev[kg]))
+            for xname,xloc in x_locs.items():   
+                y = g_df[g_df[xvar]==xname][yvar].to_numpy()
+                yt = g_df[g_df[xvar]==xname][yvartest].to_numpy()
+                jitt_x = np.random.random(y.shape)*.5*dodge_r - .5*dodge_r/2
+                axes.flatten()[ifacet].text(x=xloc-dodge_r, y=y_lim[1]/(1.1+0.05*kg),s=gen_pval_annot(statfunc(yt)),color=hue_dict[gname])
+                axes.flatten()[ifacet].scatter(x=xloc*np.ones_like(y)+jitt_x,y=y,color=hue_dict[gname],s=5,alpha=0.6)
+                axes.flatten()[ifacet].bar(xloc,y.mean(),width=(bw)*0.95,label=gname,
+                                    color='None',edgecolor=hue_dict[gname])
+                axes.flatten()[ifacet].errorbar(xloc,y.mean(),yerr=y.std()/np.sqrt(y.size),capsize=5,
+                                    barsabove=True,
+                                    ecolor=hue_dict[gname],alpha=1,linewidth=2)
+        axes.flatten()[ifacet].set_xticks(ticks=np.arange(x_names.size),
+                                        labels=x_names,
+                                        fontweight="bold")
+        axes.flatten()[ifacet].set_ylim(y_lim)
+
+        axes.flatten()[ifacet].set_ylabel(yvar,fontweight="bold",fontsize="large")
+        axes.flatten()[ifacet].set_title(f"{facet_val}",fontweight="bold",fontsize="x-large")
+        axes.flatten()[ifacet].set_xlabel(xvar,fontweight="bold",fontsize="large")
     fig.tight_layout()
-    eng.quit()
-    return fig, np.array([ax1,ax2]), X_df
+    return fig,axes
