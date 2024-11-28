@@ -12,10 +12,10 @@ import sys
 from joblib import Parallel, delayed, cpu_count, dump,load
 
 project_path = r'E:\pirate_fmri\Analysis'
-sys.path.append(os.path.join(project_path,'src'))
+sys.path.append(os.path.join(project_path))
 from zpyhelper.filesys import checkdir
 
-from multivariate.mvpa_runner import RSARunner
+from multivariate.mvpa_runner import MVPARunner
 
 
 project_path = r'E:\pirate_fmri\Analysis'
@@ -68,7 +68,7 @@ with Parallel(n_jobs=10) as parallel:
     for roi,roifn in rois.items():
         print(f"extracting ROI data from {roi}")
         data[roi] = []
-        CrossTaskRSA = RSARunner(
+        CrossTaskRSA = MVPARunner(
                         participants=subid_list, fmribeh_dir=fmribeh_dir,
                         beta_dir   = cross_task_beta_dir,   beta_fname   = cross_task_beta_fname,
                         vsmask_dir = cross_task_vsmask_dir, vsmask_fname = cross_task_vsmask_fname,

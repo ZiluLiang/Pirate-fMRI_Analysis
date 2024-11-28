@@ -31,11 +31,11 @@ from zpyhelper.MVPA.preprocessors import chain_steps,scale_feature, average_odd_
 from zpyhelper.image.niidatahandler import retrieve_data_from_image
 from zpyhelper.image.searchlight import MVPASearchLight
 
+from modelrdms import ModelRDM
 
 project_path = r'E:\pirate_fmri\Analysis'
-sys.path.append(os.path.join(project_path,'src'))
-from multivariate.mvpa_estimator import CompositionalRetrieval
-from multivariate.modelrdms import ModelRDM
+sys.path.append(project_path)
+from src.multivariate.mvpa_estimator import CompositionalRetrieval
 
 scanner_ave_perf = pd.read_csv(os.path.join(project_path,'data','Exp1_fmri',"scanner_average_LLR_wmapping.csv"))
 
@@ -47,9 +47,9 @@ PREPROC_CATELOGUE = {
     "PCA":extract_pc
 }
 
-class RSARunner:
+class MVPARunner:
     """
-    The `RSARunner` wraps up RSA analysis in ROI and whole brain into a pipeline.
+    The `MVPARunner` wraps up RSA analysis in ROI and whole brain into a pipeline.
 
     Parameters
     ----------

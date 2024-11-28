@@ -30,7 +30,7 @@ from zpyhelper.MVPA.estimators import PatternCorrelation, MultipleRDMRegression,
 
 #from multivariate.modelrdms import ModelRDM
 from multivariate.modelrdms import ModelRDM
-from multivariate.mvpa_runner import RSARunner
+from multivariate.mvpa_runner import MVPARunner
 from utils.composition_modelfit import multi_start_optimisation
 
 import sklearn

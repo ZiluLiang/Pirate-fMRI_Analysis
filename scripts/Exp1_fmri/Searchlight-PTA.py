@@ -8,15 +8,11 @@ import os
 import sys
 from joblib import cpu_count
 
-from zpyhelper.filesys import checkdir
-from zpyhelper.MVPA.preprocessors import average_odd_even_session,normalise_multivariate_noise
-
-project_path = r'E:\pirate_fmri\Analysis'
-sys.path.append(os.path.join(project_path,'src'))
-from multivariate.mvpa_runner import RSARunner
+from multivariate.mvpa_runner import MVPARunner
 
 
 ###################################################### Run different RSA Analysis  ##################################################
+project_path = r'E:\pirate_fmri\Analysis'
 study_scripts   = os.path.join(project_path,'scripts','Exp1_fmri')
 with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
@@ -120,7 +116,7 @@ for nconfig_name,nconfig in config_neuralrdm.items():
         project_path
 
 
-        RSA = RSARunner(participants=subid_list,#[:1],
+        RSA = MVPARunner(participants=subid_list,#[:1],
                         fmribeh_dir=fmribeh_dir,
                         beta_dir=ds, beta_fname=beta_fname[ds_name],
                         vsmask_dir=vsmask_dir, vsmask_fname=vsmask_fname,
