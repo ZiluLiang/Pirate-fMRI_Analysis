@@ -229,14 +229,14 @@ def compute_llr_across_trials(params:list,param_names:list,xystrategies:list,dat
     negative_loglikelihoods = [-numpy.log(p) if p>0 else 230 for p in likelihoods_] 
     return numpy.sum(negative_loglikelihoods)
 
-def wise_start_optimisation(objective_func,bounds,args,x0,minimize_args={}):
+def wise_start_optimisation(objective_func,x0,bounds=None,args=(),minimize_args={}):
     print("starting val: ",x0)
     def_minimize_args = {}
     def_minimize_args.update(minimize_args)
     res = minimize(objective_func,x0,args=args, bounds=bounds,**def_minimize_args)
     return res.x, res.fun
 
-def multi_start_presetgrid_optimisation(objective_func,bounds,args,preset_x0_grids=list,minimize_args={},
+def multi_start_presetgrid_optimisation(objective_func,bounds,preset_x0_grids=list,args=(),minimize_args={},
                                  n_jobs=1):
     rand_starts = preset_x0_grids
     # set up minimize function
