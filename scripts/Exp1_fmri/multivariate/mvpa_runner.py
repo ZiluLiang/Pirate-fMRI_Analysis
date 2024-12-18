@@ -31,11 +31,10 @@ from zpyhelper.MVPA.preprocessors import chain_steps,scale_feature, average_odd_
 from zpyhelper.image.niidatahandler import retrieve_data_from_image
 from zpyhelper.image.searchlight import MVPASearchLight
 
-from modelrdms import ModelRDM
-
 project_path = r'E:\pirate_fmri\Analysis'
 sys.path.append(project_path)
-from src.multivariate.mvpa_estimator import CompositionalRetrieval
+from scripts.Exp1_fmri.multivariate.modelrdms import ModelRDM
+from scripts.Exp1_fmri.multivariate.mvpa_estimator import CompositionalRetrieval
 
 scanner_ave_perf = pd.read_csv(os.path.join(project_path,'data','Exp1_fmri',"scanner_average_LLR_wmapping.csv"))
 
