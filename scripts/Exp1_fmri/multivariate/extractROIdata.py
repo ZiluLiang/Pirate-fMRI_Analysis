@@ -8,17 +8,14 @@ import time
 import glob
 from copy import deepcopy
 import os
-import sys
 from joblib import Parallel, delayed, cpu_count, dump,load
 
 project_path = r'E:\pirate_fmri\Analysis'
-sys.path.append(os.path.join(project_path))
-from zpyhelper.filesys import checkdir
+import sys
+sys.path.append(project_path)
+from scripts.Exp1_fmri.multivariate.mvpa_runner import MVPARunner
 
-from multivariate.mvpa_runner import MVPARunner
 
-
-project_path = r'E:\pirate_fmri\Analysis'
 study_scripts   = os.path.join(project_path,'scripts','Exp1_fmri')
 outputdata_dir  = os.path.join(project_path,'data','Exp1_fmri')
 with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
@@ -30,10 +27,10 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 
 
 #ANATOMICAL ROIs
-roi_analysise_dir = os.path.join(fmridata_dir,'ROIRSA','AALandHCPMMP1')
+roi_analysise_dir = os.path.join(fmridata_dir,'ROIRSA','AALandHCPMMP1withfunc')
 base_rois = ["HPC","vmPFC","V1","V2"]
-rois =  dict(zip([f"{x}_bilateral" for x in base_rois],
-                 [f"{x}_bilateral" for x in base_rois]))
+rois =  dict(zip([f"{x}_bilateral" for x in base_rois]+["testlocCalcarine","testlocPrecentral","testlocParietalSup"],
+                 [f"{x}_bilateral" for x in base_rois]+["testgtloc_bilatCalcarine","testgtloc_leftPrecentral","testgtloc_rightParietalSup"]))
 save_file_name = "roi_data_4r"
 
 

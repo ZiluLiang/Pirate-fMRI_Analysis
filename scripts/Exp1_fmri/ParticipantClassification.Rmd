@@ -1,0 +1,471 @@
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+
+data_dir = file.path(project_dir, "data","Exp1_fmri", fsep="/")
+result_dir = file.path(project_dir, "results","Exp1_fmri", fsep="/")
+
+
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+```
+
+
+## Load data
+```{r loadDataset}
+fn = file.path(data_dir,"all_participants.csv",fsep="/")
+trialdata = read.table(fn, header = TRUE, sep = ",")%>%
+  filter(subid!="sub031") # exclude this participant because fMRI data collection was incomplete
+
+data = trialdata%>%filter(ctrl_expt=="True"&ctrl_resp == 1)%>%
+  dplyr::select(-c("ctrl_expt","ctrl_resp"))%>%
+  group_by(subid,expt_session)%>%
+  arrange(expt_block,expt_trial)%>%
+  mutate(expt_trial = row_number(),
+         cohort = factor(cohort, levels=c(1,2), labels=c("first cohort", "second cohort")))
+
+#check if number of trials is correct:
+#nsub = length(unique(respdata$subid)) = 29
+#ntrialpersub = nrow(respdata)/nsub = 204+27+25*4 = 331
+range_xy = c(max(data$stim_x)-min(data$stim_x),
+             max(data$stim_y)-min(data$stim_y))
+data = data%>%
+  mutate(stage = ifelse(training==1,"train","test"))%>%
+  mutate(training = factor(training,levels = c(1,0),labels = c("training stimuli","test stimuli")),
+         stage = factor(stage,levels = c("train","test")),
+         session_str = factor(expt_session, levels = c(1,2,3),labels=c("pretraining","refresher","scanning")),
+         stim_xO = stim_x,
+         stim_yO = stim_y,
+         resp_xO = resp_x,
+         resp_yO = resp_y,
+         ##rescale so that correct location is between -1 and 1
+         stim_x = round(2*stim_x/range_xy[1],digits = 3),
+         stim_y = round(2*stim_y/range_xy[2],digits = 3),
+         resp_x = round(2*resp_x/range_xy[1],digits = 3),
+         resp_y = round(2*resp_y/range_xy[2],digits = 3))%>%
+  mutate(resp_dist = sqrt((resp_x-stim_x)^2+(resp_y-stim_y)^2))
+
+re_Assign_block = data%>%distinct(subid,stage,expt_block,.keep_all = T)%>%
+  group_by(subid,stage,expt_session)%>%
+  arrange(expt_block)%>%
+  mutate(blocknumber_withinsess = row_number(),
+         nblocks = n())%>%
+  mutate(blocknumws_normalized = blocknumber_withinsess/nblocks)%>%
+  dplyr::select(c("subid","stage","expt_block","nblocks","blocknumber_withinsess","blocknumws_normalized"))
+data = left_join(data,re_Assign_block)
+
+meanscanperf = data%>%
+  filter(expt_session==3)%>%
+  aggregate_data(groupbyvars = c("subid","stage","stim_id"),
+                 yvars=c("resp_x","resp_y","resp_xO","resp_yO"),
+                 additionalvars = c("session_str","cohort","stim_attrx","stim_attry",
+                                    "training","expt_session","expt_block","expt_trial",
+                                    "stim_x","stim_y", "stim_xO","stim_yO"),
+                 stats="mu")%>%
+  change_cols_name(oldnames = paste0("mu_",c("resp_x","resp_y","resp_xO","resp_yO")),
+                   newnames = c("resp_x","resp_y","resp_xO","resp_yO"))
+# meanscanperf should have 25*ntotoalsub rows
+```
+
+
+## LLR
+### load model distribution
+```{r}
+tryCatch(
+  expr = {
+    load(file.path(llr_dir,"probDF_data_compo_withlapse.RData"))
+  },
+  error = function(e){
+    print("please generate probability distribution data")
+  })
+```
+
+### get LLR for each response
+```{r}
+find_resp_probs = function(respdf,rowid,unique_stimloc,prob_df_list,base){
+      library(dplyr)
+      sx = respdf$stim_x[rowid]
+      sy = respdf$stim_y[rowid]
+      rx = respdf$resp_x[rowid]
+      ry = respdf$resp_y[rowid]
+
+      ind = filter(unique_stimloc,x == sx & y == sy)$loc_id
+      search_df=prob_df_list[[ind]]
+      xlb = base[max(which(base<=rx))]
+      xub = base[min(which(base>rx))]
+      ylb = base[max(which(base<=ry))]
+      yub = base[min(which(base>ry))]
+      
+      new_row = filter(search_df,x<xub & x>=xlb & y<yub & y>=ylb)
+      if(nrow(new_row)==0){
+        new_row[1, ] <- NA
+        new_row = new_row%>%
+        mutate(resp_x = rx, resp_y = ry,
+               subid = respdf$subid[rowid],
+               expt_session = respdf$expt_sess[rowid],
+               expt_block = respdf$expt_block[rowid],
+               expt_trial = respdf$expt_trial[rowid])
+      }else{
+        new_row = new_row%>%
+        mutate(resp_x = rx, resp_y = ry,
+               subid  = respdf$subid[rowid],
+               expt_session = respdf$expt_sess[rowid],
+               expt_block = respdf$expt_block[rowid],
+               expt_trial = respdf$expt_trial[rowid])
+      }
+      
+      return(new_row)
+}
+
+tryCatch(
+  expr = {
+    data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+    meanscanperf_with_prob = loadRData(file.path(data_dir,"meanscannerdata_withprob_compo_lapse-0_01.RData"))
+  },
+  error = function(e){
+    cl<- makeCluster(detectCores()-1)
+    clusterExport(cl=cl,
+                  varlist = c("data","meanscanperf","unique_stimloc","base","prob_df_list","find_resp_probs"),
+                  envir=environment())
+    new_rows <- pblapply(cl = cl,X = seq(1,nrow(data)),
+                        FUN = function(j){find_resp_probs(data,j,unique_stimloc,prob_df_list,base)})
+    new_rowsmsd <- pblapply(cl = cl,X = seq(1,nrow(meanscanperf)),
+                        FUN = function(j){find_resp_probs(meanscanperf,j,unique_stimloc,prob_df_list,base)})
+    stopCluster(cl)
+    
+
+    data_with_prob = left_join(data,do.call(rbind,new_rows))
+    meanscanperf_with_prob = left_join(meanscanperf,do.call(rbind,new_rowsmsd))
+    save(data_with_prob, file   = file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+    save(meanscanperf_with_prob, file = file.path(data_dir,"meanscannerdata_withprob_compo_lapse-0_01.RData"))
+    
+  }
+)
+
+# filter out sub031 because withdrew from data collection and data was incomplete
+data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+meanscanperf_with_prob = loadRData(file.path(data_dir,"meanscannerdata_withprob_compo_lapse-0_01.RData"))
+```
+
+
+### classify learner
+
+```{r}
+data_with_prob = data_with_prob%>%
+  mutate(error_x = abs(stim_x - resp_x),
+         error_y = abs(stim_y - resp_y))%>%
+  mutate(binorm_lap = BND_compo_lap)%>%
+  mutate(LR_trial = binorm_lap/uniform,
+         LRx_trial = UND_x_lap/uniform, 
+         LRy_trial = UND_y_lap/uniform,)%>%
+  mutate(LLR_trial = log(LR_trial),
+         LLRx_trial = log(LRx_trial),
+         LLRy_trial = log(LRy_trial))%>%
+  group_by(subid)%>%
+    arrange(stage,expt_session,expt_block)%>%
+    mutate(trialid_withinstage = row_number(),
+           ntrials = n())%>%
+    mutate(trialid_normalized = trialid_withinstage/ntrials)%>%
+  ungroup()
+
+meanscanperf_with_prob = meanscanperf_with_prob%>%
+  mutate(error_x = abs(stim_x - resp_x),
+         error_y = abs(stim_y - resp_y))%>%
+  mutate(binorm_lap = BND_compo_lap)%>%
+  mutate(LR_trial = binorm_lap/uniform,
+         LRx_trial = UND_x_lap/uniform, 
+         LRy_trial = UND_y_lap/uniform,)%>%
+  mutate(LLR_trial = log(LR_trial),
+         LLRx_trial = log(LRx_trial),
+         LLRy_trial = log(LRy_trial))%>%
+  group_by(subid)%>%
+    arrange(stage)%>%
+    mutate(trialid_withinstage = row_number(),
+           ntrials = n())%>%
+    mutate(trialid_normalized = trialid_withinstage/ntrials)%>%
+  ungroup()
+
+
+sub_LLR_data = aggregate_data(data_with_prob,
+                              groupbyvars = c("cohort","subid","stage","expt_session","blocknumber_withinsess"),
+                              yvars = c("LLR_trial","LLRx_trial","LLRy_trial","resp_dist"),
+                              stats = c("mu"),
+                              additionalvars = c("expt_coordsys","expt_curricula","expt_session"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial","mu_resp_dist"),
+                   newnames = c("LLR","LLR_x","LLR_y","distance"))%>%
+  dplyr::select(-c(starts_with("n_")))%>%
+  group_by(subid,expt_session,stage)%>%
+  mutate(nblock = max(blocknumber_withinsess))%>%
+  ungroup()
+
+meanscannerLLR = aggregate_data(meanscanperf_with_prob,
+                                groupbyvars = c("cohort","subid","stage"),
+                              yvars = c("LLR_trial","LLRx_trial","LLRy_trial"),
+                              stats = c("mu"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial"),
+                   newnames = c("LLR","LLR_x","LLR_y"))%>%
+  dplyr::select(-c(starts_with("n_")))
+
+## old way
+dividesub = sub_LLR_data%>%
+  filter(blocknumber_withinsess==nblock&expt_session!=2)#%>%
+#  aggregate_data(groupbyvars = c("subid","expt_session","stage"),
+#                 yvars = "LLR",
+#                 stats = "mu")%>%
+#  aggregate_data(groupbyvars = c("subid","stage"),
+#                 yvars = "mu_LLR",stats = "mu")%>%
+#  change_cols_name("mu_mu_LLR","LLR")
+learnerids = unique(filter(dividesub,expt_session==3&stage=="train"&LLR>=0)$subid)
+generalizerids = unique(filter(dividesub,expt_session==3&stage=="test"&LLR>=0)$subid)
+print("nonlearner")
+(nonlearnerids = unique(filter(dividesub,expt_session==3&stage=="train"&LLR<0)$subid))
+print("nongeneralizer")
+(nongeneralizerids = unique(filter(dividesub,expt_session==3&stage=="test"&LLR<0)$subid))
+
+
+#new way: by using the average performance of scanning
+learnerids = unique(filter(meanscannerLLR, stage=="train"&LLR>=0)$subid)
+generalizerids = unique(filter(meanscannerLLR,  stage=="test"&LLR>=0)$subid)
+print("nonlearner")
+(nonlearnerids = unique(filter(meanscannerLLR,  stage=="train"&LLR<0)$subid))
+print("nongeneralizer")
+(nongeneralizerids = unique(filter(meanscannerLLR, stage=="test"&LLR<0)$subid))
+
+data_with_prob = data_with_prob%>%
+  mutate(islearner = factor(ifelse(subid%in%learnerids,1,0),
+                            levels = c(1,0),labels = c("learner","non-learner")),
+         isgeneralizer = factor(ifelse(subid%in%generalizerids ,1,0),
+                                levels = c(1,0),labels = c("generalizer","non-generalizer")))
+
+meanscanperf_with_prob = meanscanperf_with_prob%>%
+  mutate(islearner = factor(ifelse(subid%in%learnerids,1,0),
+                            levels = c(1,0),labels = c("learner","non-learner")),
+         isgeneralizer = factor(ifelse(subid%in%generalizerids ,1,0),
+                                levels = c(1,0),labels = c("generalizer","non-generalizer")))
+
+sub_LLR_data = sub_LLR_data%>%
+  mutate(islearner = factor(ifelse(subid%in%learnerids,1,0),
+                            levels = c(1,0),labels = c("learner","non-learner")),
+         isgeneralizer = factor(ifelse(subid%in%generalizerids ,1,0),
+                                levels = c(1,0),labels = c("generalizer","non-generalizer")))
+```
+
+```{r}
+nlearners = length(learnerids)
+ngeneralizers = length(generalizerids)
+nsub = length(unique(sub_LLR_data$subid))
+participant_count = sub_LLR_data%>%
+  distinct(cohort,subid,islearner,isgeneralizer)%>%
+  group_by(cohort,islearner,isgeneralizer)%>%
+  summarise(n = n())%>%
+  mutate(label = paste0(isgeneralizer, "\n n=",n))
+
+#participant_count
+
+labelling_func = function(row){
+  l = row[1]
+  g = row[2]
+  c = row[3]
+  return(filter(participant_count,islearner==l&isgeneralizer==g&cohort==c)$label)
+}
+
+theme_basic(as_huxtable(participant_count)%>%
+      set_align(1, everywhere, "center"))
+```
+
+###Plot correlation between last block of training and test
+```{r}
+sub_LLR_data = sub_LLR_data%>%
+  group_by(subid,expt_session,stage)%>%
+  mutate(nblock = max(blocknumber_withinsess))%>%
+  ungroup()
+
+last_pretrain = filter(sub_LLR_data,expt_session==1&blocknumber_withinsess==nblock)%>%
+  dplyr::select(-c("nblock","expt_session","blocknumber_withinsess"))%>%
+  pivot_longer(cols=c("LLR","LLR_x","LLR_y"),
+               names_to = "performance_metric",
+               values_to = "lastpretrain")
+
+meanscanning  = meanscannerLLR%>%
+  mutate(islearner = factor(ifelse(subid%in%learnerids,1,0),
+                            levels = c(1,0),labels = c("learner","non-learner")),
+         isgeneralizer = factor(ifelse(subid%in%generalizerids ,1,0),
+                                levels = c(1,0),labels = c("generalizer","non-generalizer")))%>%
+  pivot_longer(cols=c("LLR","LLR_x","LLR_y"),
+               names_to = "performance_metric",
+               values_to = "scanning")
+
+pretrainscanner_behavsum_long = left_join(last_pretrain,meanscanning,by=c("cohort","subid","stage","islearner","isgeneralizer","performance_metric"))
+```
+
+```{r}
+annot_change <- data.frame(
+  label = c("nL\U2192L", "nG\U2192G","L\U2192nL", "G\U2192nG"),
+  stage = c("train","test","train","test"),
+  x     = c(-2.5,-2.5,2.5,2.5),
+  y     = c(2.5,2.5,-2.5,-2.5)
+)%>%
+  mutate(stage=factor(stage,levels=c("train","test"),
+                      labels=c("Training stimuli", "Test stimuli")))
+
+
+p_trsc_corr = pretrainscanner_behavsum_long %>%
+  filter(performance_metric=="LLR")%>%
+  mutate(outlierlabel=if_else(xor(scanning>0,lastpretrain>0),subid,""),
+         stage=factor(stage,levels=c("train","test"),
+                      labels=c("Training stimuli", "Test stimuli")))%>%
+  ggplot(aes(x=lastpretrain,y=scanning,color=isgeneralizer))+
+  facet_nested_wrap(vars(stage,cohort),nrow = 2,
+            remove_labels="none",axes="all",
+            )+
+  geom_point(alpha=0.5)+
+  geom_text(aes(label=outlierlabel),
+            fontface="bold",size=3)+
+  geom_text(data=annot_change,aes(x=x,y=y,label=label),
+            fontface="bold",inherit.aes=F,size=6)+
+  geom_abline(slope=1,intercept=0,linetype="dashed",color="grey")+
+  geom_vline(xintercept=0,linetype="dashed",color="grey")+
+  geom_hline(yintercept=0,linetype="dashed",color="grey")+
+  scale_color_manual(values=twolevel_colors)+
+  labs(x="last pretraining block LLR", y = "average LLR across scanning blocks",
+       title="Correlation between LLR in \nlast pretraining block and average across scanning blocks")+
+  theme(legend.position = "top",legend.direction = "horizontal")
+p_trsc_corr
+ggsave(file.path(result_dir,paste0('LLR_corr_pretrain2scan','.png')),plot = p_trsc_corr,device = 'png',width = 8,height = 9)
+
+
+p_trsc_corr2 = pretrainscanner_behavsum_long %>%
+  filter(performance_metric=="LLR"&cohort=="second cohort")%>%
+  mutate(outlierlabel=if_else(scanning<0&lastpretrain>0,subid,""),
+         stage=factor(stage,levels=c("train","test"),
+                      labels=c("Training stimuli", "Test stimuli")))%>%
+  ggplot(aes(x=lastpretrain,y=scanning,color=isgeneralizer))+
+  facet_nested_wrap(vars(stage),nrow = 1,
+            remove_labels="none",axes="all",
+            )+
+  geom_point(alpha=0.5)+
+  geom_text(aes(label=outlierlabel),
+            fontface="bold",size=3)+
+  geom_text(data=annot_change,aes(x=x,y=y,label=label),
+            fontface="bold",inherit.aes=F,size=6)+
+  geom_abline(slope=1,intercept=0,linetype="dashed",color="grey")+
+  geom_vline(xintercept=0,linetype="dashed",color="grey")+
+  geom_hline(yintercept=0,linetype="dashed",color="grey")+
+  scale_color_manual(values=twolevel_colors)+
+  labs(x="last pretraining block LLR", y = "average LLR across scanning blocks",
+       title="Correlation between LLR in \nlast pretraining block and average across scanning blocks")+
+  theme(legend.position = "top",legend.direction = "horizontal")
+p_trsc_corr2
+ggsave(file.path(result_dir,paste0('LLR_corr_pretrain2scan_cohort2only','.png')),plot = p_trsc_corr2,device = 'png',width = 10,height = 6)
+
+```
+
+### plot correlation between train and test
+```{r}
+trainperf  = sub_LLR_data%>%
+  filter(stage=="train")%>%
+  mutate(tmp_keeprow = if_else(expt_session==1&mod(blocknumber_withinsess,2)==1,0,
+                               if_else(expt_session==2,0,1)))%>%
+  filter(tmp_keeprow==1)%>%
+  pivot_longer(cols=c("distance","LLR","LLR_x","LLR_y"),
+               names_to = "performance_metric",
+               values_to = "train")%>%
+  mutate(cycle=if_else(expt_session==1,blocknumber_withinsess/2,blocknumber_withinsess+6))%>%
+  dplyr::select(-c("tmp_keeprow","blocknumber_withinsess","nblock","stage","expt_coordsys","expt_curricula"))
+
+testperf  = sub_LLR_data%>%
+  filter(stage=="test")%>%
+  pivot_longer(cols=c("distance","LLR","LLR_x","LLR_y"),
+               names_to = "performance_metric",
+               values_to = "test")%>%
+  mutate(cycle = if_else(expt_session==1,blocknumber_withinsess,blocknumber_withinsess+6))%>%
+  dplyr::select(-c("blocknumber_withinsess","nblock","stage","expt_coordsys","expt_curricula" ))
+
+traintest_behavsum_long = left_join(trainperf,testperf,
+                                    by=c("cohort","subid","expt_session",
+                                         "islearner","isgeneralizer",
+                                         "performance_metric","cycle")
+                                    )
+```
+
+```{r}
+p_trte_corr = traintest_behavsum_long %>%
+  filter(performance_metric=="LLR")%>%
+  ggplot(aes(x=train,y=test,color=isgeneralizer))+
+  facet_nested_wrap(vars(cohort,expt_session,cycle),nrow = 2,
+            remove_labels="none",axes="all",
+            )+
+  geom_point(alpha=0.7)+
+  #geom_text(aes(label=outlierlabel))+
+  geom_abline(slope=1,intercept=0,linetype="dashed",color="grey")+
+  geom_vline(xintercept=0,linetype="dashed",color="grey")+
+  geom_hline(yintercept=0,linetype="dashed",color="grey")+
+  scale_color_manual(values=twolevel_colors)+
+  theme(legend.position = "top",legend.direction = "horizontal")
+p_trte_corr
+ggsave(file.path(result_dir,paste0('LLR_corr_train2test','.png')),plot = p_trte_corr,device = 'png',width = 16,height = 9)
+```
+
+
+
+
+## Filter unreliable participants and get final group count
+```{r}
+#remove particiant in the second cohort who changed from G->nG
+data_with_prob = data_with_prob%>%
+  filter(!subid%in%c("sub027","sub113","sub119","sub126"))
+
+meanscanperf_with_prob = meanscanperf_with_prob%>%
+  filter(!subid%in%c("sub027","sub113","sub119","sub126"))
+```
+
+```{r}
+data_with_prob = data_with_prob%>%
+  mutate(cycle=case_when(expt_session==1&stage=="train"~ceil(blocknumber_withinsess/2),
+                         expt_session==1&stage=="test"~blocknumber_withinsess,
+                         expt_session==2~6+blocknumber_withinsess,
+                         expt_session==3~9+blocknumber_withinsess))
+```
+
+
+```{r}
+save(data_with_prob, file   = file.path(data_dir,"filtereddata_withprob_compo_lapse-0_01.RData"))
+save(meanscanperf_with_prob, file = file.path(data_dir,"filteredmeanscannerdata_withprob_compo_lapse-0_01.RData"))
+
+```
+
+
+```{r}
+# count subject again
+participant_count = data_with_prob%>%
+  distinct(cohort,subid,islearner,isgeneralizer)%>%
+  group_by(cohort,islearner,isgeneralizer)%>%
+  summarise(n = n())%>%
+  mutate(label = paste0(isgeneralizer, "\n n=",n))
+
+nonlearnerids = unique(filter(data_with_prob,islearner=="non-learner")$subid)
+nongeneralizerids = unique(filter(data_with_prob,isgeneralizer=="non-generalizer")$subid)
+learnerids = unique(filter(data_with_prob,islearner=="learner")$subid)
+generalizerids = unique(filter(data_with_prob,isgeneralizer=="generalizer")$subid)
+nlearners = length(learnerids)
+ngeneralizers = length(generalizerids)
+nsub = length(unique(sub_LLR_data$subid))
+
+#participant_count
+
+labelling_func = function(row){
+  l = row[1]
+  g = row[2]
+  c = row[3]
+  return(filter(participant_count,islearner==l&isgeneralizer==g&cohort==c)$label)
+}
+
+theme_basic(as_huxtable(participant_count)%>%
+      set_align(1, everywhere, "center"))
+```
