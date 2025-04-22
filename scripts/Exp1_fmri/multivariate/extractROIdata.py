@@ -9,7 +9,6 @@ import glob
 from copy import deepcopy
 import os
 from joblib import Parallel, delayed, cpu_count, dump,load
-
 project_path = r'E:\pirate_fmri\Analysis'
 import sys
 sys.path.append(project_path)
@@ -27,10 +26,12 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 
 
 #ANATOMICAL ROIs
-roi_analysise_dir = os.path.join(fmridata_dir,'ROIRSA','AALandHCPMMP1withfunc')
-base_rois = ["HPC","vmPFC","V1","V2"]
-rois =  dict(zip([f"{x}_bilateral" for x in base_rois]+["testlocCalcarine","testlocPrecentral","testlocParietalSup"],
-                 [f"{x}_bilateral" for x in base_rois]+["testgtloc_bilatCalcarine","testgtloc_leftPrecentral","testgtloc_rightParietalSup"]))
+roi_analysise_dir = os.path.join(fmridata_dir,'ROIRSA','AALandHCPMMP1andFUNCcluster') #withfunc
+base_rois = ["testgtlocTPMid","testgtlocParietalSup"] + ["HPCPHPC","HPC","vmPFC","V1","V2"]
+rois =  dict(zip([f"{x}_bilateral" for x in base_rois] + [f"{x}_left" for x in base_rois] + [f"{x}_right" for x in base_rois] + ["allgtlocPrecentral_left"],
+                 [f"{x}_bilateral" for x in base_rois] + [f"{x}_left" for x in base_rois] + [f"{x}_right" for x in base_rois] + ["allgtlocPrecentral_left"]
+                )
+            )
 save_file_name = "roi_data_4r"
 
 
@@ -61,8 +62,8 @@ cross_task_beta_preproc = {# here we skip the averaging step because decoding an
                            "distance_metric":"correlation"}
 
 data = {}
-with Parallel(n_jobs=10) as parallel:
-    for roi,roifn in rois.items():
+with Parallel(n_jobs=15) as parallel:
+    for roi,roifn in zip(["HPCPHPC_bilateral"],["HPCPHPC_bilateral"]):#rois.items():
         print(f"extracting ROI data from {roi}")
         data[roi] = []
         CrossTaskRSA = MVPARunner(
@@ -90,4 +91,13 @@ with Parallel(n_jobs=10) as parallel:
             }
             data[roi].append(subdata)
         dump(data[roi],os.path.join(roi_analysise_dir,f"{save_file_name}_{roi}.pkl"))
+
+# save all data
+data={}
+for roi,roifn in rois.items():
+    if np.logical_or(roi=="HPCPHPC_right",roi=="HPCPHPC_left"):
+        pass
+    else:
+        data[roi] = load(os.path.join(roi_analysise_dir,f"{save_file_name}_{roi}.pkl"))
+
 dump(data,os.path.join(roi_analysise_dir,f"{save_file_name}.pkl"))

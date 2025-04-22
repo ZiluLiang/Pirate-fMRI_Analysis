@@ -34,7 +34,7 @@ from zpyhelper.image.searchlight import MVPASearchLight
 project_path = r'E:\pirate_fmri\Analysis'
 sys.path.append(project_path)
 from scripts.Exp1_fmri.multivariate.modelrdms import ModelRDM
-from scripts.Exp1_fmri.multivariate.mvpa_estimator import CompositionalRetrieval
+from scripts.Exp1_fmri.multivariate.mvpa_estimator import CompositionalRetrieval_CV
 
 scanner_ave_perf = pd.read_csv(os.path.join(project_path,'data','Exp1_fmri',"scanner_average_LLR_wmapping.csv"))
 
@@ -549,20 +549,18 @@ class MVPARunner:
                         )# only show details at the first participant
                 
                 elif A["type"] == "composition":
-                    sbhav = pd.DataFrame(np.hstack([stimid,stimgtloc,stimfeature,stimgroup,sessions]),
-                                        columns=["stim_id","stim_x","stim_y","stim_color","stim_shape","stim_group","stim_session"])
+                    sbhav = modelrdm.stimdf.copy()
+                    sbhav["taskname"] = ["localizer" if s==np.max(sbhav["stim_session"]) else "navigation" for s in np.array(sbhav["stim_session"])]
                     assert self.taskname=="both"
                     print(f"running composition searchlight {A['name']}")
-                    sbhav["stim_task"] = 1*(sbhav["stim_session"] == np.max(sbhav["stim_session"]))
                     
                     CompositionalRSA_kwarg = {"stim_df":sbhav}
                         
-                        
                     subSearchLight.run(
-                        estimator = CompositionalRetrieval,#CompositionalRSA,
+                        estimator = CompositionalRetrieval_CV,
                         estimator_kwargs = CompositionalRSA_kwarg,
                         outputpath   = os.path.join(outputdir,A["type"],A["name"],'first',subid), 
-                        outputregexp = 'beta_%04d.nii',#'rho_%04d.nii', 
+                        outputregexp = 'result_%04d.nii',
                         verbose      = j == 0
                         )
                     
