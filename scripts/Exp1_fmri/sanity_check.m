@@ -21,12 +21,29 @@ if flag_runGLM
     err_tracker   = struct(); %#ok<*UNRCH>
     for j = 1:numel(glm_names)
         glm_name = glm_names{j};
-        steps  = struct('first', {{'specify','estimate','contrast'}});%, ...
-%                        'second',{{'specify','estimate','contrast','result'}});
+        steps  = struct('first', {{'contrast'}}, ... %'specify','estimate',
+                        'second',{{'specify','estimate','contrast','result'}});
         glm_dir  = fullfile(directory.fmri_data,glm_name);
-        preproc_img_dir =  directory.smoothed;
-        subidlist       = participants.cohort2ids;
-        err_tracker.(glm_name) = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidlist);
+        err_tracker.(glm_name) = glm_runner(glm_name,rmfield(steps,'second'));
+
+        pgroups = struct('C1C2', {participants.validids},...
+                         'C1',{participants.cohort1ids}, ...
+                         'C2',{participants.cohort2ids});
+        gnames = fieldnames(pgroups);
+        SGnames = {'nG','G'};
+        for kg = 1:numel(gnames)
+            curr_g = gnames{kg};
+            subid_list = participants.validids(cellfun(@(x) ismember(x,pgroups.(curr_g)), participants.validids));
+            subid_Gstr = cellfun(@(x) SGnames{1+ismember(x,participants.generalizerids)}, subid_list,'UniformOutput',false);
+            gzer_list  = participants.generalizerids(cellfun(@(x) ismember(x, subid_list), participants.generalizerids));
+            ngzer_list = participants.nongeneralizerids(cellfun(@(x) ismember(x, subid_list), participants.nongeneralizerids));
+            
+            % run second level without covariate FOR ALL
+            err_tracker.(glm_name) = glm_runner(glm_name,rmfield(steps,'first'),'','',subid_list,curr_g,subid_Gstr);
+
+            % run second level without covariate FOR G only
+            % err_tracker.(glm_name) = glm_runner(glm_name,rmfield(steps,'first'),'','',gzer_list,sprintf("%sGonly",curr_g));
+        end
     end
 end
 
