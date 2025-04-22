@@ -1,6 +1,7 @@
-% This script generates anatomical masks in AAL3v1 parcellation using
-% marsbar and puts the ROI generated using Abn.
+% This script generates anatomical masks in AAL3v1 and HCPMMP1 parcellation 
+% using marsbar.
 % For definition of anatomical masks see AAL_anatomical_masks.json
+% and HCP-MMP_anatomical_masks.json
 % -----------------------------------------------------------------------    
 % Author: Zilu Liang
 clear;clc;

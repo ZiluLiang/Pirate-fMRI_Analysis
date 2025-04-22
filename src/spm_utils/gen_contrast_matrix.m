@@ -46,7 +46,7 @@ function w_mat = gen_contrast_matrix(subSPM,weights,flag_rescale)
             warning('the following regressors are not found in the model and will be removed: %s', ...
                 strjoin(weighted_regressors(cellfun(@(x) ~any(contains(subSPM.xX.name,x)),reg_pattern)),', ') ...
                 )
-            weighted_regressors = weighted_regressors(cellfun(@(x) any(contains(subSPM.xX.name,x)),reg_pattern));
+            weighted_regressors = weighted_regressors(cellfun(@(x) any(contains(subSPM.xX.name,x)),reg_pattern)); % need to figure out a way to take into account parametric modulators
         end        
         Nrows = numel(weights);
         w_mat = zeros(Nrows,numel(subSPM.xX.name));

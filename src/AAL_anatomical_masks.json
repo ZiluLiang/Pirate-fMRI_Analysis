@@ -15,7 +15,10 @@
     ],
 
     "HPC":[
-        "Hippocampus",
-        "ParaHippocampal"
-    ]
+        "Hippocampus"
+    ],
+
+    "IPS":[
+        "Parietal_Inf"
+        ]
 }
