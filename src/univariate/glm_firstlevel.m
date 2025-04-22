@@ -47,7 +47,7 @@ function glm_firstlevel(nii_files,multicond_files,multireg_files,output_dir)
         specification.sess(iSess).regress = struct('name',{},'val',{});
         specification.sess(iSess).multi_reg = multireg_files{iSess};
         % high-pass filter
-        specification.sess(iSess).hpf = 128;
+        specification.sess(iSess).hpf = 180;%changed on 2024 02 24
     end
     
     %% Factorial Design

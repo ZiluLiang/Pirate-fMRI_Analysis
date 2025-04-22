@@ -11,6 +11,7 @@ function err_tracker = glm_runner(glm_name,steps,glm_dir,preproc_img_dir,subidli
 % - preproc_img_dir: directory for preprocessed fmri data
 % - subidlist: list of participants to be incuded in the analysis
 % - groupglm_pref: prefix added to second level (group level) glm names
+% - subgroups: between-group variable
 % - groupglm_cov: covariate for group level glm. should be like:
 %                   struct('c', {}, 'cname', {}, 'iCFI', {}, 'iCC', {}) or
 %                   struct('files', {}, 'iCFI', {}, 'iCC', {})
@@ -100,7 +101,7 @@ function error_tracker = run_firstlevel(subid,glm_name,glm_dir,preproc_img_dir,s
             if ~isempty(glm_config.contrasts)
                 fprintf('%s: Computing first-level contrast for %s \n', glm_name, subid)
                 contrast_weights = cellfun(@(v) gen_contrast_matrix(fullfile(output_dir,'SPM.mat'),v),{glm_config.contrasts.wvec},'uni',0);
-                keep_contrasts = cellfun(@(x) any(x),contrast_weights);
+                keep_contrasts = cellfun(@(x) any(x,'all'),contrast_weights);
 
                 glm_contrast(output_dir,...
                              {glm_config.contrasts(keep_contrasts).name},...

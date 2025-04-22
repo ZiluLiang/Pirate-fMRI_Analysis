@@ -66,8 +66,25 @@ function [multicond,multicond_fn,multireg_fn] = setup_multi(glm_name,subid,outpu
         save(string(multicond_fn),'-struct','multi')
         multicond_fn = {cellstr(multicond_fn)};
         % multi-regressors: currently only nuisance regressors are used（headmotion）
+        N_nuireg = sum(cellfun(@(x) ismember(x,fmri.nuisance_terms), {'raw','fw'}))*6;
         nuisance_list  = cellfun(@(x) readtable(x),nuisance_files,'UniformOutput',0); %#ok<*UNRCH>
-        nuisance_table = cat(1,nuisance_list{:});
+        nuisance_list_reguhm = cellfun(@(x) x(:,1:N_nuireg),nuisance_list,'UniformOutput',0);
+        nuisance_list_outlihm = cellfun(@(x) x(:,N_nuireg+1:end),nuisance_list,'UniformOutput',0);
+        N_cols_each = cellfun(@(x) size(x,2),nuisance_list_outlihm);
+        N_rows_each = cellfun(@(x) size(x,1),nuisance_list_outlihm);
+        
+        concat_outlihm_list = arrayfun(@(rows) arrayfun(@(cols) zeros([N_rows_each(rows),N_cols_each(cols)]), 1:numel(nuisance_list_outlihm),'UniformOutput',0),  1:numel(nuisance_list_outlihm),'UniformOutput',0);
+        
+        sess_concatedoutlihm_list = cell(numel(concat_outlihm_list),1);
+        for isess = 1:numel(concat_outlihm_list)
+            concat_outlihm_list{isess}{isess} = table2array(nuisance_list_outlihm{isess});
+            sess_concatedoutlihm_list{isess} = cat(2, ...
+                                                    nuisance_list_reguhm{isess}, ...
+                                                    array2table(cat(2,concat_outlihm_list{isess}{:}),'VariableNames',arrayfun(@(x) sprintf('Var%d',x+N_nuireg),1:sum(N_cols_each),'UniformOutput',0)) ...
+                                                    );
+        end
+
+        nuisance_table = cat(1,sess_concatedoutlihm_list{:});
         nuisance_file  = fullfile(output_dir,'nuisance_concat.txt');
         writetable(nuisance_table,nuisance_file,'Delimiter',' ','WriteVariableNames',false)
         multireg_fn    = {cellstr(nuisance_file)};
@@ -164,10 +181,15 @@ function multi = gen_multiconditions(data,cond_names,pmod_names,custom_cfg)
                 pmod_nanfilters = cellfun(@(x) ~isnan(x),pmod_vals,'UniformOutput',false); 
                 idx = all([~isnan(onsets{j}),~isnan(durations{j}),cat(2,pmod_nanfilters{:})],2);
                 % fill in pmod struct
+                pmod_counter = 0;
                 for k = 1:numel(pmod_names{j})
-                    pmod(j).name{k} = pmod_names{j}{k};
-                    pmod(j).param{k} = pmod_vals{k}(idx);
-                    pmod(j).poly{k} = 1;
+                    pmodval = pmod_vals{k}(idx);
+                    if numel(unique(pmodval))>1 % only include pmod with more than 2 unique values     
+                        pmod_counter = pmod_counter+1;
+                        pmod(j).name{pmod_counter} = pmod_names{j}{k};
+                        pmod(j).param{pmod_counter} = pmod_vals{k}(idx);
+                        pmod(j).poly{pmod_counter} = 1;
+                    end
                 end
             else % if there is no parametric modulator
                 idx = all([~isnan(onsets{j}),~isnan(durations{j})],2);
