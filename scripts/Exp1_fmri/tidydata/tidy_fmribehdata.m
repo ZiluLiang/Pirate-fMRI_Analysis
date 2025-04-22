@@ -8,14 +8,14 @@
 % if an event did not happen in a given trial, the value of onset and duration
 % in the corresponding row will be set to nan.
 
-
+clear;clc;
 untidied_behavior_pardir = 'E:\pirate_fmri\Analysis\data\Exp1_fmri\untidiedbhavior';
 untidied_behaviordir = fullfile(untidied_behavior_pardir,'fmri_behavior');
 renamer_fn = fullfile('E:\pirate_fmri\Analysis\data\Exp1_fmri','renamer.json');
 renamer    = loadjson(renamer_fn);
 participants = get_pirate_defaults(false,'participants');
 output_dir = 'E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\beh';
-ids = participants.cohort2ids; %participants.validids
+ids = participants.validids;%participants.cohort2ids; %participants.validids
 checkdir(fullfile(output_dir,ids))
 
 %% move stimuli file to the folder
@@ -76,48 +76,85 @@ for isub = 1:numel(ids)
 
         for t = 1:size(olddata,1)
             % construct regressors for repetition suppression analysis
+            % {'difffeature','diffcolor','diffshape','diffx','diffy','dist2deuc','distx','disty'}
             if t == 1 || olddata.ctrl_resp(t-1) % exclude from repetition suppression analysis if in trial 1 or if response is required in the previous trial
-                % distance based on 10d model (feature-based)
-                olddata.featuredist(t)   = nan;
-                olddata.colordist(t)     = nan;
-                olddata.shapedist(t)     = nan;
-                % distance based on 2d model (groundtruth or response)
-                olddata.dist2d(t)        = nan;
-                olddata.dist2d_resp(t)   = nan;
-                % distance based on hierachy model
-                olddata.hrchydist_ucord(t) = nan; 
-                olddata.hrchydist_quadr(t) = nan; 
+                % distance based on feature model
+                olddata.difffeature(t)   = nan;
+                olddata.diffcolor(t)     = nan;
+                olddata.diffshape(t)     = nan;
+                olddata.diffx(t)         = nan;
+                olddata.diffy(t)         = nan;
+
+                % distance based on 2d model (euclidean)
+                olddata.dist2deuc(t)        = nan;
+                olddata.distx(t)         = nan;
+                olddata.disty(t)         = nan;
 
                 olddata.rstrials(t)      = nan;
                 olddata.excluders(t)     = 1; 
             else
                 % distance based on 10d model (feature-based)
-                olddata.featuredist(t) = norm([olddata.stim_attrx(t),olddata.stim_attry(t)]-[olddata.stim_attrx(t-1),olddata.stim_attry(t-1)]);
-                olddata.colordist(t)     = 1-strcmp(olddata.stim_color(t),olddata.stim_color(t-1));
-                olddata.shapedist(t)     = 1-strcmp(olddata.stim_shape(t),olddata.stim_shape(t-1));
+                olddata.difffeature(t)   = sum(abs([olddata.stim_attrx(t),olddata.stim_attry(t)]-[olddata.stim_attrx(t-1),olddata.stim_attry(t-1)])); % i.e. number of different features
+                olddata.diffcolor(t)     = 1 - strcmp(olddata.stim_color(t),olddata.stim_color(t-1));
+                olddata.diffshape(t)     = 1 - strcmp(olddata.stim_shape(t),olddata.stim_shape(t-1));
+                olddata.diffx(t)         = 1 - (olddata.stim_attrx(t)==olddata.stim_attrx(t-1));
+                olddata.diffy(t)         = 1 - (olddata.stim_attry(t)==olddata.stim_attry(t-1));
+                
                 % distance based on 2d model (groundtruth or response)
-                olddata.dist2d(t) =  norm([olddata.stim_x(t),olddata.stim_y(t)]-[olddata.stim_x(t-1),olddata.stim_y(t-1)]);               
+                olddata.dist2deuc(t)        = norm([olddata.stim_x(t),olddata.stim_y(t)]-[olddata.stim_x(t-1),olddata.stim_y(t-1)]);               
+                olddata.distx(t)         = abs(olddata.stim_x(t)-olddata.stim_x(t-1));
+                olddata.disty(t)         = abs(olddata.stim_y(t)-olddata.stim_y(t-1));
+
                 resp_loc_curr     = [resp_map.resp_x(resp_map.stim_id==olddata.stim_id(t)),resp_map.resp_y(resp_map.stim_id==olddata.stim_id(t))];
                 resp_loc_prev     = [resp_map.resp_x(resp_map.stim_id==olddata.stim_id(t-1)),resp_map.resp_y(resp_map.stim_id==olddata.stim_id(t-1))];                
-                olddata.dist2d_resp(t) =  norm(resp_loc_curr-resp_loc_prev);
-                % distance based on hierachy model                
-                olddata.hrchydist_ucord(t) = norm([olddata.x_dist(t),olddata.y_dist(t)]-[olddata.x_dist(t-1),olddata.y_dist(t-1)]); % distance based on hierachy model: unsigned distance hierachy
-                olddata.hrchydist_quadr(t) = norm([olddata.x_sign(t),olddata.y_sign(t)]-[olddata.x_sign(t-1),olddata.y_sign(t-1)]); % distance based on hierachy model: quadrant/axis
+                %olddata.dist2d_resp(t) =  norm(resp_loc_curr-resp_loc_prev);
 
                 olddata.rstrials(t)    = 1;
-                olddata.excluders(t)   = nan;                
+                olddata.excluders(t)   = nan;
+
             end
-            % construct regressors for train>test stimuli analysis
+            % construct regressors for train>test stimuli analysis as well
+            % as RS separated by train vs test
             if olddata.training(t)
                 olddata.onset_training(t)    = olddata.onset_stimuli(t);
                 olddata.duration_training(t) = olddata.duration_stimuli(t);
                 olddata.onset_test(t)    = nan;
                 olddata.duration_test(t) = nan;
+                
+                if t==1 || olddata.training(t-1)==0 % if previoust trial is test
+                    trainrs = nan;
+                    crossrs = 1;
+                else
+                    trainrs = 1;
+                    crossrs = nan;
+                end
+
+                olddata.onset_rstraining(t)  = olddata.onset_stimuli(t)*olddata.rstrials(t)*trainrs;
+                olddata.onset_rstest(t)      = nan;
+                olddata.onset_rstraintest(t) = olddata.onset_stimuli(t)*olddata.rstrials(t)*crossrs;
+                olddata.duration_rstraining(t) = olddata.duration_stimuli(t)*olddata.rstrials(t)*trainrs;
+                olddata.duration_rstest(t)     = nan;
+                olddata.duration_rstraintest(t) = olddata.duration_stimuli(t)*olddata.rstrials(t)*crossrs;
             else
                 olddata.onset_training(t)    = nan;
                 olddata.duration_training(t) = nan;
                 olddata.onset_test(t)    = olddata.onset_stimuli(t);
                 olddata.duration_test(t) = olddata.duration_stimuli(t);
+
+                if t==1 || olddata.training(t-1)==1 % if previoust trial is train
+                    testrs = nan;
+                    crossrs = 1;
+                else
+                    testrs = 1;
+                    crossrs = nan;
+                end
+
+                olddata.onset_rstraining(t)    = nan;
+                olddata.onset_rstest(t)        = olddata.onset_stimuli(t)*olddata.rstrials(t)*testrs;
+                olddata.onset_rstraintest(t) = olddata.onset_stimuli(t)*olddata.rstrials(t)*crossrs;
+                olddata.duration_rstraining(t) = nan;
+                olddata.duration_rstest(t)     = olddata.duration_stimuli(t)*olddata.rstrials(t)*testrs;
+                olddata.duration_rstraintest(t) = olddata.duration_stimuli(t)*olddata.rstrials(t)*crossrs;
             end
             % assign 'resp' location to current stimulus even if no response is
             % required for current trial for neural axis glm analysis
@@ -190,15 +227,14 @@ for isub = 1:numel(ids)
         end
 
         keep_v = {'stim_id','stim_img','stim_x','stim_y','stim_attrx','stim_attry','resp_x','resp_y',...% fields in the orginal data table
-                  'resp_dist','respmap_x','respmap_y',...% response map 
-                  'x_dist','x_sign','y_dist','y_sign','hrchydist_ucord','hrchydist_quadr',...% hierachy model: stimuli location wrt screen centre
+                  'respmap_x','respmap_y',...% response map 
                   'onset_stimuli','duration_stimuli',... % stimuli event
                   'onset_response','duration_response',... % response event                
                   'onset_rstrials','duration_rstrials',...  % repetition suppression event
                   'onset_excluders','duration_excluders',...% excluded trials in repetition suppression
-                  'dist2d','dist2d_resp','featuredist','colordist','shapedist',... % parametric modulators for repetition suppression:groundtruth distance/recontructed distance from participant response between current stimulus and previous stimulus 
-                  'onset_training','duration_training',... % training event   
-                  'onset_test','duration_test',... % test event 
+                  'difffeature','diffcolor','diffshape','diffx','diffy','dist2deuc','distx','disty',...% RS parametric modulators for distance
+                  'onset_training','duration_training','onset_rstraining','duration_rstraining',... % training event   
+                  'onset_test','duration_test','onset_rstest','duration_rstest','onset_rstraintest','duration_rstraintest',... % test event 
                   'onset_training_resp','duration_training_resp','onset_test_resp','duration_test_resp',...
                   'onset_training_noresp','duration_training_noresp','onset_test_noresp','duration_test_noresp',...
                   'onset_training_beforeresp','duration_training_beforeresp','onset_test_beforeresp','duration_test_beforeresp',...
@@ -230,6 +266,7 @@ for isub = 1:numel(ids)
     end
 end
 
+
 %% localizer task
 taskname = "localizer";
 for isub = 1:numel(ids)
@@ -259,16 +296,35 @@ for isub = 1:numel(ids)
 
         % construct regressors for repetition suppression analysis
         for t = 1:size(olddata,1)
+            % {'diffcolor','diffshape','diffx','diffy','dist2deuc','distx','disty'}
             if t == 1 % exclude from repetition suppression analysis if in trial 1
-                olddata.dist2d(t) =  nan;
-                olddata.excluders(t)  = 1;
-                olddata.rstrials(t)   = nan;
+                % distance based on feature model   
+                olddata.diffx(t)         = nan;
+                olddata.diffy(t)         = nan;
+
+                % distance based on 2d model (euclidean)
+                olddata.dist2deuc(t)        = nan;
+                olddata.distx(t)         = nan;
+                olddata.disty(t)         = nan;
+
+                olddata.rstrials(t)      = nan;
+                olddata.excluders(t)     = 1; 
+
                 olddata.prev_stimx(t) = nan;
                 olddata.prev_stimy(t) = nan;
             else
-                olddata.excluders(t)  = nan;
-                olddata.rstrials(t)   = 1;
-                olddata.dist2d(t) =  norm([olddata.stim_x(t),olddata.stim_y(t)]-[olddata.stim_x(t-1),olddata.stim_y(t-1)]);
+                % distance based on 10d model (feature-based)
+                olddata.diffx(t)         = 1 - (olddata.stim_attrx(t)==olddata.stim_attrx(t-1));
+                olddata.diffy(t)         = 1 - (olddata.stim_attry(t)==olddata.stim_attry(t-1));
+                
+                % distance based on 2d model (groundtruth or response)
+                olddata.dist2deuc(t)     = norm([olddata.stim_x(t),olddata.stim_y(t)]-[olddata.stim_x(t-1),olddata.stim_y(t-1)]);               
+                olddata.distx(t)         = abs(olddata.stim_x(t)-olddata.stim_x(t-1));
+                olddata.disty(t)         = abs(olddata.stim_y(t)-olddata.stim_y(t-1));
+
+                olddata.rstrials(t)    = 1;
+                olddata.excluders(t)   = nan;
+
                 olddata.prev_stimx(t) = olddata.stim_x(t-1);
                 olddata.prev_stimy(t) = olddata.stim_y(t-1);
             end
@@ -291,11 +347,12 @@ for isub = 1:numel(ids)
 
         keep_v = {'stim_id','stim_img','stim_x','stim_y','stim_attrx','stim_attry','response','acc',...% fields in the orginal data table
                   'prev_stimx','prev_stimy',...
-                  'dist2d','excluders','rstrials',...% fields in the orginal data table
+                  'excluders','rstrials',...
                   'onset_stimuli',  'duration_stimuli',... % stimuli event
                   'onset_response',... % response event, no duration of response, will be set as stick function in glm                
                   'onset_rstrials', 'duration_rstrials',...  % repetition suppression event
                   'onset_excluders','duration_excluders',...% excluded trials in repetition suppression
+                  'diffx','diffy','dist2deuc','distx','disty'
                  };
         keep_v = [keep_v,...
                   arrayfun(@(x) sprintf('onset_stim%02d',x),unique_ids,'uni',0)',...#
