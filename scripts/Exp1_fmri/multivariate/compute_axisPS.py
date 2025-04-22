@@ -1,3 +1,8 @@
+"""
+Compute axis pattern similarity (PS) for training stimuli that are not at the center of the screen.
+This script computes the PS for each participant and each ROI, and saves the results in a pickle file.
+It also generates a null distribution of PS by permuting the data 10,000 times.
+"""
 import itertools
 import numpy as np
 import scipy
@@ -47,15 +52,15 @@ print(f"N_cohort2 = {len(cohort2ids)}")
 
 cohort_names_lists = dict(zip(["First Cohort","Second Cohort","Combined Cohort"],[cohort1ids,cohort2ids,subid_list]))
 
-base_rois = ["HPC","vmPFC","V1","V2"]
-rois =  [f"{x}_bilateral" for x in base_rois]
-ROIRSAdir = os.path.join(fmridata_dir,'ROIRSA','AALandHCPMMP1')
+ROIRSAdir = os.path.join(fmridata_dir,'ROIRSA','AALandHCPMMP1andFUNCcluster')
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
+rois = list(roi_data.keys())
 
 ## select activity pattern of non-center training stimuli
 sub_patterns = {}
 sub_stimdfs = {}
-for roi in rois:
+for ir, roi in enumerate(rois):
+    print(f"{ir+1}/{len(rois)}",end="\n")
     sub_patterns[roi], sub_stimdfs[roi] = [],[]
     for subid,subdata in zip(subid_list,roi_data[roi]):
         
