@@ -21,30 +21,13 @@ import sys
 from joblib import Parallel, delayed, cpu_count, dump,load
 import plotly.express as px
 
-project_path = r'E:\pirate_fmri\Analysis'
-sys.path.append(os.path.join(project_path,'src'))
 from zpyhelper.filesys import checkdir
 from zpyhelper.MVPA.rdm import compute_rdm,lower_tri,upper_tri, compute_rdm_nomial, compute_rdm_identity
 from zpyhelper.MVPA.preprocessors import scale_feature, average_odd_even_session,normalise_multivariate_noise, split_data, concat_data
 from zpyhelper.MVPA.estimators import PatternCorrelation, MultipleRDMRegression, NeuralRDMStability
 
-#from multivariate.modelrdms import ModelRDM
-from multivariate.modelrdms import ModelRDM
-from multivariate.mvpa_runner import MVPARunner
-from utils.composition_modelfit import multi_start_optimisation
-
-import sklearn
-from sklearn.manifold import MDS,TSNE 
-import sklearn.manifold as manifold
-from sklearn.decomposition import PCA
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVR
-from sklearn.multioutput import MultiOutputRegressor,MultiOutputClassifier
-from sklearn.model_selection import LeaveOneGroupOut
-from sklearn.metrics import accuracy_score,r2_score
 
 import scipy
-eng = matlab.engine.start_matlab()
 
 def plot_rdm_withlabel(rdm_mat:np.ndarray,
                         lower_tri_only=True,
@@ -234,8 +217,7 @@ def gen_pval_annot(p,show_pval=0.1):
     asterisks = np.array(["","*","**","***"])
     plevel    = [p>=0.05,all([p<0.05,p>=0.01]),all([p<0.01,p>=0.001]),p<0.001]
     if type(show_pval) == bool:
-        if show_pval:
-            showpths = 0.1 if show_pval else 0
+        showpths = 0.1 if show_pval else 0
     elif isinstance(show_pval,float):
         showpths = show_pval           
     else:
