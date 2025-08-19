@@ -194,7 +194,7 @@ def get_likelihood_function(params:list,param_names:list,xystrategies:list,fixed
             py = p_oneD(param_dict["lapse_rate"],param_dict["betay"]*putative_y,param_dict["sigma_y"],
                         resp=resp_y, resp_other=resp_x, arena_r=arena_r)
         elif ystrategy == "bias":
-            py = p_oneD(param_dict["lapse_rate"],param_dict["betay"], param_dict["sigma_biasy"],
+            py = p_oneD(param_dict["lapse_rate"],param_dict["biasy"], param_dict["sigma_biasy"],
                         resp=resp_y, resp_other=resp_x, arena_r=arena_r)
         elif ystrategy == "random":
             py = univariate_uniform(resp_y,-numpy.sqrt(arena_r**2-resp_x**2), numpy.sqrt(arena_r**2-resp_x**2) )

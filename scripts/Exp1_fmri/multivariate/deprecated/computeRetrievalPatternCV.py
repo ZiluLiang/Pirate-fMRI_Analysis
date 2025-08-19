@@ -43,7 +43,7 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     generalizers    = pirate_defaults['participants']["generalizerids"]
 print(f"N_participants = {len(subid_list)}")
 
-ROIRSAdir = os.path.join(project_path,'AALandHCPMMP1andFUNCcluster')
+ROIRSAdir = os.path.join(project_path,'AALandHCPMMP1_anatrepfun')
 ##################################################### METHODS #####################################################
 
 def average_and_reorder(activitypattern,stimdf):
@@ -247,10 +247,10 @@ class CompositionalRetrieval_CV_Reduced(MetaEstimator):
                                         component_df[["stim_x","stim_y"]].to_numpy(),
                                         lambda u,v: np.sum((2-np.abs(u-v))*(1*(v!=0))))
                 
-            compo_locrep  = component_df[["stim_x","stim_y"]].to_numpy()*2
-            config_locrep = configural_df[["stim_x","stim_y"]].to_numpy()*2
-            loc_reg = LinearRegression(fit_intercept=False,positive=False).fit(compo_locrep.T, config_locrep.T)
-            dist_mod_reg_coefs = loc_reg.coef_
+            #compo_locrep  = component_df[["stim_x","stim_y"]].to_numpy()*2
+            #config_locrep = configural_df[["stim_x","stim_y"]].to_numpy()*2
+            #loc_reg = LinearRegression(fit_intercept=False,positive=False).fit(compo_locrep.T, config_locrep.T)
+            #dist_mod_reg_coefs = loc_reg.coef_
             
             pdcoef = LinearRegression(fit_intercept=True).fit(
                         X=np.array([scale_feature(dist_mod_reg_coefs.flatten(),2),scale_feature(percept_reg_coefs.flatten(),2)]).T,
@@ -314,11 +314,11 @@ class CompositionalRetrieval_CV_Reduced(MetaEstimator):
 
 ##################################################### ANALYSIS STARTS HERE #####################################################
 organize_and_get_data = False
-n_perm = 50
-run_sc = False
-run_ana = False
-rois = ["testgtlocParietalSup_bilateral","vmPFC_bilateral","HPC_bilateral","V1_bilateral"]
-restuldir = os.path.join(ROIRSAdir,"retrievalpatternCV_rotated")
+n_perm = 100
+run_sc = True
+run_ana = True
+rois = ["PPC_bilateral","V1_bilateral","vmPFC_bilateral","HPC_bilateral"][:1]#["testgtlocParietalSup_bilateral","vmPFC_bilateral","HPC_bilateral","V1_bilateral"]
+restuldir = os.path.join(ROIRSAdir,"retrievalpatternCV_rotated_new")
 checkdir(restuldir)
 
 
@@ -340,16 +340,11 @@ if organize_and_get_data:
 
     # Get the data for rotated lzer and rotated shuffled lzer
     import time
-    subXs  = {}
-    subdfs = {}
-    rotated_lzerX = {}
-    rotated_lzerdfs = {}
-    rotated_shufflelzerX = {}
     with Parallel(n_jobs=20) as parallel:
         print("Rotating localizer data")
         for roi in rois:
-
-            rotated_lzerX, rotated_shufflelzerX, rotated_lzerdfs = [], [], []
+            # run and save for each ROI
+            rotated_lzerX, shufflelzerX, rotated_shufflelzerX, rotated_lzerdfs = [], [], [], []
             subXs, subdfs = allsubXs[roi],allsubdfs[roi]#[], []
             for Xs,dfs,subid in zip(allsubXs[roi],allsubdfs[roi],subid_list):
                 
@@ -357,7 +352,9 @@ if organize_and_get_data:
                 trdf, _, lzer_df = dfs
                 
                 # get the shuffle of lzer: we permuted the rows, i.e., stimuli labels were randomly reassigned to activity patterns                
+                starttime= time.time()
                 lzer_shuffled_Xs = [np.random.default_rng(p).permutation(lzer_X) for p in range(n_perm)]
+                print(f"Shuffling {n_perm} localizer data in {roi} - {subid} took {time.time()-starttime:.2f}s",end="\r",flush=True)
                 
 
                 # split training stim data into odd and even
@@ -367,21 +364,25 @@ if organize_and_get_data:
                 starttime= time.time()
 
                 Rlzerodd, _,  _ = kabsch_algorithm(lzer_X, trX[trfodd])
-                Rlzereven, __build_class__, _ = kabsch_algorithm(lzer_X, trX[trfeven])
+                Rlzereven, _, _ = kabsch_algorithm(lzer_X, trX[trfeven])
                 lzeraligned_stacked  = np.vstack(
                                            [Rlzerodd,
                                             Rlzereven
                                            ]
                                            )
-                odd_res = parallel(delayed(kabsch_algorithm)(trX[trfodd],P) for P in lzer_shuffled_Xs)
-                even_res = parallel(delayed(kabsch_algorithm)(trX[trfeven],P) for P in lzer_shuffled_Xs)
+                odd_res = parallel(delayed(kabsch_algorithm)(P,trX[trfodd]) for P in lzer_shuffled_Xs)
+                even_res = parallel(delayed(kabsch_algorithm)(P,trX[trfeven]) for P in lzer_shuffled_Xs)
                 slzeraligned_stacked = [np.vstack([lso[0],lse[0]]) for lso,lse in zip(odd_res,even_res)]
 
-                print(f"Rotating {n_perm+1} (ori+permutated) localizer data in {roi} - {subid} took {time.time()-starttime:.2f}s",end="\r",flush=True)
+                print(f"Rotating {n_perm} (ori+permutated) localizer data in {roi} - {subid} took {time.time()-starttime:.2f}s",end="\r",flush=True)
 
                 rotated_lzerX.append(lzeraligned_stacked)
+                shufflelzerX.append(lzer_shuffled_Xs)
                 rotated_shufflelzerX.append(slzeraligned_stacked)
                 rotated_lzerdfs.append(
+                    # the original lzer_df only has one session,
+                    # because we align lzer pattern twice, once to odd and once to even, 
+                    # the rotated lzer_df now has two sessions, so we need to concat them
                     pd.concat([lzer_df.assign(stim_session=0), lzer_df.assign(stim_session=1)]).reset_index(drop=True)
                 )
 
@@ -390,6 +391,7 @@ if organize_and_get_data:
             dump({"unrotated_Xs":subXs,
                 "unrotated_dfs":subdfs,
                 "rotated_lzerX":rotated_lzerX,
+                "shuffled_lzerX":shufflelzerX,
                 "rotated_shufflelzerX":rotated_shufflelzerX,
                 "rotated_lzerdfs":rotated_lzerdfs
                 },
@@ -405,16 +407,19 @@ if run_sc:
     rdm_corrOE = {"train":{},"test":{},"all":{}}
     r2OE = {"train":{},"test":{},"all":{}}
     roi_shortnames = {
-        "testgtlocParietalSup_bilateral":"Superior Parietal",
+        "PPC_bilateral":"PPC",
         "V1_bilateral":"V1"
     }
-    for roi in ["testgtlocParietalSup_bilateral", "V1_bilateral"]:
+    roi_shortnames = dict(zip(rois,
+                              [x.replace("_bilateral","") for x in rois]
+                              ))
+    for roi in rois:
         rotated_datasets = load(os.path.join(restuldir,roi,"rotated_datasets.pkl"))
         subXs, subdfs = rotated_datasets["unrotated_Xs"], rotated_datasets["unrotated_dfs"]
         rotated_lzerX, rotated_shufflelzerX, rotated_lzerdfs = rotated_datasets["rotated_lzerX"], rotated_datasets["rotated_shufflelzerX"], rotated_datasets["rotated_lzerdfs"]
         # correlation between odd and even
         rdm_corrOE["all"][roi] = [compare_rdm(np.vstack([Xs[1][dfs[1].stim_session.values==0], Xs[0][dfs[0].stim_session.values==0]]),
-                                               np.vstack([Xs[1][dfs[1].stim_session.values==1], Xs[0][dfs[0].stim_session.values==1]])) for Xs,dfs in zip(subXs, subdfs)]
+                                              np.vstack([Xs[1][dfs[1].stim_session.values==1], Xs[0][dfs[0].stim_session.values==1]])) for Xs,dfs in zip(subXs, subdfs)]
         r2OE["all"][roi] = [r2_score(np.vstack([Xs[1][dfs[1].stim_session.values==0], Xs[0][dfs[0].stim_session.values==0]]),
                                       np.vstack([Xs[1][dfs[1].stim_session.values==1], Xs[0][dfs[0].stim_session.values==1]])) for Xs,dfs in zip(subXs, subdfs)]
         rdm_corrOE["test"][roi] = [compare_rdm(Xs[1][dfs[1].stim_session.values==0],
@@ -435,7 +440,7 @@ if run_sc:
                     ["Generalizer","nonGeneralizer"],
                     [choose_color_from[2],choose_color_from[4]]  
                 ))
-    for roi in ["V1_bilateral","testgtlocParietalSup_bilateral"]:
+    for roi in rois:
         fig = plt.figure(figsize=(10,5))
         plt.subplot(1,2,2)
         print(roi)
@@ -460,7 +465,7 @@ if run_sc:
         fig.suptitle(f"{roi_shortnames[roi]}", fontsize=16,fontweight="bold")
         fig.tight_layout()
 
-    for roi in ["V1_bilateral","testgtlocParietalSup_bilateral"]:
+    for roi in rois:
         
         scodddata = [x for x,subid in zip(rdm_sc["odd"][roi],subid_list) if subid in generalizers]
         scevendata = [x for x,subid in zip(rdm_sc["even"][roi],subid_list) if subid in generalizers]
@@ -491,7 +496,7 @@ if run_sc:
 # run the analysis
 if run_ana:
     print("\nRunning analysis\n")
-    def PTACV_run_group(subXs,subdfs,subid_list,run_regs):
+    def RPCV_run_group(subXs,subdfs,subid_list,run_regs):
         results = []
         reg_coefs = dict(zip(run_regs,[[] for _ in run_regs]))
         percept_reg_coefs, dmod_reg_coefs = {}, {}
@@ -519,7 +524,7 @@ if run_ana:
 
     def runrsaforshuffledlzer(p,Xs,dfs,subid_list,run_regs,outputdir):
         print(f"\nRunning Rotated Shuffle {p}",end="\r",flush=True)
-        _, resultdf   = PTACV_run_group(Xs,dfs,subid_list,run_regs) 
+        _, resultdf   = RPCV_run_group(Xs,dfs,subid_list,run_regs) 
         curr_perm_res = resultdf.assign(roi=roi,dataset="rotatedshuffle",perm=p)
         curr_perm_res.to_csv(os.path.join(outputdir,f"perm{p}_results.csv"),index=False)
 
@@ -527,11 +532,12 @@ if run_ana:
         for roi in rois:
             rotated_datasets = load(os.path.join(restuldir,roi,"rotated_datasets.pkl"))
             subXs, subdfs = rotated_datasets["unrotated_Xs"], rotated_datasets["unrotated_dfs"]
+            shufflelzerX = rotated_datasets["shuffled_lzerX"]
             rotated_lzerX, rotated_shufflelzerX, rotated_lzerdfs = rotated_datasets["rotated_lzerX"], rotated_datasets["rotated_shufflelzerX"], rotated_datasets["rotated_lzerdfs"]
 
             # run the analysis for regular unrotated activity patterns
             run_regs = ["train2test","loc2test","loc2train"]
-            unrotated_reg_coefs, unrotated_results = PTACV_run_group(subXs,subdfs,subid_list,run_regs)    
+            unrotated_reg_coefs, unrotated_results = RPCV_run_group(subXs,subdfs,subid_list,run_regs)    
             unrotated_results = unrotated_results.assign(roi=roi,dataset="orginal")
             unrotated_results.to_csv(os.path.join(restuldir,roi,"unrotated_results.csv"),index=False)
             dump(unrotated_reg_coefs,os.path.join(restuldir,roi,"unrotated_reg_coefs.pkl"))
@@ -541,22 +547,35 @@ if run_ana:
             run_regs = ["loc2test","loc2train"]
             rotated_Xs = [[Xs[0],Xs[1],rXs] for Xs,rXs in zip(subXs,rotated_lzerX)]
             rotated_dfs =[[dfs[0],dfs[1], rdf] for dfs, rdf in zip(subdfs, rotated_lzerdfs)]
-            rotatedlzer_reg_coefs, rotatedlzer_results = PTACV_run_group(rotated_Xs,rotated_dfs,subid_list,run_regs)    
+            rotatedlzer_reg_coefs, rotatedlzer_results = RPCV_run_group(rotated_Xs,rotated_dfs,subid_list,run_regs)    
             rotatedlzer_results = rotatedlzer_results.assign(roi=roi,dataset="rotated")
             rotatedlzer_results.to_csv(os.path.join(restuldir,roi,f"rotatedlzer_results.csv"),index=False)
             dump(rotatedlzer_reg_coefs,os.path.join(restuldir,roi,"rotatedlzer_reg_coefs.pkl"))
 
+            # run the nalysis for shuffled activity patterns 
+            shuffledlzer_results = []
+            run_regs = ["loc2test","loc2train"]
+            shulffledoutputdir = os.path.join(restuldir,roi,"shuffledlzer")
+            checkdir(shulffledoutputdir)
+            #shufflelzerX  is a list of nsub, in each element is a list of n_perm shuffled lzer activity patterns  
+            # each shuffled lzer activity patterns is the same size as the original lzerX(only one run), 
+            # therefore we need to copy it with np.vstack before applying it to odd/even naviX
+            shuffle_Xs = [ [ [Xs[0],Xs[1],np.vstack([sXs[p],sXs[p]])] for Xs,sXs in zip(subXs,shufflelzerX)] for p in range(n_perm)]
+            dfs =[ [dfs[0],dfs[1], rdf] for dfs, rdf in zip(subdfs, rotated_lzerdfs)]
+            parallel(delayed(runrsaforshuffledlzer)(p,Xs,dfs,subid_list,run_regs,shulffledoutputdir) for p,Xs in zip(range(n_perm),shuffle_Xs))
+
+
             # run the analysis for rotated shuffled activity patterns    
             run_regs = ["loc2test","loc2train"]
-            shulffledoutputdir = os.path.join(restuldir,roi,"rotatedshuffledlzer")
+            rotatedshulffledoutputdir = os.path.join(restuldir,roi,"rotatedshuffledlzer")
             checkdir(shulffledoutputdir)
-            #rotated_shufflelzerX[roi]  is a list of nsub, in each element is a list of n_perm shuffled then rotated lzer activity patterns    
+            #rotated_shufflelzerX  is a list of nsub, in each element is a list of n_perm shuffled then rotated lzer activity patterns    
             rotatedshuffle_Xs = [ [ [Xs[0],Xs[1],srXs[p]] for Xs,srXs in zip(subXs,rotated_shufflelzerX)] for p in range(n_perm)]
             dfs =[ [dfs[0],dfs[1], rdf] for dfs, rdf in zip(subdfs, rotated_lzerdfs)]
-            parallel(delayed(runrsaforshuffledlzer)(p,Xs,dfs,subid_list,run_regs,shulffledoutputdir) for p,Xs in zip(range(n_perm),rotatedshuffle_Xs))
+            parallel(delayed(runrsaforshuffledlzer)(p,Xs,dfs,subid_list,run_regs,rotatedshulffledoutputdir) for p,Xs in zip(range(n_perm),rotatedshuffle_Xs))
 
             # without parallel
-            #rotatedshuffledlzer_reg_coefs[roi], resultdf = PTACV_run_group(rotatedshuffle_Xs[p],dfs,subid_list,run_regs)    
+            #rotatedshuffledlzer_reg_coefs[roi], resultdf = RPCV_run_group(rotatedshuffle_Xs[p],dfs,subid_list,run_regs)    
             #curr_perm_res = resultdf.assign(roi=roi,dataset="rotatedshuffle",perm=p)
             #rotatedshuffledlzer_results.append(curr_perm_res)
             #curr_perm_res.to_csv(os.path.join(restuldir,"rotatedshuffledlzer",f"perm{p}_results.csv"),index=False)
@@ -631,7 +650,7 @@ for roi in rois:
 unrotatedreg_coefs = dict(zip(rois, [{} for _ in rois]))
 rotatedreg_coefs = dict(zip(rois, [{} for _ in rois]))
 for roi in rois:
-    rotatedreg_coefs[roi] = load(os.path.join(restuldir,roi,"rotatedlzer_reg_coefs.pkl"))
+    rotatedreg_coefs[roi]   = load(os.path.join(restuldir,roi,"rotatedlzer_reg_coefs.pkl"))
     unrotatedreg_coefs[roi] = load(os.path.join(restuldir,roi,"unrotated_reg_coefs.pkl"))
 
 

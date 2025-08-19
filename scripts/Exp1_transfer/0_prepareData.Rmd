@@ -1,0 +1,254 @@
+---
+title: "1_PrepareData"
+output: html_document
+date: "2024-05-06"
+---
+```{r setup, include=FALSE}
+
+rm(list = ls())
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE,fig.height = 9)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+
+data_dir = file.path(project_dir, "data","Exp1_transfer", fsep="/")
+result_dir = file.path(project_dir, "results","Exp1_transfer", fsep="/")
+
+
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+```
+
+# Attention Check
+Plot attention check results and see if any need to be excluded from analyses
+```{r,fig.height=3,fig.width=8}
+pilotV1_data = read.csv(file.path(data_dir,"pilotcohortdata","treasurehunt_V1.csv",fsep="/"))%>%
+  mutate(pilotver = "V1")
+pilotV2_data = read.csv(file.path(data_dir,"pilotcohortdata","treasurehunt_V2.csv",fsep="/"))%>%
+  mutate(pilotver = "V2")
+pilotV3_data = read.csv(file.path(data_dir,"pilotcohortdata","treasurehunt_V3.csv",fsep="/"))%>%
+  mutate(pilotver = "V3")
+pilotV4_data = read.csv(file.path(data_dir,"replicationcohort","treasurehunt_V4.csv",fsep="/"))%>%
+  mutate(pilotver = "V4")
+
+
+pilot_data = rbind(pilotV1_data,pilotV2_data,pilotV3_data,pilotV4_data)%>%
+  mutate(subid=expt_subject)
+
+length(unique(filter(pilot_data,attention_check_accuracy>0.5)$subid))/length(unique(pilot_data$subid))
+
+attcheckdf = pilot_data%>%
+  dplyr::distinct(subid,.keep_all = T)
+attcheckdf = attcheckdf%>%
+  mutate(subid=factor(subid,
+                      levels=arrange(attcheckdf,pilotver,attention_check_accuracy)$subid))%>%
+  mutate(passed=attention_check_accuracy>0.5)
+attcheckdf%>%
+  ggplot(aes(x=subid,y=attention_check_accuracy,color=pilotver,fill=pilotver,alpha=passed))+
+  geom_col()+
+  geom_hline(yintercept = 0.5,color="black",linetype="dashed")+
+  theme(axis.text.x = element_text(angle=90),
+        aspect.ratio = .2)
+```
+
+```{r}
+remove_sub = unique(filter(attcheckdf,passed==F)$subid)
+
+pilot_data = pilot_data%>%
+  filter(!subid%in%remove_sub)%>%
+  mutate(expt_map     = factor(seq_map),
+         expt_maptype = factor(seq_map),
+         iscenter     = factor(if_else(stim_x*stim_y==0,"center","noncenter"),levels=c("center","noncenter")),
+         istraining = factor(stim_group,level=c("training","test"))
+        )%>%
+  mutate(stim_group = factor(stim_group,levels = c("training","test")),
+         stim_attrx = factor(stim_x),
+         stim_attry = factor(stim_y),
+         stim_attryshape = factor(stim_attry,labels = x_shapes),
+         expt_session=ifelse(expt_block>=8*2+4,2,expt_session)
+         )
+```
+
+# classify participants according to performance in Treasure Hunt task
+```{r filter treasure hunt data}
+data = pilot_data%>%
+  filter(expt_task==0)
+
+#check if number of trials is correct:
+(nsub = length(unique(pilot_data$expt_subject))) #= 8
+(ntrialpersub = nrow(pilot_data)/nsub) # 404 = 6 cycle/map * (9+9+16) trial/cycle +  8*25
+
+
+data = data%>%
+  mutate(resp_dist = sqrt((resp_x-stim_x)^2+(resp_y-stim_y)^2))
+
+re_Assign_msblock = data%>%distinct(subid,expt_map,expt_session,expt_block,.keep_all = T)%>%
+  group_by(subid,expt_map,expt_session)%>%
+  arrange(expt_block)%>%
+  mutate(blocknumber_withinsess = row_number())%>%
+  dplyr::select(c("subid","expt_map","expt_session","expt_block","blocknumber_withinsess"))
+data = left_join(data,re_Assign_msblock)
+
+
+```
+
+## calculate llr for each participant and classify learner/generalizer
+### llr from fixed non participant specific
+```{r calculate llr for each participant}
+#load model distribution df
+load(file.path(llr_dir,"probDF_data_compo_withlapse.RData"))
+cl<- makeCluster(detectCores())
+clusterExport(cl=cl,
+              varlist = c("data","unique_stimloc","base","prob_df_list"),
+              envir=environment())
+new_rows <- pblapply(cl = cl,X = seq(1,nrow(data)),FUN = function(j){
+  library(dplyr)
+  sx = data$stim_x[j]
+  sy = data$stim_y[j]
+  rx = data$resp_x[j]
+  ry = data$resp_y[j]
+
+  ind = filter(unique_stimloc,x == sx & y == sy)$loc_id
+  search_df=prob_df_list[[ind]]
+  xlb = base[max(which(base<=rx))]
+  xub = base[min(which(base>rx))]
+  ylb = base[max(which(base<=ry))]
+  yub = base[min(which(base>ry))]
+  
+  new_row = filter(search_df,x<xub & x>=xlb & y<yub & y>=ylb)
+  if(nrow(new_row)==0){
+    new_row[1, ] <- NA
+    new_row = new_row%>%
+    mutate(subid = data$subid[j],
+           expt_session = data$expt_sess[j],
+           expt_block = data$expt_block[j],
+           expt_trial = data$expt_trial[j])
+  }else{
+    new_row = new_row%>%
+    mutate(subid  = data$subid[j],
+           expt_session = data$expt_sess[j],
+           expt_block = data$expt_block[j],
+           expt_trial = data$expt_trial[j])
+  }
+  new_row = new_row%>%
+    mutate(binorm_lap = BND_compo_lap)%>%
+    mutate(LR_trial = binorm_lap/uniform,
+           LRx_trial = UND_x_lap/uniform,
+           LRy_trial = UND_y_lap/uniform,)%>%
+    mutate(LLR_trial = log(LR_trial),
+           LLRx_trial = log(LRx_trial),
+           LLRy_trial = log(LRy_trial))%>%
+    dplyr::select(c(subid,expt_session,expt_block,expt_trial,LLR_trial,LLRx_trial,LLRy_trial))
+  return(new_row)
+  })
+stopCluster(cl)
+
+a = do.call(rbind,new_rows)
+
+data_with_prob = left_join(data,a)
+save(data_with_prob, file = file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+
+data_with_prob = loadRData(file.path(data_dir,"data_withprob_compo_lapse-0_01.RData"))
+data_with_prob = data_with_prob%>%
+  mutate(error_x = abs(stim_x - resp_x),
+         error_y = abs(stim_y - resp_y))%>%
+  group_by(subid)%>%
+    arrange(stim_group,expt_session,expt_block)%>%
+    mutate(trialid_withinstage = row_number(),
+           ntrials = n())%>%
+  ungroup()
+```
+
+
+```{r classify learner}
+sub_LLR_data = aggregate_data(data_with_prob,
+                              groupbyvars = c("pilotver","remapping_condname","subid","seq_map","stim_group","expt_session","cycle"),
+                              yvars = c("LLR_trial","LLRx_trial","LLRy_trial"),
+                              stats = c("mu"),
+                              additionalvars = c("expt_coordsys","expt_curricula","expt_session","expt_maptype"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial"),
+                   newnames = c("LLR","LLR_x","LLR_y"))
+
+# keep the training stimuli response in the final block of each session
+dividesub = sub_LLR_data%>%
+  filter(seq_map=="training map")%>%
+  dplyr::select(-c(starts_with("n_")))%>%
+  group_by(subid,stim_group,expt_session)%>%
+  filter(cycle == 6)%>%
+  aggregate_data(groupbyvars = c("subid","stim_group"),
+                 yvars = c("LLR"),
+                 stats = c("sum"))
+
+#
+classifyl_stype = "training"
+learnerids = unique(filter(dividesub, stim_group==classifyl_stype&sum_LLR>=0)$subid)
+(nonlearnerids = unique(filter(dividesub, stim_group==classifyl_stype&sum_LLR<0)$subid))
+
+classifyg_stype = "test"
+generalizerids = unique(filter(dividesub,stim_group==classifyg_stype&sum_LLR>=0)$subid)
+(nongeneralizerids = unique(filter(dividesub,stim_group==classifyg_stype&sum_LLR<0)$subid))
+
+# learnerids = c("6Wgfkt0TDbfN","IaUzcq81FpYy","XeoSBLkhOwc5",
+#                "7X9sxTIl0sFc","YBQSartY8cGi", "0x3b1d7RNwtn",
+#                "ei39tqQQ2Uoj", "j5qR4VPBKbAD", "4i2wCqKlzfcz",
+#                "73ToiYjyUPlD")
+#nongeneralizerids = c("6Wgfkt0TDbfN","7X9sxTIl0sFc","zrWMqvmHKVSV","Tf8ODdWcZp2M","4i2wCqKlzfcz")
+#generalizerids = c("XeoSBLkhOwc5","YBQSartY8cGi","0x3b1d7RNwtn","ei39tqQQ2Uoj","j5qR4VPBKbAD",
+#                   "73ToiYjyUPlD","IaUzcq81FpYy")
+
+data_with_prob = data_with_prob%>%
+  mutate(islearner = ifelse(subid%in%learnerids,1,0),
+         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))%>%
+  mutate(islearner = factor(islearner,levels = c(0,1),labels = c("non-learner","learner")),
+         isgeneralizer = factor(isgeneralizer,levels = c(0,1),labels = c("non-generalizer","generalizer")))
+
+sub_LLR_data = sub_LLR_data%>%
+  mutate(islearner = ifelse(subid%in%learnerids,1,0),
+         isgeneralizer = ifelse(subid%in%generalizerids ,1,0))%>%
+  mutate(islearner = factor(islearner,levels = c(0,1),labels = c("non-learner","learner")),
+         isgeneralizer = factor(isgeneralizer,levels = c(0,1),labels = c("non-generalizer","generalizer")))
+```
+
+```{r count participant type}
+nlearners = length(learnerids)
+ngeneralizers = length(generalizerids)
+nsub = length(unique(sub_LLR_data$subid))
+
+participant_countbypilot = sub_LLR_data%>%
+  distinct(pilotver,subid,islearner,isgeneralizer)%>%
+  group_by(pilotver,islearner,isgeneralizer)%>%
+  summarise(n = n())
+print(participant_countbypilot)
+participant_countbytransfer = sub_LLR_data%>%
+  distinct(remapping_condname,subid,islearner,isgeneralizer)%>%
+  group_by(islearner,isgeneralizer,remapping_condname)%>%
+  summarise(n = n())
+print(participant_countbytransfer)
+
+participant_count = sub_LLR_data%>%
+  distinct(subid,islearner,isgeneralizer)%>%
+  group_by(islearner,isgeneralizer)%>%
+  summarise(n = n())
+participant_count = participant_count%>%
+  mutate(label = paste0(isgeneralizer, "\n n=",n))
+participant_count
+labelling_func = function(row){
+  l = row[1]
+  g = row[2]
+  return(filter(participant_count,islearner==l&isgeneralizer==g)$label)
+}
+```
+
+
+# save data
+```{r}
+save(data_with_prob,learnerids,generalizerids,
+     labelling_func,participant_count,
+     file = file.path(data_dir,"allexpdata_compo_lapse-0_01.RData"))
+write_csv(data_with_prob,
+          file=file.path(data_dir,"treasurehuntdatawithprob.csv"))
+```
+

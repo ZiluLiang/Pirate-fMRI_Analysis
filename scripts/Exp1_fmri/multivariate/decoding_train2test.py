@@ -1,7 +1,7 @@
 """
 This file run the feature decoding analysis by training the feature decoder in training stimuli and evaluate the decoder performance in test stimuli.
 
-During decoder fitting, hyperparameter C is optimized using a stratified k-fold gridsearchCV approach
+During decoder fitting, hyperparameter C is optimized using a stratified k-fold gridsearchCV approach.
 During this hyperparameter search, the fitting data is processed to look for hyperparameter that maximize the decoding accuracy in the validation set (a subset of the decoder fitting dataset).
 
 """
@@ -26,8 +26,12 @@ from sklearn.metrics import accuracy_score,f1_score, confusion_matrix,precision_
 import warnings
 warnings.simplefilter('ignore', category=FutureWarning)
 
+project_path = r'E:\pirate_fmri\Analysis'
+fmridata_dir = os.path.join(project_path,'data','Exp1_fmri','fmri')
+study_scripts   = os.path.join(project_path,'scripts','Exp1_fmri')
+ROIRSAdir = os.path.join(fmridata_dir,'ROIdata')
 
-study_scripts   = r"D:\OneDrive - Nexus365\pirate_ongoing\scripts\Exp1_fmri"
+sys.path.append(project_path)
 
 with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
@@ -37,12 +41,8 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 
 print("N_Total: ",len(subid_list))
 
-ROIRSAdir = r"D:\OneDrive - Nexus365\pirate_ongoing\AALandHCPMMP1andFUNCcluster"
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
 rois =  list(roi_data.keys())
-#rois =  [x for x in list(roi_data.keys()) if "bilateral" in x] + ["allgtlocPrecentral_left"]
-rois = ["HPC_bilateral","vmPFC_bilateral","testgtlocParietalSup_bilateral","V1_bilateral"] # 
-
 
 SCORER_DICT = {"acc":accuracy_score,
                "f1micro":lambda y_true,y_pred: f1_score(y_true,y_pred,average="micro"),
@@ -50,20 +50,10 @@ SCORER_DICT = {"acc":accuracy_score,
                "recall":lambda y_true,y_pred: recall_score(y_true,y_pred,average="micro")}
 
 preprox_fun = lambda x,sess: concat_data([scale_feature(sx,2) for sx in split_data(x,sess)]) 
-# def preprox_with_alignment(x,sess):
-#     sess_patterns, uniq_sess = split_data(x,sess,return_groups=True)
-#     sess_patterns = concat_data([scale_feature(sx,2) for sx in sess_patterns])
-    
-#     firstrun_patterns = sess_patterns[uniq_sess.index(0)]
-#     for patterns,s in uniq_sess:
-#         if np.logical_and(s!=0,s!=4):
-            
-#         sess_patterns[uniq_] = extract_pc(sess_patterns[s],n_components=2)
-#     return concat_data([scale_feature(sx,2) for sx in split_data(x,sess)])
 
 # For LR
 baseclf_kwargs = {'max_iter':100000,'solver':'lbfgs','multi_class':'multinomial','random_state':0}
-gridsearcg_paramgrid={'C':np.concatenate([np.geomspace(10**-10,5,num=50),np.linspace(5,50,num=50)])}
+gridsearcg_paramgrid={'C':np.concatenate([np.geomspace(10**-10,5,num=50),np.linspace(5,100,num=50)])}
 
 # For saving
 save_fn = "noncenter_train2test_LRdecoding_acc_skf"
@@ -73,14 +63,14 @@ flag_saveGSres = True
 flag_saveCM = True
 
 # Parallel jobs
-njobs = 14       
+njobs = 15       
 
 res_dfs = []
 confusion_mats = {}
 GSres = []
 
 n_rands = 20 # to make sure the results are not dependent on the random state
-for ir,roi in enumerate(["vmPFC_bilateral"]):#rois):
+for ir,roi in enumerate(rois):#rois):
     confusion_mats[roi] = {}
     for rands in range(n_rands):
         print(f"\n{ir+1}/{len(rois)} - randomstates: {rands}/{n_rands}",end="\n")  
@@ -133,14 +123,14 @@ for ir,roi in enumerate(["vmPFC_bilateral"]):#rois):
                     assert np.logical_and(np.unique(fit_sg_labels).size == 1,np.unique(fit_sg_labels)[0]!=heldout_stimgroup)
 
                     # grid search for best hyperparameters in the fit set
-                    n_splits = 4 if heldout_stimgroup==1 else 2 # 2f-fold for fit on test stimuli, 2-fold for training stimuli           
-                    n_repeats = 10 if heldout_stimgroup==1 else 5 # 10 repeats for fit on test stimuli, 5 repeats for training stimuli
+                    n_splits = 4 if heldout_stimgroup==1 else 2 # 4-fold for fit on test stimuli, 2-fold for training stimuli           
+                    n_repeats = 20 if heldout_stimgroup==1 else 10 # 20 repeats for fit on test stimuli, 10 repeats for training stimuli
                     clf = GridSearchCV(LogisticRegression(**baseclf_kwargs),
                                     param_grid=gridsearcg_paramgrid,
-                                    cv=RepeatedStratifiedKFold(n_repeats=20,n_splits=n_splits),#LeaveOneGroupOut(),
+                                    cv=RepeatedStratifiedKFold(n_repeats=20,n_splits=n_splits),
                                     refit=True,
                                     n_jobs=njobs)
-                    clf.fit(fit_X,fit_target) # ,groups=fit_sess_labels
+                    clf.fit(fit_X,fit_target) 
                     GSres.append(pd.DataFrame(clf.cv_results_).assign(roi=roi,subid=subid,target=tarvar,heldoutgroup=heldout_stimgroup,heldouttype=heldout_types[heldout_stimgroup],random_state=rands))
 
                     for k,scorer in SCORER_DICT.items():
@@ -216,5 +206,3 @@ gs = sns.catplot(data=res_df_sum[res_df_sum.roi.str.contains("bilateral")],
             kind="bar",errorbar="se")
 for ax in gs.axes.flatten():
     ax.axhline(0.25,linestyle="--",color="black")
-    #ax.set_xticklabels(ax.get_xticklabels(),rotation=90)
-    #ax.set_title(ax.get_title().split("=")[1].strip())

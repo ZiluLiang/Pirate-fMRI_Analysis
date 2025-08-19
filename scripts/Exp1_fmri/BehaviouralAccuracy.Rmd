@@ -10,16 +10,22 @@ data_dir = file.path(project_dir, "data","Exp1_fmri", fsep="/")
 result_dir = file.path(project_dir, "results","Exp1_fmri", fsep="/")
 
 
+
 source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
 source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
 source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+source(file.path(project_dir, "scripts","Exp1_fmri","plotting_colorpals.R",fsep="/"), local = knitr::knit_global())
+
 ```
 
 # Load Data
 ```{r}
-data_with_prob = loadRData(file.path(data_dir,"filtereddata_withprob_compo_lapse-0_01.RData"))
+data_with_prob = loadRData(file.path(data_dir,"filtereddata_withprob_compo_lapse-0_01.RData"))%>%
+  mutate(stim_group = factor(stage,levels=c("train","test"),
+                             labels=c("training","test")))
 meanscanperf_with_prob = loadRData(file.path(data_dir,"filteredmeanscannerdata_withprob_compo_lapse-0_01.RData"))
 
+write.csv(data_with_prob,file.path(project_dir, "data","Exp1_fmri","allbehavdatawithprob.csv", fsep="/"))
 ```
 
 ```{r}
@@ -56,7 +62,7 @@ theme_basic(as_huxtable(participant_count)%>%
 ```{r}
 blockdata_sub = aggregate_data(data_with_prob,
                            yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
-                           groupbyvars = c("cohort","subid","stage","expt_session","blocknumber_withinsess"),
+                           groupbyvars = c("cohort","subid","stim_group","expt_session","blocknumber_withinsess"),
                            stats = c("mu"),
                            additionalvars = c("islearner","isgeneralizer","session_str"))%>%
   change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
@@ -67,7 +73,7 @@ blockdata_sub = aggregate_data(data_with_prob,
 
 blockdata_sum = aggregate_data(blockdata_sub,
                            yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory"),
-                           groupbyvars = c("cohort","islearner","isgeneralizer","stage",
+                           groupbyvars = c("cohort","islearner","isgeneralizer","stim_group",
                                            "expt_session","blocknumber_withinsess"),
                            stats = c("mu","se","n"),
                            additionalvars = c("session_str"))
@@ -97,7 +103,7 @@ apply(blockdata_sum[ , c("islearner","isgeneralizer","cohort")], 1, labelling_fu
                     ymin = mu_distance - se_distance,
                     ymax = mu_distance + se_distance),
                 width=0.4)+
-  facet_nested(cols =vars(stage,session_str),
+  facet_nested(cols =vars(stim_group,session_str),
                rows = vars(cohort,islearner,generalizer_label),
                scales = "free_x",space = "free_x",
                axes = "all")+
@@ -123,7 +129,7 @@ ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot 
                     ymin = mu_LLR - se_LLR,
                     ymax = mu_LLR + se_LLR),
                 width=0.4)+
-  facet_nested(cols =vars(stage,session_str),
+  facet_nested(cols =vars(stim_group,session_str),
                rows = vars(cohort,islearner,generalizer_label),
                scales = "free_x",space = "free_x",axes = "all",remove_labels="none")+
   scale_x_continuous(breaks = seq(1,12,1))+
@@ -138,7 +144,7 @@ ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = '
 ###side by side comparison all blocks
 ```{r}
 (p = blockdata_sub%>%
-   mutate(addtext=if_else(session_str=="refresher"&isgeneralizer=="generalizer"&stage=="train"&LLR<0,subid,""))%>%
+   mutate(addtext=if_else(session_str=="refresher"&isgeneralizer=="generalizer"&stim_group=="training"&LLR<0,subid,""))%>%
   ggplot(aes(x=blocknumber_withinsess,y=LLR,color=cohort))+
   geom_point(alpha = 0.1,size = 2,stroke=0,
                 position=position_dodge(0.9))+
@@ -153,7 +159,7 @@ ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = '
                 width=0.4,
                 position=position_dodge(0.9))+
    geom_text(aes(label=addtext,x=0.8*blocknumber_withinsess,y=0.8*LLR),size=2.5,fontface="bold")+
-  facet_nested(cols =vars(stage,session_str),
+  facet_nested(cols =vars(stim_group,session_str),
                rows = vars(islearner,isgeneralizer),
                scales = "free_x",space = "free_x",axes = "all",remove_labels="none")+
   scale_x_continuous(breaks = seq(1,12,1))+
@@ -181,7 +187,7 @@ ggsave(file.path(result_dir,paste0('LLR_classified_cohortsidebyside','.png')),pl
                 width=0.4,
                 position=position_dodge(0.9))+
   #geom_text(aes(label=addtext,x=0.8*blocknumber_withinsess,y=0.8*distance),size=2.5,fontface="bold")+
-  facet_nested(cols =vars(stage,session_str),
+  facet_nested(cols =vars(stim_group,session_str),
                rows = vars(islearner,isgeneralizer),
                scales = "free_x",space = "free_x",axes = "all",remove_labels="none")+
   scale_x_continuous(breaks = seq(1,12,1))+
@@ -196,18 +202,18 @@ ggsave(file.path(result_dir,paste0('rescaled_distance_classified_cohortsidebysid
 ###average performance of last pretraining cycle to scanner learner only
 ```{r}
 Lsub_lastpretrain2scan = blockdata_sub%>%
-  mutate(cycle = case_when(stage=="train"&expt_session==1~ceil(blocknumber_withinsess/2),
-                           stage=="test"&expt_session==1~blocknumber_withinsess,
+  mutate(cycle = case_when(stim_group=="training"&expt_session==1~ceil(blocknumber_withinsess/2),
+                           stim_group=="test"&expt_session==1~blocknumber_withinsess,
                            expt_session==2~blocknumber_withinsess+6,
                            expt_session==3~blocknumber_withinsess+6+3))%>%
   filter(islearner=="learner"&cycle>=6)%>%
-  aggregate_data(groupbyvars = c("cohort", "subid","stage","expt_session","cycle"),
+  aggregate_data(groupbyvars = c("cohort", "subid","stim_group","expt_session","cycle"),
                  additionalvars = c("islearner","isgeneralizer","session_str","blocknumber_withinsess"),
                  yvars = c("distance","LLR"),
                  stats="mu")%>%
   change_cols_name(paste0("mu_",c("distance","LLR")), c("distance","LLR"))
 Lsum_lastpretrain2scan = Lsub_lastpretrain2scan%>%
-  aggregate_data(groupbyvars = c("cohort", "islearner","isgeneralizer","stage","expt_session","cycle"),
+  aggregate_data(groupbyvars = c("cohort", "islearner","isgeneralizer","stim_group","expt_session","cycle"),
                  additionalvars = c("session_str","blocknumber_withinsess"),
                  yvars = c("distance","LLR"),
                  stats=c("mu","se"))
@@ -229,10 +235,10 @@ Lsum_lastpretrain2scan = Lsub_lastpretrain2scan%>%
                 width=0.4,
                 position=position_dodge(0.9))+
     geom_text(aes(x=11.5,
-                  y=if_else(isgeneralizer=="non-generalizer"&stage=="test",2,-2),
+                  y=if_else(isgeneralizer=="non-generalizer"&stim_group=="test",2,-2),
                   label="scanning"),
                   color="black",fontface="bold")+
-  facet_nested(cols =vars(stage),
+  facet_nested(cols =vars(stim_group),
                rows = vars(isgeneralizer),
                scales = "free_x",space = "free_x",axes="all",remove_labels="none")+
   scale_x_continuous(breaks = seq(6,13,1))+
@@ -263,7 +269,7 @@ ggsave(file.path(result_dir,paste0('LLR_lastpretrain2scanning_cohortsidebyside',
     geom_text(aes(x=11.5,y=1.5,
                   label="scanning"),
                   color="black",fontface="bold")+
-  facet_nested(cols =vars(stage),
+  facet_nested(cols =vars(stim_group),
                rows = vars(isgeneralizer),
                scales = "free_x",space = "free_x",axes="all",remove_labels="none")+
   scale_x_continuous(breaks = seq(6,13,1))+
@@ -367,7 +373,8 @@ for (j in c(1,2)){
     change_cols_name(oldnames = c("mu_resp_x","mu_resp_y"),
                      newnames = c("resp_x", "resp_y"))%>%
     mutate(stim_attrx = factor(stim_attrx),
-             stim_attry = factor(stim_attry))
+           stim_attry = factor(as.character(stim_attry-2))
+           )
   
   
   nb_train = length(unique(filter(ave_resp_map_df,stage=="train")$expt_block))
@@ -380,8 +387,8 @@ for (j in c(1,2)){
     ggplot(aes(x=resp_x, y = resp_y))+
     facet_manual(vars(stage,session_str,blocknumber_withinsess),design = layoutmat,strip = strip_nested())+
     geom_point(aes(color = stim_attry,fill = stim_attry,shape = stim_attrx),size = 3)+
-    scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+
-    scale_shape_manual(values = x_shapes)+
+    scale_color_manual(values = stimycolorhex,aesthetics = c("color","fill"))+
+    #scale_shape_manual(values = x_shapes)+
     guides(fill = "none")+
     labs(title =paste0("average response map: ", learn_ks[k],'_',generalize_js[j]),
       color = "y feature",shape = "x feature", x = "x", y = "y")+
@@ -394,14 +401,331 @@ for (j in c(1,2)){
 ```
 
 
+
+# Plot Average response at scanning and heatmap
+```{r}
+# will load prob_df_list, unique_stimloc, cart_GRID, base
+# these are the same parameter as in the classification calculation
+load(file.path(llr_dir,"probDF_data_compo_withlapse.RData"))
+
+(max(cart_GRID$Y) - min(cart_GRID$Y))
+```
+
+
+## average response map
+```{r}
+##### when x/y range is -3.4~3.4, radius is five; now rescale radius to x/y range is -2,2
+arena_radius_rescale = (5+30/53)*((2-(-2))/6.8) 
+
+
+arena_outline_dat = data.frame(x=arena_radius_rescale*cos(seq(0,2*pi,length.out=1000)),
+                               y=arena_radius_rescale*sin(seq(0,2*pi,length.out=1000)))
+
+
+generalize_js = c("non-generalizer","generalizer")
+learn_ks = c("non-learner","learner")
+for (j in c(1,2)){
+  for (k in c(2)){
+    resp_map_subdf = data_with_prob %>%
+    filter(isgeneralizer==generalize_js[j],islearner==learn_ks[k],expt_session==3)%>%
+    mutate(stim_attrx = factor(stim_attrx-2,levels = c(-2,-1,0,1,2)),
+           stim_attry = factor(as.character(stim_attry-2),levels = c('-2','-1','0','1','2')),
+           resp_x = resp_x*2,
+           resp_y = resp_y*2
+    )
+    
+    ave_resp_map_subdf = resp_map_subdf%>%
+    aggregate_data(
+      yvars = c("resp_x","resp_y"),
+      groupbyvars = c("islearner","isgeneralizer","stage","stim_id"),
+      stats = c("mu"),
+      additionalvars = c("expt_block","session_str","stim_x","stim_y","stim_attrx","stim_attry")
+    )%>%
+    change_cols_name(oldnames = c("mu_resp_x","mu_resp_y"),
+                     newnames = c("resp_x", "resp_y"))
+    (p = ave_resp_map_subdf%>%
+    ggplot(aes(x=resp_x, y = -resp_y))+
+    geom_point(aes(color = stim_attry,fill = stim_attry,shape = stim_attrx),size = 5)+
+    #geom_point(data=resp_map_subdf,
+    #           aes(color=stim_attry,fill=stim_attry,shape=stim_attrx),
+    #           size=0.5)+
+    scale_color_manual(values = stimycolorhex,aesthetics = c("color","fill"))+
+    #scale_shape_manual(values = x_shapes)+
+    geom_path(inherit.aes = F,
+              data=arena_outline_dat, 
+              aes(x=x, y=y),
+              color="black",
+              size=1)+
+    guides(fill = "none",shape=guide_legend(nrow=1),colour=guide_legend(nrow=1))+
+    labs(title =paste0("average response map: ", learn_ks[k],'_',generalize_js[j]),
+      color = "true y",shape = "true x", x = "x", y = "y")+
+    theme(legend.position = "top",
+      line = element_blank(),
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      legend.box="vertical"
+      )
+      )
+    ggsave(file.path(result_dir,'individualmaps',"averagemaps",
+                   paste0(learn_ks[k],'_',generalize_js[j],'scanner.png')),plot = p,width = 5,height = 5)
+  }
+  }
+  
+  
+```
+
+## heatmap of response
+For each subgroup of participant, we compute a heatmap of response
+```{r}
+# will load prob_df_list, unique_stimloc, cart_GRID, base
+# these are the same parameter as in the classification calculation
+load(file.path(llr_dir,"probDF_data_compo_withlapse.RData"))
+
+
+check_sample_probdf = do.call(rbind,prob_df_list)%>%
+  aggregate_data(groupbyvars = c("x","y"),
+                 yvars =c("UND_x_lap","UND_y_lap","BND_compo_lap","uniform"),
+                 stats = "mu")%>%
+  change_cols_name(paste0("mu_",c("UND_x_lap","UND_y_lap","BND_compo_lap","uniform")),
+                   c("UND_x_lap","UND_y_lap","BND_compo_lap","uniform"))%>%
+  pivot_longer(cols = c("UND_x_lap","UND_y_lap","BND_compo_lap","uniform"),
+               names_to = "pfunc",values_to = "prob")%>%
+  mutate(pfunc = factor(pfunc,
+                          levels = c("uniform", "UND_x_lap","UND_y_lap","BND_compo_lap"),
+                          labels = c("uniform random",
+                                     "univariate normal (x-axis) with lapse",
+                                     "univariate normal (y-axis) with lapse",
+                                     "bivariate normal with lapse")))%>%
+  filter(pfunc %in% c("uniform random","bivariate normal with lapse"))
+
+max_p_all = 1.05*round(max(check_sample_probdf$prob,na.rm = T),5)
+prob_breaks = unique(c(round(sapply(group_split(check_sample_probdf,pfunc) , function(df){1.05*max(df$prob,na.rm = T)}),5),
+                       max_p_all))
+prob_labels = sapply(prob_breaks,function(x){sprintf("%.3f%s",x*100,"%")})
+
+max_p_all = ceil(max(check_sample_probdf$prob,na.rm = T)*1e10)/1e10 # this is to round up
+prob_breaks = unique(c(ceil(sapply(group_split(check_sample_probdf,pfunc) , function(df){max(df$prob,na.rm = T)})*1e10)/1e10,
+                       max_p_all))
+prob_labels = sapply(prob_breaks,function(x){sprintf("%.3f%s",x*100,"%")})
+
+(p.modeldist = check_sample_probdf%>%
+   ggplot(aes(x = x,y=y, color = prob)) +
+        facet_grid(cols = vars(pfunc))+
+        geom_point() + 
+        scale_colour_viridis_c(na.value = "grey",
+                           limits = c(0,max_p_all),
+                           breaks = prob_breaks,
+                           labels = prob_labels,
+                           option = "inferno",
+                           trans = "sqrt")+
+        guides(color = guide_colorbar(title = "probability"))+
+        theme(axis.text = element_blank(),axis.title = element_blank(),
+            axis.ticks = element_blank(),axis.line = element_blank(),
+            legend.position = "right"))
+
+
+```
+
+```{r}
+arena_radius_rescale = (5+20/53)*(2/6.8) 
+granularity = round(arena_radius_rescale*100) #round(arena_radius_rescale/ (0.2*(2/6.8)) )
+base = seq(from = -arena_radius_rescale,to = arena_radius_rescale,length.out = granularity+1)
+lbs = base[1:granularity]
+ubs = base[2:(granularity+1)]
+freq_counts = matrix(NA,nrow=granularity,ncol=granularity)
+gridmid = (lbs+ubs)/2
+grid_df = data.frame(
+    gridx=c(meshgrid(seq(1,granularity,1))$X),
+    gridy=c(meshgrid(seq(1,granularity,1))$Y),
+    gridxloc=c(meshgrid(gridmid)$X),
+    gridyloc=c(meshgrid(gridmid)$Y))%>%
+  mutate(gridnum = row_number())
+
+find_gridxyidx = function(x){
+  return (which( ( (x>=lbs)+(x<ubs) ) == 2 ))
+}
+
+
+scanner_resp = data_with_prob%>%
+  filter(expt_session==3)%>%
+  dplyr::select(c("islearner","isgeneralizer","subid",
+                  "expt_trial","stim_id",
+                  "resp_x","resp_y",
+                  "stim_x","stim_y","stim_attrx","stim_attry"
+                  ))%>%
+    mutate(stim_attrx = factor(stim_attrx-2,levels=c(-2,-1,0,1,2)),
+           stim_attry = factor(as.character(stim_attry-2),levels=as.character(c(-2,-1,0,1,2)))
+           )
+#  filter((!is.na(resp_x))&(!is.na(resp_y)))
+scanner_resp_ave = scanner_resp%>%
+  aggregate_data(groupbyvars = c("islearner","isgeneralizer","subid",
+                                 "stim_id"),
+                 yvars = c("resp_x","resp_y"),
+                 stats="mu",
+                 additionalvars = c("stim_x","stim_y","stim_attrx","stim_attry")
+                 )%>%
+  change_cols_name(c("mu_resp_x","mu_resp_y"),
+                   c("resp_x","resp_y"))
+
+scanner_resp_ave[["gridx"]] = unlist(
+  lapply(scanner_resp_ave$resp_x, find_gridxyidx)
+)
+scanner_resp_ave[["gridy"]] = unlist(
+  lapply(scanner_resp_ave$resp_y, find_gridxyidx)
+)
+colnames(scanner_resp_ave)
+  
+scanner_grid_freq = scanner_resp_ave%>%
+  group_by("isgeneralizer")%>%
+  mutate(Ntotal = n())%>%
+  ungroup()%>%
+  aggregate_data(groupbyvars = c("isgeneralizer","gridx","gridy"),
+                 yvars="subid",
+                 stats="n",
+                 additionalvars = "Ntotal")%>%
+  change_cols_name("n_subid","freq_raw")%>%
+    mutate(freq=freq_raw/Ntotal)
+head(scanner_grid_freq,5)  
+
+freq_counts = rbind(
+  grid_df%>%mutate(isgeneralizer="generalizer"),
+  grid_df%>%mutate(isgeneralizer="non-generalizer")
+)
+
+freq_counts = left_join(freq_counts,scanner_grid_freq,by=c("isgeneralizer","gridx","gridy"))%>%
+  mutate(inarena = sqrt(gridxloc**2+gridyloc**2)<arena_radius_rescale)%>%
+  mutate(freq = if_else(inarena&is.na(freq),0,if_else(inarena,freq,NA)))
+freq_counts
+
+
+```
+
+
+
+```{r}
+(p.obsdist = freq_counts%>%
+   ggplot(aes(x = gridxloc,y=gridyloc, color = freq)) +
+        facet_grid(cols = vars(isgeneralizer))+
+        geom_point() + 
+        scale_colour_viridis_c(na.value = "white",
+                           #limits = c(0,max_p_all),
+                           #breaks = prob_breaks,
+                           #labels = prob_labels,
+                           option = "inferno",
+                           trans = "sqrt")+
+        guides(color = guide_colorbar(title = "frequency"))+
+        theme(axis.text = element_blank(),axis.title = element_blank(),
+            axis.ticks = element_blank(),axis.line = element_blank(),
+            legend.position = "right"))
+
+```
+
+```{r}
+(p = scanner_resp_ave%>%
+    ggplot(aes(x=resp_x, y = -resp_y))+
+    geom_point(aes(color = stim_attry,fill = stim_attry,shape = stim_attrx),size = 1)+
+   facet_grid(cols=vars(isgeneralizer))+
+    #geom_point(data=resp_map_subdf,
+    #           aes(color=stim_attry,fill=stim_attry,shape=stim_attrx),
+    #           size=0.5)+
+    scale_color_manual(values = stimycolorhex,aesthetics = c("color","fill"))+
+    scale_shape_manual(values = x_shapes)+
+    #geom_path(inherit.aes = F,
+    #          data=arena_outline_dat, 
+    #          aes(x=x, y=y),
+    #          color="black",
+    #          size=1)+
+    guides(fill = "none",
+           shape=guide_legend(nrow=1, override.aes = list(size=5)),
+           colour=guide_legend(nrow=1, override.aes = list(size=5))
+          )+
+   coord_fixed(expand = F)+
+    labs(
+      title="Participants' response in the scanner",
+      color = "groundtruth y",shape = "groundtruth x", x = "x", y = "y")+
+    theme(legend.position = "top",
+      line = element_blank(),
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      legend.box="vertical",
+      #legend.text = element_text(size=12),
+      #legend.title = element_text(size=12),
+      legend.spacing = unit(0,"pt"),
+      legend.box.spacing = unit(0,"pt"),
+      legend.margin = margin(0,2,0,2,"pt"),
+      strip.background = element_blank(),
+      strip.text = element_text(),
+      strip.placement = "inside"
+      )
+      )
+ggsave(filename=file.path(result_dir,"scannerrespmap.tiff"),
+       plot = p,
+       width=5.5,height=4)
+
+```
+
+
+
+
+```{r vertical ave resp map}
+(p = scanner_resp_ave%>%
+    ggplot(aes(x=resp_x, y = -resp_y))+
+    geom_point(aes(color = stim_attry,fill = stim_attry,shape = stim_attrx),size = 1)+
+   facet_nested_wrap(vars(isgeneralizer),nrow=2)+
+    #geom_point(data=resp_map_subdf,
+    #           aes(color=stim_attry,fill=stim_attry,shape=stim_attrx),
+    #           size=0.5)+
+    scale_color_manual(values = stimycolorhex,aesthetics = c("color","fill"))+
+    scale_shape_manual(values = x_shapes)+
+    #geom_path(inherit.aes = F,
+    #          data=arena_outline_dat, 
+    #          aes(x=x, y=y),
+    #          color="black",
+    #          size=1)+
+    guides(fill = "none",
+           shape=guide_legend(nrow=1, override.aes = list(size=3)),
+           colour=guide_legend(nrow=1, override.aes = list(size=3))
+          )+
+   coord_fixed(expand = F)+
+    labs(
+      color = "groundtruth y",shape = "groundtruth x", x = "x", y = "y")+
+    theme(legend.position = "top",
+      line = element_blank(),
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      legend.text = element_text(size=10),
+      legend.title = element_text(size=10),
+      legend.box="vertical",
+      legend.box.spacing = unit(0,"pt"),
+      legend.margin = margin(0,2,0,2,"pt"),
+      legend.spacing.x = unit(0,"pt"),
+      legend.spacing.y = unit(2,"pt"),
+      # Reduce space between keys and text
+      legend.key.width = unit(10, "pt"),
+      legend.key.height = unit(10, "pt"),
+      
+      # Optional: shrink padding inside legend keys
+      legend.key = element_rect(fill = NA, colour = NA),
+      
+      strip.background = element_blank(),
+      strip.text = element_text(),
+      strip.placement = "inside"
+      )
+      )
+
+ggsave(filename=file.path(result_dir,"scannerrespmap_vertical.tiff"),
+       plot = p,
+       width=3,height=6)
+
+```
 # Plot using cycle instead of block
 
-## combined cohort, generalizer only
+## combined cohort
 
 ```{r}
 cycledata_sub = aggregate_data(data_with_prob,
                            yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
-                           groupbyvars = c("cohort","subid","stage","expt_session","cycle"),
+                           groupbyvars = c("cohort","subid","stim_group","expt_session","cycle"),
                            stats = c("mu"),
                            additionalvars = c("islearner","isgeneralizer","session_str"))%>%
   change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
@@ -412,23 +736,42 @@ cycledata_sub = aggregate_data(data_with_prob,
 
 cycledata_sum = aggregate_data(cycledata_sub,
                            yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory"),
-                           groupbyvars = c("islearner","isgeneralizer","stage",
+                           groupbyvars = c("isgeneralizer","stim_group",
                                            "expt_session","cycle"),
                            stats = c("mu","se","n"),
                            additionalvars = c("session_str"))
 
-cycledata_sub = filter(cycledata_sub,isgeneralizer=="generalizer"&islearner=="learner")
-cycledata_sum = filter(cycledata_sum,isgeneralizer=="generalizer"&islearner=="learner")
+write.csv(filter(cycledata_sum,cycle==6),
+          file=file.path(project_dir,"data","Exp2_pilots","Exp1fmrifinaltrainingacc.csv"))
+
 ```
 
+###generalizer only
+```{r,fig.height=6}
 
-```{r}
+cycledata_sub = filter(cycledata_sub,isgeneralizer=="generalizer")
+cycledata_sum = filter(cycledata_sum,isgeneralizer=="generalizer")
+
+
+## NOTE THAT SUB129 is a generalizer who didn't have response in the final run
 annot_sesstext2=data.frame(x=c(3.5,8,11.5),y=c(-3,-3,-3),seslab=c("pretrain","refresher","scanning"))
-(pllr = cycledata_sub%>%
-  ggplot(aes(x=cycle,y=LLR,color=stage))+
+(pllrg = cycledata_sub%>%
+  ggplot(aes(x=cycle,y=LLR,color=stim_group))+
   geom_rect(aes(xmin=6.5,xmax=9.5,ymin=-Inf,ymax=Inf),color="lightgrey",fill="lightgrey",alpha=0.03)+
   geom_text(inherit.aes = F,data=annot_sesstext2,mapping=aes(x=x,y=y,label=seslab),size=4,fontface="bold")+
-  geom_point(alpha = 0.1,size = 2,stroke=0,position=position_dodge(1))+
+  #geom_line(
+  #  aes(group=interaction(subid,stim_group)),
+  #  alpha = 0.1,size = .1,stroke=0,position=position_dodge(1)
+  #  )+
+  geom_point(
+    #aes(group=interaction(subid,stim_group)),
+    alpha = 0.1,size = 1.5,stroke=0,position=position_jitterdodge(jitter.width = .3,dodge.width = 1)
+    )+
+  #ggbeeswarm::geom_beeswarm(
+  #  position=position_dodge(1),
+  #  cex=1,
+  # alpha=.1
+  #  )+
   geom_point(data = cycledata_sum,shape="diamond",size=3,
             aes(x=cycle,y=mu_LLR),position=position_dodge(1))+
   geom_line(data = cycledata_sum,
@@ -442,18 +785,120 @@ annot_sesstext2=data.frame(x=c(3.5,8,11.5),y=c(-3,-3,-3),seslab=c("pretrain","re
   scale_x_continuous(breaks = seq(1,13,1))+
   scale_color_manual(values= twolevel_colors)+
   labs(x="cycle",y="mean LLR",subtitle="Log-Likelihood Ratio (LLR)",color="Stimuli")+
-  theme(aspect.ratio = 0.8,legend.position = "top"))
+  theme(aspect.ratio = .45,legend.position = "top"))
 
-ggsave(file.path(result_dir,paste0('LLR_classified_Gbycycle','.png')),plot = pllr,device = 'png',width = 10,height = 8)
+ggsave(file.path(result_dir,paste0('LLR_classified_Gbycycle','.png')),plot = pllrg,device = 'png',width = 7,height = 4.5)
 ```
 
 ```{r}
 annot_sesstext=data.frame(x=c(3.5,8,11.5),y=c(-.1,-.1,-.1),seslab=c("pretrain","refresher","scanning"))
-(pdistance = cycledata_sub%>%
-  ggplot(aes(x=cycle,y=distance,color=stage))+
+(pdistanceg = cycledata_sub%>%
+  ggplot(aes(x=cycle,y=distance,color=stim_group))+
   geom_rect(aes(xmin=6.5,xmax=9.5,ymin=-Inf,ymax=Inf),color="lightgrey",fill="lightgrey",alpha=0.03)+
   geom_text(inherit.aes = F,data=annot_sesstext,mapping=aes(x=x,y=y,label=seslab),size=4,fontface="bold")+
-  geom_point(alpha = 0.1,size = 2,stroke=0,position=position_dodge(1))+
+  geom_point(
+    #aes(group=interaction(subid,stim_group)),
+    alpha = 0.1,size = 1.5,stroke=0,position=position_jitterdodge(jitter.width = .3,dodge.width = 1)
+    )+
+  geom_point(data = cycledata_sum,shape="diamond",size=2,
+            aes(x=cycle,y=mu_distance),position=position_dodge(1))+
+
+  geom_line(data = cycledata_sum,
+            aes(x=cycle,y=mu_distance),position=position_dodge(1))+
+  geom_errorbar(data = cycledata_sum,
+                aes(x=cycle,
+                    y = mu_distance,
+                    ymin = mu_distance - se_distance,
+                    ymax = mu_distance + se_distance),
+                width=0.4,position=position_dodge(1))+
+  scale_x_continuous(breaks = seq(1,13,1))+
+  scale_color_manual(values= twolevel_colors)+
+  labs(x="cycle",y="mean distance",subtitle="Distance to correct location",color="Stimuli")+
+  theme(aspect.ratio = 0.45,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('dist2goal_classified_Gbycycle','.png')),plot = pdistanceg,device = 'png',width = 7,height = 4.5)
+```
+
+```{r}
+
+p.gbehav = ggarrange(
+  pdistanceg+theme(aspect.ratio = .8), 
+  pllrg+theme(aspect.ratio = .8), # list of plots
+  labels = c("",""), # labels
+  label.y=0.95,
+  common.legend = TRUE, # COMMON LEGEND
+  legend = "top", # legend position
+  align = "hv", # Align them both, horizontal and vertical
+  nrow = 1 # number of rows
+)
+p.gbehav = annotate_figure(p.gbehav, top = text_grob("Generalizer Response Accuracy", 
+               color = "black", face = "bold", size = 14))
+
+ggsave(file.path(result_dir,paste0('responseacc_Gbycycle','.png')),plot = p.gbehav,device = 'png',width = 9,height = 4.5)
+```
+
+
+
+###non-generalizer only
+```{r }
+cycledata_sub = aggregate_data(data_with_prob,
+                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
+                           groupbyvars = c("cohort","subid","stage","expt_session","cycle"),
+                           stats = c("mu"),
+                           additionalvars = c("isgeneralizer","session_str","stim_group"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
+                                "mu_resp_dist","mu_error_x","mu_error_y"),
+                   newnames = c("LLR","LLR_x","LLR_y",
+                                "distance","errorx","errory"))
+
+
+cycledata_sum = aggregate_data(cycledata_sub,
+                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory"),
+                           groupbyvars = c("isgeneralizer","stage",
+                                           "expt_session","cycle"),
+                           stats = c("mu","se","n"),
+                           additionalvars = c("session_str","stim_group"))
+
+cycledata_sub = filter(cycledata_sub,isgeneralizer=="non-generalizer")
+cycledata_sum = filter(cycledata_sum,isgeneralizer=="non-generalizer")
+
+annot_sesstext2=data.frame(x=c(3.5,8,11.5),y=c(-3,-3,-3),seslab=c("pretrain","refresher","scanning"))
+(pllrng = cycledata_sub%>%
+  ggplot(aes(x=cycle,y=LLR,color=stim_group))+
+  geom_rect(aes(xmin=6.5,xmax=9.5,ymin=-Inf,ymax=Inf),color="lightgrey",fill="lightgrey",alpha=0.03)+
+  geom_text(inherit.aes = F,data=annot_sesstext2,mapping=aes(x=x,y=y,label=seslab),size=4,fontface="bold")+
+  geom_point(
+    #aes(group=interaction(subid,stim_group)),
+    alpha = 0.1,size = 1.5,stroke=0,position=position_jitterdodge(jitter.width = .3,dodge.width = 1)
+    )+
+  geom_point(data = cycledata_sum,shape="diamond",size=3,
+            aes(x=cycle,y=mu_LLR),position=position_dodge(1))+
+  geom_line(data = cycledata_sum,
+            aes(x=cycle,y=mu_LLR),position=position_dodge(1))+
+  geom_errorbar(data = cycledata_sum,
+                aes(x=cycle,
+                    y = mu_LLR,
+                    ymin = mu_LLR - se_LLR,
+                    ymax = mu_LLR + se_LLR),
+                width=0.4,position=position_dodge(1))+
+  scale_x_continuous(breaks = seq(1,13,1))+
+  scale_color_manual(values= twolevel_colors)+
+  labs(x="cycle",y="mean LLR",subtitle="Log-Likelihood Ratio (LLR)",color="Stimuli")+
+  theme(aspect.ratio = 0.45,legend.position = "top"))
+
+ggsave(file.path(result_dir,paste0('LLR_classified_nGbycycle','.png')),plot = pllrng,device = 'png',width = 7,height = 4.5)
+```
+
+```{r}
+annot_sesstext=data.frame(x=c(3.5,8,11.5),y=c(-.1,-.1,-.1),seslab=c("pretrain","refresher","scanning"))
+(pdistanceng = cycledata_sub%>%
+  ggplot(aes(x=cycle,y=distance,color=stim_group))+
+  geom_rect(aes(xmin=6.5,xmax=9.5,ymin=-Inf,ymax=Inf),color="lightgrey",fill="lightgrey",alpha=0.03)+
+  geom_text(inherit.aes = F,data=annot_sesstext,mapping=aes(x=x,y=y,label=seslab),size=4,fontface="bold")+
+  geom_point(
+    #aes(group=interaction(subid,stim_group)),
+    alpha = 0.1,size = 1.5,stroke=0,position=position_jitterdodge(jitter.width = .3,dodge.width = 1)
+    )+
   geom_point(data = cycledata_sum,shape="diamond",size=3,
             aes(x=cycle,y=mu_distance),position=position_dodge(1))+
   geom_line(data = cycledata_sum,
@@ -467,25 +912,57 @@ annot_sesstext=data.frame(x=c(3.5,8,11.5),y=c(-.1,-.1,-.1),seslab=c("pretrain","
   scale_x_continuous(breaks = seq(1,13,1))+
   scale_color_manual(values= twolevel_colors)+
   labs(x="cycle",y="mean distance",subtitle="Distance to correct location",color="Stimuli")+
-  theme(aspect.ratio = 0.8,legend.position = "top"))
+  theme(aspect.ratio = 0.45,legend.position = "top"))
 
-ggsave(file.path(result_dir,paste0('dist2goal_classified_Gbycycle','.png')),plot = pdistance,device = 'png',width = 10,height = 8)
+ggsave(file.path(result_dir,paste0('dist2goal_classified_nGbycycle','.png')),plot = pdistanceng,device = 'png',width = 7,height = 4.5)
 ```
 
 ```{r}
 
-p.gbehav = ggarrange(
-  pdistance, pllr, # list of plots
-  labels = "AUTO", # labels
+p.ngbehav = ggarrange(
+  pdistanceng+theme(aspect.ratio = .8),#+theme(legend.position = "none"), 
+  pllrng+theme(aspect.ratio = .8),#+theme(legend.position = "none"), # list of plots
+  labels = c("",""), # labels
   label.y=0.95,
-  common.legend = TRUE, # COMMON LEGEND
+  common.legend = T, # COMMON LEGEND
   legend = "top", # legend position
   align = "hv", # Align them both, horizontal and vertical
   nrow = 1 # number of rows
 )
-p.gbehav = annotate_figure(p.gbehav, top = text_grob("Generalizer Response Accuracy", 
+p.ngbehav = annotate_figure(p.ngbehav, top = text_grob("non-Generalizer Response Accuracy", 
                color = "black", face = "bold", size = 14))
 
-ggsave(file.path(result_dir,paste0('responseacc_Gbycycle','.png')),plot = p.gbehav,device = 'png',width = 9,height = 4.5)
+ggsave(file.path(result_dir,paste0('responseacc_nGbycycle','.png')),plot = p.ngbehav,device = 'png',width = 9,height = 4.5)
 ```
+
+```{r}
+# Group plots by row
+row1 <- ggarrange(pdistanceg+ theme(legend.position = "none",aspect.ratio = .8),  
+                  pllrg+ theme(legend.position = "none",aspect.ratio = .8), ncol = 2)
+row2 <- ggarrange(pdistanceng+ theme(legend.position = "none",aspect.ratio = .8), 
+                  pllrng+ theme(legend.position = "none",aspect.ratio = .8), ncol = 2)
+comlgd =
+  ggplotGrob(pdistanceg)$grobs[grepl("guide", sapply(ggplotGrob(pdistanceg)$grobs, function(x) x$name))][[1]]
+
+p.behav <- ggarrange(row1, row2,
+                     ncol = 1,  # Stack rows
+                     heights = c(1, 1),
+                     labels = c("generalizer", "non-generalizer"),
+                     font.label = list(size = 15, face = "bold"),
+                     label.x = 0.5, label.y = 1,
+                     common.legend = T, # COMMON LEGEND
+                     legend = "top", # legend position
+                     legend.grob = comlgd,
+                     vjust = 0.5,hjust=0.5)
+# Add global figure title, axis labels, etc. if needed
+(p.behav = annotate_figure(p.behav, 
+                           top = text_grob("Treasure Hunt Task Response Accuracy", 
+                                           color = "black", face = "bold", size = 14))
+)
+
+ggsave(file.path(result_dir,paste0('responseacc_bycycle','.png')),plot = p.behav,device = 'png',width = 8,height = 8.3)
+```
+
+
+
 

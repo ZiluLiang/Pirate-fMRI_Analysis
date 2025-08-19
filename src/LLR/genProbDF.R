@@ -6,25 +6,7 @@ for (k in unique_stimloc$loc_id){
   truex = unique_stimloc$x[k]
   truey = unique_stimloc$y[k]
 
-  ##binorm: calculate from approximated bivariate Gaussian distribution
-  cl <- makeCluster(detectCores())
-  clusterExport(cl=cl,
-                varlist = c("gaussian_prob_discret_gridproxy","probability_df","granularity",
-                            "truex","truey","arena_radius_rescale","dist_sd"),
-                envir=environment())
-  p_list <- parLapply(cl, seq(1,nrow(probability_df)),
-                      function(j){
-                        p = gaussian_prob_discret_gridproxy(arena_radius_rescale,
-                                                            probability_df$x[j],probability_df$y[j],
-                                                            truex,truey,granularity,sd = dist_sd)
-                        return(p)}
-  )
-  stopCluster(cl)
-  p_unlist = unlist(p_list)
-  p_unlist_normalized = p_unlist/sum(p_unlist,na.rm = T)
-  probability_df[["binorm"]] = p_unlist_normalized
-
-  ##binorm_compo: calculate from the multiplication of two approximated univariate Gaussian distribution
+  ##binorm_compo: calculate bivariate model from the multiplication of two approximated univariate Gaussian distribution
   cl <- makeCluster(detectCores())
   clusterExport(cl=cl,
                 varlist = c("gaussian_prob_univariate_grid_proxy","probability_df","granularity",
@@ -42,6 +24,7 @@ for (k in unique_stimloc$loc_id){
   sum_pnormx = sum(probability_df$pnorm_x,na.rm = T)
   sum_pnormy = sum(probability_df$pnorm_y,na.rm = T)
   
+  # normalize so that the probabilities sum up to 1
   probability_df = probability_df %>%
     mutate(pnorm_x_normalized = pnorm_x/sum_pnormx,
            pnorm_y_normalized = pnorm_y/sum_pnormy)%>%
@@ -50,6 +33,7 @@ for (k in unique_stimloc$loc_id){
   sum_pnormxy = sum(probability_df$pnorm_xy,na.rm = T)
   probability_df = probability_df %>%
     mutate(binorm_compo = pnorm_xy/sum_pnormxy)
+
 
 
   ##uniform random

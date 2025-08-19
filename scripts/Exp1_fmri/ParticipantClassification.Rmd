@@ -31,8 +31,15 @@ data = trialdata%>%filter(ctrl_expt=="True"&ctrl_resp == 1)%>%
          cohort = factor(cohort, levels=c(1,2), labels=c("first cohort", "second cohort")))
 
 #check if number of trials is correct:
-#nsub = length(unique(respdata$subid)) = 29
-#ntrialpersub = nrow(respdata)/nsub = 204+27+25*4 = 331
+nsub = length(unique(data$subid)) 
+print("N participant:")
+print(nsub)
+ntrialpersub = nrow(data)/nsub
+print("N trial per participant (should be equal to 204+27+25*4 = 331):")
+print(ntrialpersub)
+
+
+# data tidying: rename variables, rescale response to be between -1 and 1
 range_xy = c(max(data$stim_x)-min(data$stim_x),
              max(data$stim_y)-min(data$stim_y))
 data = data%>%
@@ -70,11 +77,12 @@ meanscanperf = data%>%
                  stats="mu")%>%
   change_cols_name(oldnames = paste0("mu_",c("resp_x","resp_y","resp_xO","resp_yO")),
                    newnames = c("resp_x","resp_y","resp_xO","resp_yO"))
+print(nrow(meanscanperf) == nsub*25)
 # meanscanperf should have 25*ntotoalsub rows
 ```
 
 
-## LLR
+## Compute LLR
 ### load model distribution
 ```{r}
 tryCatch(
@@ -86,7 +94,7 @@ tryCatch(
   })
 ```
 
-### get LLR for each response
+### get probability for each response
 ```{r}
 find_resp_probs = function(respdf,rowid,unique_stimloc,prob_df_list,base){
       library(dplyr)
@@ -154,7 +162,7 @@ meanscanperf_with_prob = loadRData(file.path(data_dir,"meanscannerdata_withprob_
 ```
 
 
-### classify learner
+### Compute LLR
 
 ```{r}
 data_with_prob = data_with_prob%>%
@@ -190,8 +198,11 @@ meanscanperf_with_prob = meanscanperf_with_prob%>%
            ntrials = n())%>%
     mutate(trialid_normalized = trialid_withinstage/ntrials)%>%
   ungroup()
+```
 
+### Classify Participants
 
+```{r}
 sub_LLR_data = aggregate_data(data_with_prob,
                               groupbyvars = c("cohort","subid","stage","expt_session","blocknumber_withinsess"),
                               yvars = c("LLR_trial","LLRx_trial","LLRy_trial","resp_dist"),
@@ -211,22 +222,6 @@ meanscannerLLR = aggregate_data(meanscanperf_with_prob,
   change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial"),
                    newnames = c("LLR","LLR_x","LLR_y"))%>%
   dplyr::select(-c(starts_with("n_")))
-
-## old way
-dividesub = sub_LLR_data%>%
-  filter(blocknumber_withinsess==nblock&expt_session!=2)#%>%
-#  aggregate_data(groupbyvars = c("subid","expt_session","stage"),
-#                 yvars = "LLR",
-#                 stats = "mu")%>%
-#  aggregate_data(groupbyvars = c("subid","stage"),
-#                 yvars = "mu_LLR",stats = "mu")%>%
-#  change_cols_name("mu_mu_LLR","LLR")
-learnerids = unique(filter(dividesub,expt_session==3&stage=="train"&LLR>=0)$subid)
-generalizerids = unique(filter(dividesub,expt_session==3&stage=="test"&LLR>=0)$subid)
-print("nonlearner")
-(nonlearnerids = unique(filter(dividesub,expt_session==3&stage=="train"&LLR<0)$subid))
-print("nongeneralizer")
-(nongeneralizerids = unique(filter(dividesub,expt_session==3&stage=="test"&LLR<0)$subid))
 
 
 #new way: by using the average performance of scanning
@@ -279,7 +274,9 @@ theme_basic(as_huxtable(participant_count)%>%
       set_align(1, everywhere, "center"))
 ```
 
-###Plot correlation between last block of training and test
+## Exlude Unreliable participants
+
+### Plot correlation between last block of training and test
 ```{r}
 sub_LLR_data = sub_LLR_data%>%
   group_by(subid,expt_session,stage)%>%
@@ -304,7 +301,7 @@ meanscanning  = meanscannerLLR%>%
 pretrainscanner_behavsum_long = left_join(last_pretrain,meanscanning,by=c("cohort","subid","stage","islearner","isgeneralizer","performance_metric"))
 ```
 
-```{r}
+```{r, fig.height=9}
 annot_change <- data.frame(
   label = c("nL\U2192L", "nG\U2192G","L\U2192nL", "G\U2192nG"),
   stage = c("train","test","train","test"),

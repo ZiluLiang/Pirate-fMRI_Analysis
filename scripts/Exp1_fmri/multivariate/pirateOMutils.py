@@ -118,7 +118,7 @@ def parallel_axes_cosine_sim(xstims,ystims,return_codingdirs = False):
     else:
         return xycosinesim
     
-def cross_val_SVD(X,session_labels,flag_centering=False):
+def cross_val_SVD(X,session_labels):
     """Compute the optimal number of components for each session using cross-validation
     Each session is left out in turn, the remaining data is further split into training data and validation data.
     We perform SVD on the training data and reconstruct the training data using the first n components.
@@ -133,8 +133,6 @@ def cross_val_SVD(X,session_labels,flag_centering=False):
         Activity pattern matrix, shape = [n_samples, n_features]
     session_labels : numpy.ndarray
         session label for each row of x, shape = [n_samples,]
-    flag_centering : bool
-        whether to center the data before SVD
     
     Returns
     -------
@@ -144,10 +142,11 @@ def cross_val_SVD(X,session_labels,flag_centering=False):
         correlation between the reconstructed data and the test data for each session
     unique_sess : numpy.ndarray
         unique session labels
-    
+    projection_1D: numpy.ndarray
+        shape is (n_runs,n_samples),
+        projection of the non-test runs onto the first component
     """
-    if flag_centering:
-        X = X-np.mean(X,axis=0) # center the data
+    
 
     unique_sess = np.unique(session_labels)
     assert unique_sess.size>3, "Number of unique sessions must be greater than 3 to perform proper cross-validation"
@@ -156,15 +155,15 @@ def cross_val_SVD(X,session_labels,flag_centering=False):
     est_d = np.full_like(unique_sess,fill_value=np.nan)
     reconstruction_corr =  np.full_like(unique_sess,fill_value=np.nan)
     reconstruction_r2   =  np.full_like(unique_sess,fill_value=np.nan)
-
     ncond = int(X.shape[0]/unique_sess.size)
-
+    projection_1D = np.full((unique_sess.size,ncond),fill_value=np.nan)
+    
     for j,te_run in enumerate(unique_sess):
         # get the test data
         te_filter = session_labels == te_run
         te_X = X[te_filter]
         assert te_X.shape[0] == ncond
-
+        
         # loop over all possible splits of the remaining (non-test runs) data into training and validation data
         rmruns = [x for x in unique_sess if x!=te_run]
         recons_corr = np.zeros((len(rmruns), ncond)) # 3 runs used as training and validation
@@ -173,13 +172,13 @@ def cross_val_SVD(X,session_labels,flag_centering=False):
             tr_filter = np.array([x in tr_runs for x in session_labels])
             tr_X = np.mean(split_data(X=X[tr_filter],groups=session_labels[tr_filter]),axis=0)
             assert tr_X.shape[0] == ncond, f"tr_X shape = {tr_X.shape}, ncond = {ncond}, len(tr_runs) = {len(tr_runs)}"
-
+            
             # get the validation data
             vld_run = [x for x in rmruns if x not in tr_runs][0]
             vld_filter = session_labels == vld_run
             vld_X = X[vld_filter]
             assert vld_X.shape[0] == ncond
-
+            
             #perform SVD on training data
             u,s,vh = np.linalg.svd(tr_X,full_matrices=False)
 
@@ -187,6 +186,7 @@ def cross_val_SVD(X,session_labels,flag_centering=False):
             for ncompo in range(1,ncond):
                 
                 reconst_train = np.dot(u[:,:ncompo]*s[:ncompo],vh[:ncompo,:])
+                
                 recons_corr[k,ncompo-1] = scipy.stats.pearsonr(reconst_train.flatten(),vld_X.flatten()).statistic
                 # could also use the following code to do reconstruction:
                 # only take the first n components and set the remaining to zero
@@ -209,6 +209,6 @@ def cross_val_SVD(X,session_labels,flag_centering=False):
         reconst_rm = np.dot(u[:,:optdim]*s[:optdim],vh[:optdim,:])
         reconstruction_corr[j] = scipy.stats.pearsonr(reconst_rm.flatten(),te_X.flatten()).statistic 
         reconstruction_r2[j]   = r2_score(te_X,reconst_rm)
-        est_d[j] = optdim
-
+        est_d[j] = optdim        
+        
     return est_d, reconstruction_corr, reconstruction_r2, unique_sess

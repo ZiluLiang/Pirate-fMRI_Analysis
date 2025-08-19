@@ -27,12 +27,15 @@ import scipy
 import warnings
 warnings.simplefilter('ignore', category=FutureWarning)
 
-project_path = r"D:\OneDrive - Nexus365\pirate_ongoing"
+project_path = r'E:\pirate_fmri\Analysis'
+fmridata_dir = os.path.join(project_path,'data','Exp1_fmri','fmri')
+study_scripts   = os.path.join(project_path,'scripts','Exp1_fmri')
+ROIRSAdir = os.path.join(fmridata_dir,'ROIdata')
+
 sys.path.append(project_path)
 from scripts.Exp1_fmri.multivariate.pirateOMutils import  minmax_scale, generate_filters
 
 
-study_scripts   = r"D:\OneDrive - Nexus365\pirate_ongoing\scripts\Exp1_fmri"
 with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
@@ -44,7 +47,6 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 print("N_cohort 1: ",len(cohort1ids), "  N_cohort 2: ",len(cohort2ids), "N_Total: ",len(subid_list))
 cohort_names_lists = dict(zip(["First Cohort","Second Cohort","Combined Cohort"],[cohort1ids,cohort2ids,subid_list]))
 
-ROIRSAdir = r"D:\OneDrive - Nexus365\pirate_ongoing\AALandHCPMMP1andFUNCcluster"
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
 
 respar_dir = os.path.join(ROIRSAdir,"axisPS")
@@ -56,7 +58,7 @@ resoutput_dir = os.path.join(respar_dir,"MDS")
 checkdir(resoutput_dir)
 
 # set ROIs
-rois = ["HPC_bilateral","V1_bilateral","vmPFC_bilateral","testgtlocParietalSup_bilateral"]
+rois = ["HPC_bilateral","V1_bilateral","vmPFC_bilateral","PPC_bilateral"]
 classifyby = "HPC_bilateral"
 curr_classifications = PS_classification[classifyby].values
 PSgroupnamestr = {1:"top-left",-1:"top-right",0:"orthogonal"}
