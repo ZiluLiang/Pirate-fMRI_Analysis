@@ -13,11 +13,14 @@ CambridgeMRCPPCmaskusedbyPaulspaper
 **/__pycache__/
 **/bspmview**.mat
 **/test*
+**/furtheranalysisaftersubmission
+**/deprecated
 
 scripts/resultvisualization
 scripts/LLR_bysub
 scripts/Exp1_fmri/Exp1_fmri_mvnn_effect
-scripts/Exp1_fmri/*.ipynb
+scripts/Exp1_transfer
+scripts/Exp2*
 src/CanlabCore-master.zip
 src/High_pass_filter_analysis.png
 src/LLR/genParticipantSpecificProbDF.R
