@@ -17,24 +17,24 @@ from zpyhelper.MVPA.rdm import upper_tri
 from zpyhelper.MVPA.preprocessors import split_data
 
 import sys
-project_path = r"D:\OneDrive - Nexus365\pirate_ongoing"
+project_path = r'E:\pirate_fmri\Analysis'
+fmridata_dir = os.path.join(project_path,'data','Exp1_fmri','fmri')
+study_scripts   = os.path.join(project_path,'scripts','Exp1_fmri')
+ROIRSAdir = os.path.join(fmridata_dir,'ROIdata')
+
 sys.path.append(project_path)
 from scripts.Exp1_fmri.multivariate.pirateOMutils import parallel_axes_cosine_sim
 
 import warnings
 warnings.simplefilter('ignore', category=FutureWarning)
 
-study_scripts = os.path.join(project_path,'scripts','Exp1_fmri')
 with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
-    #fmribeh_dir = pirate_defaults['directory']['fmribehavior']
-    #fmridata_dir = pirate_defaults['directory']['fmri_data']
     nongeneralizers = pirate_defaults['participants']["nongeneralizerids"]
     generalizers    = pirate_defaults['participants']["generalizerids"]
 print(f"N_participants = {len(subid_list)}")
 
-ROIRSAdir = os.path.join(project_path,'AALandHCPMMP1andFUNCcluster')
 
 def cal_PS(X:np.ndarray,stim_locs:np.ndarray, uniqueaxlocs:list)->float:
     """calculate PS for a single run
@@ -117,15 +117,15 @@ resoutput_dir = os.path.join(ROIRSAdir,"axisPS")
 checkdir(resoutput_dir)
 
 
-### we save: the estimate of PS per run
-### and the null distribution of PS per run for each participants
+### we save: the estimate of PS per participant
+### and the null distribution of PS for each participants
 averagePS_savefn = "PS_NCtrainingstim"
 
 
 ## calculate PS and null distribution of PS from permutation 10000
 # define number of permutation
 n_perm  = 10000
-run_PS_permutation = False
+run_PS_permutation = True
 run_classification = True
 if run_PS_permutation:
     # Load data

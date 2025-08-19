@@ -41,8 +41,13 @@ import plotly.graph_objects as go
 import warnings
 warnings.simplefilter('ignore', category=FutureWarning)
 
+project_path = r'E:\pirate_fmri\Analysis'
+fmridata_dir = os.path.join(project_path,'data','Exp1_fmri','fmri')
+study_scripts   = os.path.join(project_path,'scripts','Exp1_fmri')
+ROIRSAdir = os.path.join(fmridata_dir,'ROIdata')
 
-study_scripts   = r"D:\OneDrive - Nexus365\pirate_ongoing\scripts\Exp1_fmri"
+sys.path.append(project_path)
+
 with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
@@ -53,12 +58,8 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 
 print("N_cohort 1: ",len(cohort1ids), "  N_cohort 2: ",len(cohort2ids), "N_Total: ",len(subid_list))
 
-ROIRSAdir = r"D:\OneDrive - Nexus365\pirate_ongoing\AALandHCPMMP1andFUNCcluster"
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
-rois =  [x for x in list(roi_data.keys()) if "bilateral" in x] + ["allgtlocPrecentral_left"]
-rois = ["V1_bilateral","testgtlocParietalSup_bilateral","HPC_bilateral","vmPFC_bilateral"]
-rois = rois
-#rois = ["V1_bilateral","HPC_bilateral","vmPFC_bilateral","testgtlocParietalSup_bilateral"]
+rois = ["V1_bilateral","PPC_bilateral","HPC_bilateral","vmPFC_bilateral"]
 preprox_fun = lambda x,sess: concat_data([scale_feature(scale_feature(sx,2),1) for sx in split_data(x,sess)]) #scale_feature(x,1)#scale_feature(x,1)#concat_data([scale_feature(sx,1) for sx in split_data(x,sess)]) #extract_pc(scale_feature(x,1)) #
 
 # For LR
@@ -67,7 +68,6 @@ gridsearcg_paramgrid={'C':np.concatenate([np.geomspace(10**-5,5,num=15),np.linsp
                       'tol':np.geomspace(10**-7,5,num=5)}
 
 # For saving
-#save_fn = "flzeralignedprocrustes"
 save_fn = "noncenter_navi2loc_LRdecoding_acc_skf"
 save_dir = os.path.join(ROIRSAdir,"navi2loc_decoding_results")#"rotation_testres") # navi2loc_decoding_results
 checkdir(save_dir)
@@ -115,99 +115,55 @@ for ir, roi in enumerate(rois):
             session_labels   = ncDF.stim_session.to_numpy()
 
             for tarvar in ["stim_x","stim_y"]:
-                # get splitter
-                if tarvar=="stim_x":
-                    tr_fil = np.vstack([navi_filter,training_filter,filter_y]).all(axis=0)
-                    lz_fil = np.vstack([lzer_filter,filter_y]).all(axis=0)
-                elif tarvar=="stim_y":
-                    tr_fil = np.vstack([navi_filter,training_filter,filter_x]).all(axis=0)
-                    lz_fil = np.vstack([lzer_filter,filter_x]).all(axis=0)
                 
-                trX = np.vstack(
-                    [np.mean(split_data(whitenedX[tr_fil],session_labels[tr_fil]),axis=0),
-                     np.mean(cXs[cDF.taskname.to_numpy() == "navigation"],axis=0)]
-                )
-                lzX = np.vstack(
-                    [whitenedX[lz_fil,:],
-                     cXs[cDF.taskname.to_numpy() == "localizer"]
-                     ]
-                )
-                
-                #RlzX, RmatO,_ = kabsch_algorithm(lzX, trX)
-                #RlzerX = lzerX@Rmat
-
-                # shuffle within each row independently?
-                #rng = np.random.default_rng(rands)
-                #shuffled = []
-                #for x in lzerX:
-                #    shuffled.append(rng.permutation(x))
-                #lzX_rowshuffled = np.vstack(shuffled)
-                #RlzX_rowshuffled, RmatRS, _ = kabsch_algorithm(lzX_rowshuffled[:lzX.shape[0],:], trX)
-
-                #lzX_tarshuffled = rng.permutation(lzerX)
-                #RlzX_tarshuffled, RmatTS, _ = kabsch_algorithm(lzX_tarshuffled[:lzX.shape[0],:], trX)
-
-                #randommatrix = rng.random(lzerX.shape)
-                #Rrandmat, RmatRAND, _ = kabsch_algorithm(randommatrix[:lzX.shape[0],:], trX)
-
-                dataset = {
-                    "original":              whitenedX#np.vstack([whitenedX[~lzer_filter], lzerX]),
-                    #"rotated":               np.vstack([whitenedX[~lzer_filter], lzerX@RmatO]),
-                    #"rowindshuffledrotated": np.vstack([whitenedX[~lzer_filter], lzX_rowshuffled@RmatRS]),
-                    #"tarshuffledrotated":    np.vstack([whitenedX[~lzer_filter], lzX_tarshuffled@RmatO]),
-                    #"randommatrixrotated":   np.vstack([whitenedX[~lzer_filter], randommatrix@RmatO])
-                }
+                target_labels = (ncDF[tarvar].values*2+2).astype(int)
             
-                for dsname, whitenedX in dataset.items():
-                    target_labels = (ncDF[tarvar].values*2+2).astype(int)
+                fit_accs, eval_accs = [],[]
+                confusion_mats[roi][rands][subid][tarvar] = []  
                 
-                    fit_accs, eval_accs = [],[]
-                    confusion_mats[roi][rands][subid][tarvar] = []  
+                for ana,fil in zip(["train2loc","test2loc"],[training_filter,test_filter]):
+                    # get splitter
+                    if tarvar=="stim_x":
+                        fit_fil = np.vstack([navi_filter,fil,filter_x]).all(axis=0)
+                        eval_fil = np.vstack([lzer_filter,filter_x]).all(axis=0)
+                    elif tarvar=="stim_y":
+                        fit_fil = np.vstack([navi_filter,fil,filter_y]).all(axis=0)
+                        eval_fil = np.vstack([lzer_filter,filter_y]).all(axis=0)
+
+
                     
-                    for ana,fil in zip(["train2loc","test2loc"],[training_filter,test_filter]):
-                        # get splitter
-                        if tarvar=="stim_x":
-                            fit_fil = np.vstack([navi_filter,fil,filter_x]).all(axis=0)
-                            eval_fil = np.vstack([lzer_filter,filter_x]).all(axis=0)
-                        elif tarvar=="stim_y":
-                            fit_fil = np.vstack([navi_filter,fil,filter_y]).all(axis=0)
-                            eval_fil = np.vstack([lzer_filter,filter_y]).all(axis=0)
+                    # get fit and evaluationa data
+                    fit_X, eval_X = whitenedX[fit_fil], whitenedX[eval_fil]
+                    fit_target, eval_target = target_labels[fit_fil], target_labels[eval_fil]
+                    fit_sess_labels = session_labels[fit_fil]
 
+                    # grid search for best hyperparameters in the fit set                
+                    n_splits, n_repeats = 2, 5                
+                    clf = GridSearchCV(LogisticRegression(**baseclf_kwargs),
+                                    param_grid=gridsearcg_paramgrid,
+                                    cv=RepeatedStratifiedKFold(n_repeats=n_repeats,n_splits=n_splits,random_state=rands),
+                                    n_jobs=njobs)
+                    clf.fit(fit_X,fit_target)
+                    GSres.append(pd.DataFrame(clf.cv_results_).assign(roi=roi,subid=subid,target=tarvar,analysis=ana,random_state=rands))
 
-                        
-                        # get fit and evaluationa data
-                        fit_X, eval_X = whitenedX[fit_fil], whitenedX[eval_fil]
-                        fit_target, eval_target = target_labels[fit_fil], target_labels[eval_fil]
-                        fit_sess_labels = session_labels[fit_fil]
+                    fit_acc = clf.score(fit_X,fit_target)
+                    eval_acc = clf.score(eval_X,eval_target)
+                    eval_cfm = confusion_matrix(eval_target,clf.predict(eval_X))
 
-                        # grid search for best hyperparameters in the fit set                
-                        n_splits, n_repeats = 4, 10                
-                        clf = GridSearchCV(LogisticRegression(**baseclf_kwargs),
-                                        param_grid=gridsearcg_paramgrid,
-                                        cv=RepeatedStratifiedKFold(n_repeats=n_repeats,n_splits=n_splits,random_state=rands),
-                                        n_jobs=njobs)
-                        clf.fit(fit_X,fit_target)
-                        GSres.append(pd.DataFrame(clf.cv_results_).assign(roi=roi,subid=subid,target=tarvar,analysis=ana,random_state=rands,dataset=dsname))
-
-                        fit_acc = clf.score(fit_X,fit_target)
-                        eval_acc = clf.score(eval_X,eval_target)
-                        eval_cfm = confusion_matrix(eval_target,clf.predict(eval_X))
-
-                        confusion_mats[roi][rands][subid][tarvar].append(eval_cfm)
-                        fit_accs.append(fit_acc)
-                        eval_accs.append(eval_acc)
-                    tmpdf = pd.DataFrame()
-                    tmpdf["fit_acc"] = fit_accs
-                    tmpdf["eval_acc"] = eval_accs
-                    tmpdf["analysis"] = ["train2loc","test2loc"] # 
-                    res_dfs.append(
-                        tmpdf.assign(roi=roi,
-                                subid=subid,
-                                target=tarvar,
-                                random_state=rands,
-                                dataset=dsname
+                    confusion_mats[roi][rands][subid][tarvar].append(eval_cfm)
+                    fit_accs.append(fit_acc)
+                    eval_accs.append(eval_acc)
+                tmpdf = pd.DataFrame()
+                tmpdf["fit_acc"] = fit_accs
+                tmpdf["eval_acc"] = eval_accs
+                tmpdf["analysis"] = ["train2loc","test2loc"] # 
+                res_dfs.append(
+                    tmpdf.assign(roi=roi,
+                            subid=subid,
+                            target=tarvar,
+                            random_state=rands
+                            )
                                 )
-                                    )
     # save roi results
     roires_df = pd.concat(res_dfs).reset_index(drop=True)
     roiGSres_df = pd.concat(GSres).reset_index(drop=True)

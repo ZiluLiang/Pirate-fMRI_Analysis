@@ -1,0 +1,911 @@
+---
+title: "1_Treasure Hunt Task"
+output: html_document
+date: "2024-03-20"
+self_contained: false
+---
+
+```{r setup, include=FALSE}
+
+rm(list = ls())
+knitr::opts_chunk$set(error = FALSE,echo=FALSE, message=FALSE, warning=FALSE,fig.width = 9,fig.height = 9)
+
+rm(list = ls())
+project_dir = rstudioapi::getActiveProject();
+src_dir = file.path(project_dir, "src/R", fsep="/")
+llr_dir = file.path(project_dir, "src/LLR", fsep="/")
+
+data_dir = file.path(project_dir, "data","Exp1_transfer", fsep="/")
+result_dir = file.path(project_dir, "results","Exp1_transfer", fsep="/")
+
+
+source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
+source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
+load(file.path(data_dir,"allexpdata_compo_lapse-0_01.RData"))
+
+```
+
+
+
+## Behavioural performance of learner/generalizer in treasure hunt task{.tabset}
+```{r treasurehunt block average}
+blockdata_sub = aggregate_data(filter(data_with_prob,islearner=="learner"),
+                           yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y","resp_correct"),
+                           groupbyvars = c("subid","expt_maptype","stim_group","expt_session","cycle"),
+                           stats = c("mu"),
+                           additionalvars = c("islearner","isgeneralizer","cycle","expt_maptype"))%>%
+  change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
+                                "mu_resp_dist","mu_error_x","mu_error_y","mu_resp_correct"),
+                   newnames = c("LLR","LLR_x","LLR_y",
+                                "distance","errorx","errory","accuracy"))
+
+
+blockdata_sum = aggregate_data(blockdata_sub,
+                           yvars = c("distance","LLR","LLR_x","LLR_y","errorx","errory","accuracy"),
+                           groupbyvars = c("islearner","isgeneralizer","expt_maptype","stim_group",
+                                           "expt_session","cycle"),
+                           stats = c("mu","se","n"),
+                           additionalvars = c("cycle","expt_maptype"))
+
+blockdata_sub = left_join(blockdata_sub,change_cols_name(participant_count,"label","generalizer_label"),by=c("islearner","isgeneralizer"))
+blockdata_sum = left_join(blockdata_sum,change_cols_name(participant_count,"label","generalizer_label"),by=c("islearner","isgeneralizer"))
+
+```
+
+
+### rescaled distance to goal
+```{r rescaled distance to goal,fig.height=6}
+# with data count
+
+
+annot_cycletext=data.frame(x=c(3,11),y=c(-.1,-.1),cyclab=c("training map","transfer map"))
+
+(pdistance = blockdata_sub%>%
+  ggplot(aes(x=cycle,y=distance,fill=stim_group,color=stim_group))+
+  
+    facet_nested(rows = vars(generalizer_label),
+               scales = "free_x",space = "free_x")+
+  
+    geom_rect(aes(xmin=6.5,xmax=14.5,ymin=-Inf,ymax=Inf),color="lightgrey",fill="lightgrey",alpha=0.02)+
+    geom_text(inherit.aes = F,data=annot_cycletext,mapping=aes(x=x,y=y,label=cyclab),size=4,fontface="bold")+
+    
+    geom_point(alpha = 0.3,size = 2,stroke=0,position=position_dodge(1))+
+    geom_point(data = blockdata_sum,shape="diamond",size=3,
+              aes(x=cycle,y=mu_distance),position=position_dodge(1))+
+    geom_line(data = blockdata_sum,
+              aes(x=cycle,y=mu_distance),position=position_dodge(1))+
+    geom_errorbar(data = blockdata_sum,
+                  aes(x=cycle,
+                      y = mu_distance,
+                      ymin = mu_distance - se_distance,
+                      ymax = mu_distance + se_distance),
+                  width=0.4,position=position_dodge(1))+
+    
+    scale_x_continuous(breaks = seq(1,14,1))+
+    scale_color_manual(values= twolevel_colors)+
+    guides(fill = "none")+
+    labs(x="cycle",y="mean distance to goal (a.u.) rescaled",color = "Stimuli",
+         title = "Distance to correct location")+
+    theme(aspect.ratio = 12,legend.position = "top"))
+
+
+#ggsave(file.path(result_dir,paste0('rescaled_distance_classified','.png')),plot = p,device = 'png',width = 15,height = 8)
+
+```
+
+
+### mean LLR
+```{r,fig.height=6}
+#withdatacount
+annot_cycletext2=data.frame(x=c(3,11),y=c(-5.2,-5.2),cyclab=c("training map","transfer map"))
+
+(pllr = blockdata_sub%>%
+  ggplot(aes(x=cycle,y=LLR,fill=stim_group,color=stim_group))+
+  
+    facet_nested(rows = vars(generalizer_label),
+               scales = "free_x",space = "free_x")+
+  
+    geom_rect(aes(xmin=6.5,xmax=14.5,ymin=-Inf,ymax=Inf),color="lightgrey",fill="lightgrey",alpha=0.02)+
+    geom_text(inherit.aes = F,data=annot_cycletext2,mapping=aes(x=x,y=y,label=cyclab),size=4,fontface="bold")+
+    
+    geom_point(alpha = 0.3,size = 2,stroke=0,position=position_dodge(1))+
+    geom_point(data = blockdata_sum,shape="diamond",size=3,
+              aes(x=cycle,y=mu_LLR),position=position_dodge(1))+
+    geom_line(data = blockdata_sum,
+              aes(x=cycle,y=mu_LLR),position=position_dodge(1))+
+    geom_errorbar(data = blockdata_sum,
+                  aes(x=cycle,
+                      y = mu_LLR,
+                      ymin = mu_LLR - se_LLR,
+                      ymax = mu_LLR + se_LLR),
+                  width=0.4,position=position_dodge(1))+
+    
+    scale_x_continuous(breaks = seq(1,14,1))+
+    scale_color_manual(values= twolevel_colors)+
+    guides(fill = "none")+
+    labs(x="cycle",y="mean LLR",color = "Stimuli",
+         title = "Log-Likelihood Ratio")+
+    theme(aspect.ratio = 12,legend.position = "top"))
+
+
+#ggsave(file.path(result_dir,paste0('LLR_classified','.png')),plot = p,device = 'png',width = 15,height = 8)
+```
+
+```{r,fig.height=4}
+
+p.gbehav = ggarrange(
+  pdistance, pllr, # list of plots
+  labels = "AUTO", # labels
+  label.y=0.95,
+  common.legend = TRUE, # COMMON LEGEND
+  legend = "top", # legend position
+  align = "hv", # Align them both, horizontal and vertical
+  nrow = 1 # number of rows
+)
+p.gbehav = annotate_figure(p.gbehav, top = text_grob("Learners' Response Accuracy", 
+               color = "black", face = "bold", size = 14))
+
+ggsave(file.path(result_dir,paste0('responseacc_Gbycycle','.png')),plot = p.gbehav,device = 'png',width = 8,height = 6)
+
+```
+
+
+### Individual response map
+```{r 2D + 1D LLR}
+for (pid in unique(filter(data_with_prob)$subid)){
+  current_data = filter(data_with_prob,subid == pid)%>%
+    mutate(stim_attrx = factor(stim_attrx),
+           stim_attry = factor(stim_attry))
+  current_data_sum = aggregate_data(current_data,
+                                    yvars = c("resp_dist","LLR_trial","LLRx_trial","LLRy_trial","error_x","error_y"),
+                                    groupbyvars = c("subid","seq_map","expt_block"),
+                                    stats = c("mu"),
+                                    additionalvars = c("islearner","isgeneralizer","cycle"))%>%
+                    change_cols_name(oldnames = c("mu_LLR_trial","mu_LLRx_trial","mu_LLRy_trial",
+                                                  "mu_resp_dist","mu_error_x","mu_error_y"),
+                                     newnames = c("LLR","LLR_x","LLR_y",
+                                                  "distance","errorx","errory"))#%>%
+                    
+  
+  plot_name = paste(pid,unique(current_data$islearner),unique(current_data$isgeneralizer))
+  n_trainingcycle=6
+  nb_percyc = 3
+  n_transfer=8
+  nb_pertranscyc = 2
+  layoutmat = matrix(c(## first three rows are training cycles
+                       seq(1,n_trainingcycle*nb_percyc,by=nb_percyc),NA,NA,
+                       seq(2,n_trainingcycle*nb_percyc,by=nb_percyc),NA,NA,
+                       seq(3,n_trainingcycle*nb_percyc,by=nb_percyc),NA,NA,
+                       ## transfer
+                       seq(n_trainingcycle*nb_percyc+1,n_trainingcycle*nb_percyc+n_transfer*nb_pertranscyc,by=nb_pertranscyc), 
+                       seq(n_trainingcycle*nb_percyc+2,n_trainingcycle*nb_percyc+n_transfer*nb_pertranscyc,by=nb_pertranscyc) 
+                       ),
+                     nrow=5, ncol=8, byrow = TRUE)
+  (p = current_data%>%
+    ggplot(aes(x=resp_x, y = resp_y))+
+    facet_manual(vars(seq_map,expt_block),design = layoutmat,strip = strip_nested())+
+    geom_point(aes(shape = stim_attry, color = stim_attrx,fill = stim_attrx),size=3.5,alpha=0.7)+
+    geom_text(data = current_data_sum,size = 3,
+            aes(x=0.1,y=2,label = sprintf("2D LLR = %s", formatC(LLR, digits = 2))))+
+    geom_text(data = current_data_sum,size = 3,
+              aes(x=0.1,y=1.6,
+                  label = sprintf("1D LLR(x,y): [%s, %s]",
+                                  formatC(LLR_x, digits = 2),
+                                  formatC(LLR_y, digits = 2))))+
+    scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+
+    #scale_shape_manual(values = x_shapes)+
+    guides(fill = "none")+
+    labs(title = plot_name,
+         color = "x feature",shape = "y feature", x = "x", y = "y")+
+    ylim(-1.1,1.1)+
+    xlim(-1.1,1.1)+
+    theme(legend.position = "top",aspect.ratio = 1))
+  #show(p)
+  ggsave(file.path(result_dir,'individualmaps',"participant_map_with1dLLR",paste0(pid,'.png')),plot = p,width = 16,height = 9)
+  
+}
+```
+
+### average response map
+```{r}
+generalize_js = c("non-generalizer","generalizer")
+learn_ks = c("non-learner","learner")
+for (j in generalize_js){
+  for (k in learn_ks){
+    ave_resp_map_df = data_with_prob %>%
+    filter(isgeneralizer==j,islearner==k)%>%
+    aggregate_data(
+      yvars = c("resp_x","resp_y"),
+      groupbyvars = c("islearner","isgeneralizer","expt_block","stim_id"),
+      stats = c("mu"),
+      additionalvars = c("seq_map","stim_x","stim_y","stim_attrx","stim_attry")
+    )%>%
+    change_cols_name(oldnames = c("mu_resp_x","mu_resp_y"),
+                     newnames = c("resp_x", "resp_y"))%>%
+    mutate(stim_attrx = factor(stim_attrx),
+             stim_attry = factor(stim_attry))
+  
+    if (nrow(ave_resp_map_df)>0){
+        n_trainingcycle=6
+        nb_percyc = 3
+        n_transfer=8
+        nb_pertranscyc = 2
+        layoutmat = matrix(c(## first three rows are training cycles
+                             seq(1,n_trainingcycle*nb_percyc,by=nb_percyc),NA,NA,
+                             seq(2,n_trainingcycle*nb_percyc,by=nb_percyc),NA,NA,
+                             seq(3,n_trainingcycle*nb_percyc,by=nb_percyc),NA,NA,
+                             ## transfer
+                             seq(n_trainingcycle*nb_percyc+1,n_trainingcycle*nb_percyc+n_transfer*nb_pertranscyc,by=nb_pertranscyc), 
+                             seq(n_trainingcycle*nb_percyc+2,n_trainingcycle*nb_percyc+n_transfer*nb_pertranscyc,by=nb_pertranscyc) 
+                             ),
+                           nrow=5, ncol=8, byrow = TRUE)
+      p = ave_resp_map_df%>%
+        ggplot(aes(x=resp_x, y = resp_y))+
+        facet_manual(vars(seq_map,expt_block),design = layoutmat,strip = strip_nested())+
+        geom_point(aes(color = stim_attry,fill = stim_attry,shape = stim_attrx),size = 3)+
+        scale_color_manual(values = y_colors,aesthetics = c("color","fill"))+
+        #scale_shape_manual(values = x_shapes)+
+        guides(fill = "none")+
+        labs(title =paste0("average response map: ", k,'_',j),
+             color = "y feature",shape = "x feature", x = "x", y = "y")+
+        ylim(-1.1,1.1)+
+        xlim(-1.1,1.1)+
+        theme(legend.position = "top",aspect.ratio = 1)
+      ggsave(file.path(result_dir,'individualmaps',"averagemaps",
+                       paste0(k,'_',j,'.png')),plot = p,width = 16,height = 9)
+      #show(p)
+    }
+  
+  }
+}
+
+```
+
+## Axis errordiff
+```{r}
+axisdata_sub = aggregate_data(filter(data_with_prob,islearner=="learner"),
+                           yvars = c("error_reversal","error_derangement","error_diff"),
+                           groupbyvars = c("subid","expt_maptype","stim_group","cycle"),
+                           stats = c("mu"),
+                           additionalvars = c("islearner","isgeneralizer"))%>%
+  change_cols_name(oldnames = paste0("mu_",c("error_reversal","error_derangement","error_diff")),
+                   newnames =c("error_reversal","error_derangement","error_diff"))
+
+
+axisdata_sum = aggregate_data(axisdata_sub,
+                           yvars = c("error_reversal","error_derangement","error_diff"),
+                           groupbyvars = c("islearner","isgeneralizer","expt_maptype","stim_group",
+                                           "cycle"),
+                           stats = c("mu","se","n"))
+
+axisdata_sub = left_join(axisdata_sub,change_cols_name(participant_count,"label","generalizer_label"),by=c("islearner","isgeneralizer"))
+axisdata_sum = left_join(axisdata_sum,change_cols_name(participant_count,"label","generalizer_label"),by=c("islearner","isgeneralizer"))
+```
+
+```{r}
+
+axisdata_long_sub = axisdata_sub%>%
+  pivot_longer(cols=c(error_derangement,error_reversal),
+               names_to = "transfertype",
+               values_to = "error")%>%
+  mutate(transfertype = factor(transfertype,levels=c("error_reversal","error_derangement"),
+                               labels=c("reversal","derangement")))
+axisdata_long_sum = aggregate_data(axisdata_long_sub,
+                     yvars = c("error"),
+                     groupbyvars = c("generalizer_label","stim_group","expt_maptype",
+                                     "cycle","transfertype"),
+                     stats = c("mu","se"))
+axisdata_long_sum
+```
+
+
+```{r}
+transfertypepal = c("#EE000099","#008B4599")
+annot_cycletext=data.frame(x=c(3,11),y=c(-.1,-.1),cyclab=c("training map","transfer map"))
+
+error_diff_ttest = axisdata_sub%>%
+  group_by(generalizer_label,stim_group,cycle)%>%
+  summarise(statval = wilcox.test(error_diff,alternative="two.sided")$statistic,
+            pval = wilcox.test(error_diff,alternative="two.sided")$p.value,
+            mudiff = mean(error_diff),
+            maxmu = max(c(max(error_reversal),max(error_derangement))))%>%
+  ungroup()%>%
+  mutate(pval_fdr = p.adjust(pval,method="fdr"))%>%
+  mutate(annot_pval = case_when(pval<0.001 ~ "***",
+                                pval>=0.001 & pval<0.01~ "**",
+                                pval>=0.01 & pval<0.05 ~ "*",
+                                pval>=0.05 ~ ""
+                                ),
+         annot_pvaladj = case_when(pval_fdr<=0.001~"***",
+                                pval_fdr>=0.001 & pval_fdr<0.01~ "**",
+                                pval_fdr>=0.01 & pval_fdr<0.05 ~ "*",
+                                pval_fdr>=0.05~""
+                                ),
+         annot_y = 1.1*maxmu)
+  
+
+(paxiserr = axisdata_long_sub%>%
+  ggplot(aes(x=cycle,y=error,fill=transfertype,color=transfertype))+
+  
+    facet_nested(cols=vars(stim_group),
+                 rows = vars(generalizer_label),
+                 scales = "free_y",space = "fixed")+
+  
+    geom_rect(aes(xmin=6.5,xmax=14.5,ymin=-Inf,ymax=Inf),color="lightgrey",fill="lightgrey",alpha=0.02)+
+    geom_text(inherit.aes = F,data=annot_cycletext,mapping=aes(x=x,y=y,label=cyclab),size=4,fontface="bold")+
+    
+    geom_text(data=error_diff_ttest,
+              aes(x=cycle,y=annot_y,label=annot_pval),
+              fontface="bold",size=5,
+              inherit.aes = FALSE)+
+    geom_point(alpha = 0.3,size = 2,stroke=0,
+               position=position_dodge(0.3))+
+    #geom_point(data = axisdata_long_sum,shape="diamond",size=3,
+    #          aes(x=cycle,y=mu_error))+
+    geom_line(data = axisdata_long_sum,
+              aes(x=cycle,y=mu_error))+
+    geom_ribbon(data = axisdata_long_sum,
+                aes(x=cycle,
+                    y = mu_error,
+                    ymin = mu_error - se_error,
+                    ymax = mu_error + se_error),
+                width=0.4,
+                alpha=0.5)+
+    
+    scale_x_continuous(breaks = seq(1,14,1))+
+    scale_color_manual(values= transfertypepal,aesthetics = c("color","fill"))+
+    guides(fill=guide_legend("Transfer Type"),color = guide_legend("Transfer Type"))+
+    labs(x="cycle",y="mean distance to goal (a.u.) rescaled",
+         title = "Distance to correct location on each axis",
+         caption="asterisks indicate result of Wilcoxon signed-rank test: ***p<0.001,**p<0.01,*p<0.05")+
+    theme(aspect.ratio = .7,legend.position = "top"))
+
+ggsave(file.path(result_dir,'transfertype_axis_error.png'),plot = paxiserr,width = 8,height = 7)
+```
+
+```{r}
+axisdata_trial = data_with_prob%>%
+  filter(islearner=="learner" & expt_map=="transfer map")%>%
+  pivot_longer(cols=c(error_derangement,error_reversal),
+               names_to = "transfertype",
+               values_to = "error")%>%
+  mutate(transfertype = factor(transfertype,levels=c("error_reversal","error_derangement"),
+                               labels=c("reversal","derangement")))%>%
+  group_by(subid,stim_group,transfertype)%>%
+  arrange(expt_index)%>%
+  mutate(training_trial = if_else(stim_group=="training",row_number(),(cycle-6)*9+1))%>%
+  ungroup()%>%
+  group_by(subid,stim_group,transfertype)%>%
+  arrange(training_trial,expt_index)%>%
+  mutate(error_moving = zoo::rollmeanr(x=error, 2, na.pad = TRUE))
+
+axisdata_trial_sum = aggregate_data(axisdata_trial,
+                           yvars = c("error","error_moving"),
+                           groupbyvars = c("islearner","isgeneralizer","expt_maptype","stim_group",
+                                           "cycle","transfertype","training_trial"),
+                           stats = c("mu","se","n"))
+axisdata_trial = left_join(axisdata_trial,change_cols_name(participant_count,"label","generalizer_label"),by=c("islearner","isgeneralizer"))
+axisdata_trial_sum = left_join(axisdata_trial_sum,change_cols_name(participant_count,"label","generalizer_label"),by=c("islearner","isgeneralizer"))
+
+axisdata_trial_sum%>%
+  ggplot(aes(x=training_trial,y=mu_error_moving,fill=transfertype,color=transfertype))+
+  
+    facet_nested(rows = vars(generalizer_label),
+                 scales = "free_y",space = "fixed")+
+  
+    geom_line(aes(linetype=stim_group))+
+    geom_ribbon(aes(linetype=stim_group,
+                    ymin = mu_error_moving - se_error_moving,
+                    ymax = mu_error_moving + se_error_moving))+
+    
+    scale_color_manual(values= transfertypepal,aesthetics = c("color","fill"))+
+    guides(fill=guide_legend("Transfer Type"),color = guide_legend("Transfer Type"))+
+    labs(x="training trials",y="mean distance to goal (a.u.) rescaled",
+         title = "Distance to correct location on each axis",
+         #caption="asterisks indicate result of Wilcoxon signed-rank test: ***p<0.001,**p<0.01,*p<0.05"
+         )+
+    theme(aspect.ratio = 0.4,legend.position = "top")
+```
+
+
+```{r neuralnetwork}
+nnres_path = "E:/compositionality_theories/NeuralNetworkModel/data/pirate_1map_OH_diffautotype_diffautoval_nobias_rich_lrpoint5_axiscenteratzero"
+nnres_path = "E:/compositionality_theories/NeuralNetworkModel/data/pirate_1map_OH_diffautoval_nobias_rich_lrpoint5_axiscenteratzero_trialud"
+nndata = read.csv(file.path(nnres_path,"transferres.csv"))%>%
+  #filter(epoch<=50)%>%
+  mutate(transfertype=factor(transfertype,
+                             levels=c("error_reversal","error_derangement"),
+                             labels=c("reversal","derangement")),
+         autoweight_type = factor(autoweight_type,
+                                  levels=c("pure hetero","mixed objective","pure auto"),
+                                  labels=c("pure hetero\n\u03B1=0",
+                                           "mixed objective\n0<\u03B1<1",
+                                           "pure auto\n\u03B1=1")),
+         subset=factor(subset,levels=c("train","test"),labels=c("training","test")))
+nndata_sum = nndata%>%
+  aggregate_data(groupbyvars=c("epoch","subset","autoweight_type","transfertype"),
+                 yvars="error",
+                 stats=c("mu","se"))
+
+```
+
+
+```{r}
+(paxerrnn = nndata%>%
+  ggplot(aes(x=epoch,fill=transfertype,color=transfertype))+
+  facet_grid(rows=vars(subset),cols=vars(autoweight_type))+
+  #geom_point(aes(y=error))+
+  geom_line(data=nndata_sum,
+            aes(y=mu_error))+
+  geom_ribbon(data = nndata_sum,
+                aes(x=epoch,
+                    y = mu_error,
+                    ymin = mu_error - se_error,
+                    ymax = mu_error + se_error),
+                alpha=0.5)+
+  scale_x_continuous(trans="sqrt",breaks=c(50,200,500))+
+  scale_y_continuous(trans="sqrt")+
+  scale_color_manual(values= transfertypepal,aesthetics = c("color","fill"))+
+    guides(fill=guide_legend("Transfer Type"),color = guide_legend("Transfer Type"))+
+    labs(x="epoch",y="mean distance to goal (a.u.) rescaled",
+         title = "Distance to correct location on each axis",
+         caption="")+
+   #geom_text(inherit.aes = F,
+   #          aes(x=40,y=0.08,label="trasnfer\nmap"),color="black",fontface="bold")+
+  theme(aspect.ratio=0.8))
+  
+```
+
+```{r}
+(paxiserr = axisdata_long_sub%>%
+  ggplot(aes(x=cycle,y=error,fill=transfertype,color=transfertype))+
+  
+    facet_nested(rows=vars(stim_group),
+                 cols = vars(generalizer_label),
+                 scales = "free_y",space = "fixed")+
+  
+    geom_rect(aes(xmin=6.5,xmax=14.5,ymin=-Inf,ymax=Inf),color="lightgrey",fill="lightgrey",alpha=0.02)+
+    geom_text(inherit.aes = F,data=annot_cycletext,mapping=aes(x=x,y=y,label=cyclab),size=3,fontface="bold")+
+    
+    geom_text(data=error_diff_ttest,
+              aes(x=cycle,y=annot_y,label=annot_pval),
+              fontface="bold",size=5,
+              inherit.aes = FALSE)+
+    geom_point(alpha = 0.3,size = 2,stroke=0,
+               position=position_dodge(0.3))+
+    #geom_point(data = axisdata_long_sum,shape="diamond",size=3,
+    #          aes(x=cycle,y=mu_error))+
+    geom_line(data = axisdata_long_sum,
+              aes(x=cycle,y=mu_error))+
+    geom_ribbon(data = axisdata_long_sum,
+                aes(x=cycle,
+                    y = mu_error,
+                    ymin = mu_error - se_error,
+                    ymax = mu_error + se_error),
+                alpha=0.5)+
+    
+    scale_x_continuous(breaks = seq(1,14,1))+
+    scale_color_manual(values= transfertypepal,aesthetics = c("color","fill"))+
+    guides(fill=guide_legend("Transfer Type"),color = guide_legend("Transfer Type"))+
+    labs(x="cycle",y="mean distance to goal (a.u.) rescaled",
+         title = "Distance to correct location on each axis",
+         caption="asterisks indicate result of Wilcoxon signed-rank test: ***p<0.001,**p<0.01,*p<0.05")+
+    theme(aspect.ratio = .7,legend.position = "top"))
+```
+
+
+```{r}
+(pae = cowplot::plot_grid(
+  paxiserr+theme(legend.position = "none",aspect.ratio=1.1)+labs(title="Human Participants"),
+  paxerrnn+theme(legend.position = "none",aspect.ratio=1.8)+labs(title="Neural Network (Transfer only)"),
+                   nrow = 1,
+                   labels = c("",""),
+                  rel_widths = c(1.1,1)
+                   ))
+cogscidir = 'D:/Dropbox/cogscisubmission'
+ggsave(file.path(cogscidir,'transfertype_axis_error.png'),plot = pae,width = 10.8,height = 6.5)
+
+```
+
+
+
+```{r}
+axisdata_sub = axisdata_sub%>%
+  mutate(cycle_within_map = if_else(expt_maptype=="training map",cycle,cycle-6))
+axisdata_long_sub = axisdata_long_sub%>%
+  mutate(cycle_within_map = if_else(expt_maptype=="training map",cycle,cycle-6))
+# random structure: cycle nested within participant
+axisdata_long_sub <- within(axisdata_long_sub, isgeneralizer <- relevel(isgeneralizer, ref = "non-generalizer"))
+
+transfertype_trainingerr_lme = lmer("error~isgeneralizer*transfertype*cycle_within_map + (cycle_within_map|subid)",
+                            data=filter(axisdata_long_sub,stim_group=="training"&islearner=="learner")
+                            )
+
+transfertype_testerr_lme = lmer("error~isgeneralizer*transfertype*cycle_within_map + (cycle_within_map|subid)",
+                            data=filter(axisdata_long_sub,stim_group=="test"&islearner=="learner"))
+
+export_summs(transfertype_trainingerr_lme,transfertype_testerr_lme,
+             model.names=c("Training Stimuli","Test Stimuli"))
+```
+
+## Axis error fit
+```{r}
+fitted_param = read.csv(file.path(data_dir,"exponentialdecay_fittedparam.csv",fsep="/"))%>%
+  dplyr::select(-c("X"))
+
+subinfo = data_with_prob%>%
+  distinct(pilotver,islearner,isgeneralizer,subid,remapping_condnum,remapping_condname,
+           stim_group,expt_map)
+
+fitted_param = left_join(subinfo,fitted_param,by=c("subid","expt_map","stim_group"))%>%
+  mutate(stim_group=factor(stim_group,levels=c("training","test")))%>%
+  mutate(isgeneralizer = factor(isgeneralizer,levels=c("generalizer","non-generalizer")))
+head(fitted_param,10)
+
+fitted_param_long = fitted_param %>%
+  pivot_longer(cols=c(N0,rate),
+               names_to = "paramname",
+               values_to = "paramestimate")
+```
+
+
+#### fit qual
+```{r,fig.height=4}
+fitted_param %>%
+  filter(islearner=="learner")%>%
+  distinct(pilotver,islearner,isgeneralizer,subid,stim_group,expt_map,yvar,.keep_all = T)%>%
+  ggplot(aes(x=expt_map,y=r2,color=stim_group))+
+  facet_grid2(rows=vars(isgeneralizer),cols=vars(yvar),axes="all")+
+  geom_boxplot(position=position_dodge(1))+
+  geom_point(position = position_dodge(1),alpha=0.8)+
+  scale_color_manual(values=twolevel_colors)+
+  theme(legend.position = "top")+
+  labs(x="Maps",y="R-squared",color="Stimuli")
+```
+
+```{r corr traintest,fig.height=3}
+fit_qual_wide = 
+  fitted_param_long %>%
+  pivot_wider(id_cols=c(pilotver,islearner,isgeneralizer,subid,remapping_condname,
+                        remapping_condnum,expt_map,paramname),
+              names_from=c(stim_group,yvar),
+              values_from=paramestimate)%>%
+  mutate(expt_map = factor(expt_map,levels=c("training map","transfer map")))
+fit_qual_wide
+
+for (yvar in unique(fitted_param$yvar)){
+    xcol = paste("training",yvar,sep="_")
+    ycol = paste("test",yvar,sep="_")
+    
+    p = ggplot(filter(fit_qual_wide,islearner=="learner"&isgeneralizer=="generalizer"),
+           aes(x=.data[[xcol]],
+               y=.data[[ycol]],
+               color=expt_map))+
+    facet_grid2(cols=vars(paramname),rows=vars(isgeneralizer),
+               axes="all",independent = "all",scales="free")+
+    geom_point()+
+    #geom_smooth(formula="y~x",method="lm")+
+    geom_abline()+
+    labs(title=paste0("Parameters fitted for ", yvar),
+         x="paramter fits in training data",
+         y="parameter fits in test data")+
+    scale_color_manual(values=transfertypepal)+
+    theme(legend.position="top")
+    
+    show(p)
+}
+```
+
+
+```{r}
+#find bad fit participant
+for (st in unique(fitted_param$stim_group)){
+  for (m in unique(fitted_param$expt_map)){
+    badfit_gs = unique(filter(fitted_param,islearner=="learner"&isgeneralizer=="generalizer"&r2<0.1&stim_group==st&expt_map==m)$subid)
+    if (length(badfit_gs)>0){
+      p = filter(axisdata_long_sub,
+               subid%in%badfit_gs&stim_group==st&expt_maptype==m)%>%
+  ggplot(aes(x=cycle,y=error))+
+    facet_grid(cols=vars(transfertype))+
+    geom_line(alpha = 0.3,size = 2,stroke=0,
+               position=position_dodge(0.3),
+              aes(color=subid))+
+    labs(titles=paste(m, st,sep=" "))
+    show(p)
+    }
+  }
+}
+
+```
+#### fitted params
+```{r}
+fitted_param_axiserr = fitted_param%>%
+  filter(yvar != "resp_dist"&expt_map=="transfer map")%>%
+  mutate(transfertype = case_when(
+    remapping_condnum==0&yvar=="error_x"~"reversal",  # 0 is reversal-derangement
+    remapping_condnum==0&yvar=="error_y"~"derangement",
+    remapping_condnum==1&yvar=="error_x"~"derangement",  # 1 is derangement-reversal
+    remapping_condnum==1&yvar=="error_y"~"reversal",
+    ),
+    rate_normed = rate/N0
+         )%>%
+  mutate(transfertype=factor(transfertype,levels=c("reversal","derangement")))
+
+fitted_param_axiserr
+```
+```{r,fig.height=4}
+fitted_param_axiserr_sum = fitted_param_axiserr%>%
+  filter(expt_map=="transfer map")%>%
+  aggregate_data(groupbyvars=c("islearner","isgeneralizer","expt_map","stim_group","transfertype"),
+                 yvars=c("N0","rate","rate_normed"),
+                 stats = c("mu","se"))
+ptitle = list("N0" = "Initial Error",
+              "rate" = "Decay Rate",
+              "rate_normed" = "Decay Rate / Initial Error")
+
+fitted_param_axiserr_wide = fitted_param_axiserr%>%
+  pivot_wider(id_cols=c(pilotver,islearner,isgeneralizer,subid,
+                        remapping_condnum,remapping_condname,stim_group,
+                        expt_map),
+              names_from = transfertype,
+              values_from = c(N0,rate,rate_normed))%>%
+  mutate(rate_normed_diff = rate_normed_reversal - rate_normed_derangement,
+         N0_diff = N0_reversal-N0_derangement,
+         rate_diff = rate_reversal-rate_derangement)
+
+
+
+for (pname in c("N0","rate","rate_normed")){
+  ycol = pname
+  muycol = paste0("mu_",pname)
+  seycol = paste0("se_",pname)
+  
+  diffcol = paste0(pname,"_diff")
+  revcol = paste0(pname,"_reversal")
+  dercol = paste0(pname,"_derangement")
+  stattestparamval = fitted_param_axiserr_wide%>%
+  group_by(islearner,isgeneralizer,expt_map,stim_group)%>%
+  summarise(statval = wilcox.test(.data[[diffcol]],alternative="two.sided")$statistic,
+            pval = wilcox.test(.data[[diffcol]],alternative="two.sided")$p.value,
+            mudiff = mean(.data[[diffcol]]),
+            maxval = max( c(mean(.data[[revcol]]),mean(.data[[dercol]])) )
+            )%>%
+  ungroup()%>%
+  mutate(pval_fdr = p.adjust(pval,method="fdr"))%>%
+  mutate(annot_pval = case_when(pval<0.001 ~ "***",
+                                pval>=0.001 & pval<0.01~ "**",
+                                pval>=0.01 & pval<0.05 ~ "*",
+                                pval>=0.05 ~ ""
+                                ),
+         annot_pvaladj = case_when(pval_fdr<=0.001~"***",
+                                pval_fdr>=0.001 & pval_fdr<0.01~ "**",
+                                pval_fdr>=0.01 & pval_fdr<0.05 ~ "*",
+                                pval_fdr>=0.05~""
+                                ),
+         annot_y = 2)
+  (phfit = filter(fitted_param_axiserr,islearner=="learner")%>%
+  ggplot(aes(x=stim_group,color=transfertype))+
+  facet_grid2(cols=vars(expt_map),
+             rows=vars(isgeneralizer),
+             axes="all")+
+  geom_point(aes(y=.data[[ycol]]),
+             position=position_dodge(0.9))+
+  geom_col(data=filter(fitted_param_axiserr_sum,islearner=="learner"&expt_map=="transfer map"),
+           aes(y=.data[[muycol]]),
+           position=position_dodge(0.9),
+           fill=NA)+
+  geom_text(
+    inherit.aes = F,data=stattestparamval,
+    mapping=aes(x=stim_group,y=annot_y,label=annot_pval),size=7,fontface="bold")+
+    
+  geom_errorbar(data=filter(fitted_param_axiserr_sum,islearner=="learner"&expt_map=="transfer map"),
+           aes(ymin=.data[[muycol]]-.data[[seycol]],ymax=.data[[muycol]]+.data[[seycol]]),
+           position=position_dodge(0.9),
+           width=0.5)+
+  scale_color_manual(values=transfertypepal)+
+  theme(legend.position = "none")+
+  labs(x="Stimuli", y = "Value", title=paste0("Human Participants\n",ptitle[[pname]]),
+       caption="asterisks indicate result of \nWilcoxon signed-rank test: ***p<0.001,**p<0.01,*p<0.05"))
+  #show(p)
+  line_df <- layer_data(p, 1) |> 
+  select(x, y, PANEL,transfertype = colour) |> 
+  mutate(pairing = (row_number() + 1) %/% 2,
+         isgeneralizer=factor(PANEL,levels=c(1,2),
+                              labels=c("generalizer","non-generalizer")))
+  phfit = phfit + 
+    geom_line(aes(x, y, group = pairing), colour = "grey",alpha=0.5, data = line_df)
+  show(phfit)
+  ggsave(file.path(result_dir,paste0('expodecayfit_',pname,'.png')), plot = phfit,width = 6,height = 
+           6)
+}
+```
+
+
+```{r}
+nnparamfit_dir = 'E:/compositionality_theories/NeuralNetworkModel/analysis/pirate_1map_OH_diffautoval_nobias_rich_lrpoint5_axiscenteratzero_trialud/transfer experiment'
+nnpfityvars = c("rate.reversal","rate.derangement","rate_diff",
+                "rateN0.reversal","rateN0.derangement","rateN0_diff")
+nnparamfit = read.csv(file.path(nnparamfit_dir,'model_fit_timecourse_wide.csv'))%>%
+  mutate(trainorevaluate=factor(trainorevaluate,
+                                levels=c("training","evaluation"),
+                                labels=c("training","test")),
+         autoweight_type = factor(autoweight_type,
+                                  levels=c("no auto","auto+hetero","no hetero"),
+                                  labels=c("pure hetero\n\u03B1=0",
+                                           "mixed objective\n0<\u03B1<1",
+                                           "pure auto\n\u03B1=1")),
+         expt_map="transfer map")%>%
+  aggregate_data(groupbyvars = c("run","expt_map","trainorevaluate",
+                                 "autoweight_type"),
+                 yvars=nnpfityvars,
+                 stats=c("mu"))%>%
+  change_cols_name(paste0("mu_",nnpfityvars),
+                   nnpfityvars)
+nnparamfit_long = nnparamfit%>%
+  pivot_longer(cols=c(rate.reversal,rate.derangement),
+               values_to = "rate",
+               names_to = "transfertype")%>%
+  mutate(transfertype=factor(transfertype,levels=c("rate.reversal","rate.derangement"),
+                             labels=c("reversal","derangement")))
+nnparamfit_long_sumsum = nnparamfit_long%>%
+  aggregate_data(groupbyvars = c("expt_map","trainorevaluate",
+                                 "autoweight_type",
+                                 "transfertype"),
+                 yvars=c("rate"),
+                 stats=c("mu","se"))#%>%
+#  change_cols_name("mu_rate","rate")
+#nnparamfit_long_sumsum = nnparamfit_long%>%
+#  aggregate_data(groupbyvars = c("trainorevaluate",
+####                                 "autoweight_type",
+##                                 "transfertype"),
+#                 yvars=c("rate"),
+#                 stats=c("mu","se"))
+head(nnparamfit_long)
+
+```
+```{r}
+nnpfit_long = read.csv(file.path(nnparamfit_dir,'model_fit_timecourse_wide.csv'))%>%
+  pivot_longer(cols=c(rate.reversal,rate.derangement),
+               values_to = "rate",
+               names_to = "transfertype")%>%
+  mutate(transfertype=factor(transfertype,levels=c("rate.reversal","rate.derangement"),
+                             labels=c("reversal","derangement")))
+nnpfit_long = within(nnpfit_long,autoweight_type<-relevel(factor(autoweight_type),ref="no auto"))%>%
+  mutate(config_run = paste0(config,run))
+nnpfit_long = within(nnpfit_long,transfertype<-relevel(factor(transfertype),ref="derangement"))
+traindrate = lmer(formula="rate~transfertype*autoweight_type+(1|config_run)",
+     data=filter(nnpfit_long,trainorevaluate=="training"&autoweight_type!="no hetero"))
+testdrate = lmer(formula="rate~transfertype*autoweight_type+(1|config_run)",
+     data=filter(nnpfit_long,trainorevaluate=="evaluation"&autoweight_type!="no hetero"))
+export_summs(traindrate,testdrate,
+             model.names=c("Training Stimuli","Test Stimuli"))
+```
+
+
+```{r}
+pname = "rate"
+ycol=pname
+muycol = paste0("mu_",pname)
+seycol = paste0("se_",pname)
+
+
+nnstattestparamval = nnparamfit%>%
+  group_by(autoweight_type,trainorevaluate)%>%
+  summarise(statval = wilcox.test(rate_diff,alternative="greater")$statistic,
+            pval = wilcox.test(rate_diff,alternative="greater")$p.value,
+            mudiff = mean(rate_diff),
+            maxval = max( c(max(rate.derangement),max(rate.reversal)) )
+            )%>%
+  ungroup()%>%
+  mutate(pval_fdr = p.adjust(pval,method="fdr"))%>%
+  mutate(annot_pval = case_when(pval<0.001 ~ "***",
+                                pval>=0.001 & pval<0.01~ "**",
+                                pval>=0.01 & pval<0.05 ~ "*",
+                                pval>=0.05 ~ ""
+                                ),
+         annot_pvaladj = case_when(pval_fdr<=0.001~"***",
+                                pval_fdr>=0.001 & pval_fdr<0.01~ "**",
+                                pval_fdr>=0.01 & pval_fdr<0.05 ~ "*",
+                                pval_fdr>=0.05~""
+                                ),
+         annot_y = 1.1*maxval)
+
+(pnnfit = nnparamfit_long_sumsum%>%
+  ggplot(aes(x=trainorevaluate,color=transfertype))+
+  facet_grid2(rows=vars(autoweight_type),
+              cols=vars(expt_map),
+             axes="all")+
+  geom_point(data = nnparamfit_long,aes(y=.data[[ycol]]),
+             position=position_jitterdodge(jitter.width = 0.3, dodge.width=0.9),
+             alpha=0.3)+
+  geom_col(aes(y=.data[[muycol]]),
+           position=position_dodge(0.9),
+           fill=NA)+
+  geom_text(
+    inherit.aes = FALSE,data=nnstattestparamval,
+    aes(x=trainorevaluate,y=annot_y,label=annot_pval),size=7,fontface="bold")+
+    
+  geom_errorbar(
+    aes(ymin=.data[[muycol]]-.data[[seycol]],ymax=.data[[muycol]]+.data[[seycol]]),
+           position=position_dodge(0.9),
+           width=0.5)+
+  ylim(0,0.75)+
+  scale_color_manual(values=transfertypepal)+
+  theme(legend.position = "top")+
+  labs(x="Stimuli", y = "Value", title=paste0("Neural Network\nDecay Rate"), #Wilcoxon signed-rank test
+       caption="asterisks indicate result of \nWilcoxon signed-rank test: ***p<0.001,**p<0.01,*p<0.05")+
+  theme(legend.position = "right")
+  
+  )
+line_df <- layer_data(pnnfit, 1) |> 
+select(x, y, PANEL,transfertype = colour) |> 
+mutate(pairing = (row_number() + 1) %/% 2,
+       autoweight_type = factor(PANEL,levels=c(1,2,3),
+                                labels=c("pure hetero\n\u03B1=0",
+                                           "mixed objective\n0<\u03B1<1",
+                                           "pure auto\n\u03B1=1")))
+pnnfit2 = pnnfit + 
+  geom_line(aes(x, y, group = pairing), colour = "grey",alpha=0.3, data = line_df)
+show(pnn2)
+  
+```
+
+```{r}
+(pfit = cowplot::plot_grid(
+  p+theme(aspect.ratio=1.2)+labs(y="Parameter Value",caption=""),
+  pnn2+theme(aspect.ratio=1,legend.position="none")+labs(y="Parameter Value",caption=""),
+                   nrow = 1,
+                   labels = c("",""),
+                  rel_widths = c(1,1)
+                   ))
+(pfit2 = cowplot::plot_grid(pfit,
+                          ggplot()+
+                            theme(line=element_blank(),
+                                  plot.caption.position="plot",
+                                  plot.caption = element_text(hjust=0.5))+
+                            labs(caption="asterisks indicate result of Wilcoxon signed-rank test: ***p<0.001,**p<0.01,*p<0.05"),
+                          nrow=2,
+                          rel_widths = c(1,1),
+                          rel_heights = c(1,0.01)))
+cogscidir = 'D:/Dropbox/cogscisubmission'
+ggsave(file.path(cogscidir,'transfertype_pfit.png'),plot = pfit2,width = 5,height = 6)
+```
+
+
+
+
+```{r,fig.height=4}
+filter(fitted_param_axiserr,islearner=="learner"&isgeneralizer=="generalizer"&expt_map=="transfer map")%>%
+  ggplot(aes(x=stim_group,color=transfertype))+
+  facet_grid2(cols=vars(remapping_condname),
+             axes="all")+
+  geom_boxplot(aes(y=.data[[ycol]]),
+             position=position_dodge(0.9))+
+  geom_point(aes(y=.data[[ycol]]),
+             position=position_dodge(0.9))+
+  scale_color_manual(values=transfertypepal)+
+  theme(legend.position = "top")+
+  labs(x="Stimuli", y = "Value", title=ptitle[[pname]])
+```
+
+
+```{r}
+fitted_param_axiserr_wide = fitted_param_axiserr%>%
+  pivot_wider(id_cols=c(pilotver,islearner,isgeneralizer,subid,
+                        remapping_condnum,remapping_condname,stim_group,
+                        expt_map),
+              names_from = transfertype,
+              values_from = c(N0,rate))
+
+fitted_param_axiserr_wide = fitted_param_axiserr_wide%>%
+  mutate(rate_diff = rate_reversal - rate_derangement,
+         ratenorm_reversal  = rate_reversal/N0_reversal,
+         ratenorm_derangement  = rate_derangement/N0_derangement)%>%
+  mutate(ratenorm_diff = ratenorm_reversal - ratenorm_derangement)
+
+
+```
+
+
+

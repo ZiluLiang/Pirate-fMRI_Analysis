@@ -27,18 +27,26 @@ Tmapdirs = {"Parietal_teststim2D":    [os.path.join(searchlightrsa_dirs["teststi
             "Visual_locationrep":  [os.path.join(searchlightrsa_dirs["trainingloc"],'Threshvoxel0001clusterfdr_spmT_0001.nii'),
                                     os.path.join(searchlightrsa_dirs["traintest"],'gtlocEuclidean','C1C2_G','Threshvoxel001cluster194vx_spmT_0001.nii')
                                     ],   
+            "Visual_trainingloc2D":  [os.path.join(searchlightrsa_dirs["trainingloc"],'Threshvoxel0001clusterfdr_spmT_0001.nii')
+                                      ],   
+            "Visual_allstim2D":  [os.path.join(searchlightrsa_dirs["traintest"],'gtlocEuclidean','C1C2_G','Threshvoxel001cluster194vx_spmT_0001.nii')
+                                 ],   
             "ParietalPFC_traintest001": [os.path.join(searchlightrsa_dirs["traintest"],'stimuligroup','C1C2_G','Threshvoxel001cluster111_spmT_0001.nii')]                       
             }
 Tmapviews = {"Parietal_teststim2D":    [-22.5,-61,56],#[24, -56,  65],
              "Parietal_trainingloc2D": [-22.5,-61,56],
              "Parietal_traintestSep":  [-22.5,-61,56],
              "Visual_locationrep":     [12,-61,10],
+             "Visual_trainingloc2D":   [12,-61,10],
+             "Visual_allstim2D":      [12,-61,10],
              "ParietalPFC_traintest001":[-5,-61,-2]
              }
 Tranges = {"Parietal_teststim2D":[3.31,10], # t=3.31 is the cutoff for p=0.001
            "Parietal_trainingloc2D":[3.31,10], # we chose an image with cutoff at p=.0005, but we use t=3.31 (the cutoff for p=0.001) bc we are showing parietals all together, we keep the same range for easy comparison
            "Parietal_traintestSep":[3.31,10], # t=3.31 is the cutoff for p=0.001
            "Visual_locationrep":[3.55,10],    # t=3.55 is the cutoff for p=0.001
+           "Visual_trainingloc2D":   [3.55,10],
+           "Visual_allstim2D":      [3.55,10],
            "ParietalPFC_traintest001":[3.31,10] # t=3.31 is the cutoff for p=0.001
            }
 savedir = os.path.join(fmridata_dir,'unsmoothedLSA','rsa_searchlight','Tmaps')

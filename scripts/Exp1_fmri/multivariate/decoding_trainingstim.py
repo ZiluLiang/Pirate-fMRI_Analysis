@@ -24,9 +24,7 @@ from zpyhelper.MVPA.preprocessors import scale_feature, average_odd_even_session
 from zpyhelper.filesys import checkdir
 
 from sklearn.linear_model import LinearRegression,LogisticRegression
-from sklearn.svm import SVC
-from sklearn.multioutput import MultiOutputRegressor,MultiOutputClassifier
-from sklearn.model_selection import LeaveOneGroupOut, GridSearchCV, RepeatedStratifiedKFold,StratifiedKFold
+from sklearn.model_selection import  GridSearchCV, RepeatedStratifiedKFold,StratifiedKFold
 from sklearn.metrics import accuracy_score,r2_score, confusion_matrix
 
 import scipy
@@ -36,7 +34,11 @@ import warnings
 warnings.simplefilter('ignore', category=FutureWarning)
 
 
-study_scripts   = r"D:\OneDrive - Nexus365\pirate_ongoing\scripts\Exp1_fmri"
+project_path = r'E:\pirate_fmri\Analysis'
+fmridata_dir = os.path.join(project_path,'data','Exp1_fmri','fmri')
+study_scripts   = os.path.join(project_path,'scripts','Exp1_fmri')
+ROIRSAdir = os.path.join(fmridata_dir,'ROIdata')
+
 with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
     pirate_defaults = json.load(f)
     subid_list = pirate_defaults['participants']['validids']
@@ -47,10 +49,8 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 
 print("N_cohort 1: ",len(cohort1ids), "  N_cohort 2: ",len(cohort2ids), "N_Total: ",len(subid_list))
 
-ROIRSAdir = r"D:\OneDrive - Nexus365\pirate_ongoing\AALandHCPMMP1andFUNCcluster"
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
-rois =  [x for x in list(roi_data.keys()) if "bilateral" in x]# + ["allgtlocPrecentral_left"]
-#rois = ["HPC_bilateral","vmPFC_bilateral","V1_bilateral"]
+rois = list(roi_data.keys())
 
 preprox_fun = lambda x,sess: concat_data([scale_feature(scale_feature(sx,2),1) for sx in split_data(x,sess)]) #scale_feature(x,1)#scale_feature(x,1)#concat_data([scale_feature(sx,1) for sx in split_data(x,sess)]) #extract_pc(scale_feature(x,1)) #
 
@@ -114,12 +114,7 @@ for ir,roi in enumerate(rois):
                 fit_accs, eval_accs = [],[]
                 skf = StratifiedKFold(n_splits=n_splits,shuffle=True,random_state=rands)
                 for i, (fit_idx, eval_idx) in enumerate(skf.split(preproced_X,target_labels)):
-                #for heldout_sessions in np.unique(session_labels):
-                    
-                    #fit_session_labels = session_labels[session_labels!=heldout_sessions]
-                    #fit_X, fit_target = preproced_X[session_labels!=heldout_sessions], target_labels[session_labels!=heldout_sessions] 
-                    #eval_X, eval_target = preproced_X[session_labels==heldout_sessions], target_labels[session_labels==heldout_sessions]
-
+                
                     # split data in to fit and evaluation set
                     fit_sess_labels = session_labels[fit_idx]
                     fit_X, fit_target = preproced_X[fit_idx], target_labels[fit_idx] 

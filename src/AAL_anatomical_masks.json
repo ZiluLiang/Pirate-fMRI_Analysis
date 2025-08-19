@@ -1,13 +1,5 @@
 {   
-    "mPFC":[
-        "Frontal_Med_Orb",
-        "OFCmed",
-        "Rectus",
-        "Frontal_Sup_Medial",
-        "ACC_sub",
-        "ACC_pre",
-        "ACC_sup"
-    ],
+
     "vmPFC":[
         "Frontal_Med_Orb",
         "OFCmed",
@@ -18,7 +10,7 @@
         "Hippocampus"
     ],
 
-    "IPS":[
-        "Parietal_Inf"
+    "PPC":[
+        "Parietal_Sup"
         ]
 }

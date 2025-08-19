@@ -60,7 +60,7 @@ print(f"N_cohort2 = {len(cohort2ids)}")
 
 cohort_names_lists = dict(zip(["First Cohort","Second Cohort","Combined Cohort"],[cohort1ids,cohort2ids,subid_list]))
 
-ROIRSAdir = os.path.join(project_path,'AALandHCPMMP1andFUNCcluster')
+ROIRSAdir = os.path.join(project_path,'AALandHCPMMP1_anatrepfun')
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
 rois = [x for x in roi_data.keys() if "bilateral" in x]
 
@@ -111,7 +111,7 @@ def PTA_RSA_CV(subrsaX, subdf):
     PS_fits, PS_evals  = [], []
     runs = subdf.stim_session.to_numpy()
     unique_runs = np.unique(runs).astype(int)
-    for eval_runs in itertools.combinations(unique_runs,2):
+    for eval_runs in itertools.combinations(unique_runs,1):
         fit_runs = [x for x in unique_runs if x not in eval_runs]
         fit_index = [x in fit_runs for x in runs]
         eval_index = [x in eval_runs for x in runs]
@@ -236,7 +236,7 @@ for pgroi in rois:
 
             
 
-dump({"RSA":ROIRSA_PTA_cvres,"PS":ROIPS_PTA_cvres},os.path.join(resoutput_dir,"ROI_PTARSA_2v2.pkl"))        
+dump({"RSA":ROIRSA_PTA_cvres,"PS":ROIPS_PTA_cvres},os.path.join(resoutput_dir,"ROI_PTARSA_3v1.pkl"))        
 
 # savedop = load(os.path.join(ROIRSAdir,"ROI_PTARSA_cv.pkl"))
 # ROIRSA_PTA_cvres = savedop["RSA"]
