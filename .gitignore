@@ -31,7 +31,7 @@ src/external
 
 .Rproj.user
 
-.ipynb
+*.ipynb
 !scripts/Exp1_fmri/compare_MVpreproc.ipynb
 !scripts/Exp1_fmri/publication_ready_figures.ipynb
 !scripts/Exp1_fmri/illustrativeparallelmodel.ipynb
