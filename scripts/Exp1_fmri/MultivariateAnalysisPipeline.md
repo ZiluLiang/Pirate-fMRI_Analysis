@@ -1,29 +1,29 @@
-This file is an overview of the multi-variate analyses in the current dataset, the related scripts and their caveats.
+This file is an overview of the multivariate analyses in the current dataset, the related scripts and their caveats.
 
 # Preparation for RSA analysis
 ## Activity pattern
 To run multivariate analysis, we need to get the activity pattern matrix. To achieve that, we adopted the ['LS-A' approach](https://doi.org/10.1016/j.neuroimage.2011.08.076).
-### 1. the LS-A approach
-For each participant, we build first level GLMs with 25 regressors (one for each stimuli) in each session (run), this yields a total of 25*4 = 100 condition regressors. Response stage was modeled with a boxcar function with a duration corresponding to participant's actual navigation time in the task. Realignment parameters and their first derivatives are included as nuisance regressors (see [Univariate Analysis Pipeline](/src/univariate/UnivariateAnalysisPipeline.md#iii-models-for-extracting-beta-series)).  
+### 1. The LS-A approach
+For each participant, we build first-level GLMs with 25 regressors (one for each stimulus) in each session (run), which yields a total of 25*4 = 100 condition regressors. Response stage was modelled with a boxcar function with a duration corresponding to the participant's actual navigation time in the task. Realignment parameters and their first derivatives are included as nuisance regressors (see [Univariate Analysis Pipeline](/src/univariate/UnivariateAnalysisPipeline.md#iii-models-for-extracting-beta-series)).  
 Then we build the following contrasts:  
-(1) a contrast for each of the stimuli, this yields 25 contrasts  
-We extracted the 25 stimuli contrast to constructs a $N_{stimuli}\times N_{voxels}$ activity pattern matrix for visualization.
+(1) a contrast for each of the stimuli, which yields 25 contrasts  
+We extracted the 25 stimuli contrast to construct a $N_{stimuli}\times N_{voxels}$ activity pattern matrix for visualisation.
 
 (2) a contrast for each of the stimuli in odd/even runs, this yields 25*2 = 50 contrasts  
-We extracted the 50 stimuli contrasts separating odd and even runs to construct two $N_{stimuli}\times N_{voxels}$ activity pattern matrices for calculating reliability map and running RSA.
+We extracted the 50 stimulus contrasts separating odd and even runs to construct two $N_{stimuli}\times N_{voxels}$ activity pattern matrices for calculating the reliability map and running RSA.
 
 ### 2. activity pattern 4D nii files
-Then three 4D nii files are created by stacking images together:  for each participant, a `stimuli_4r.nii` file created from 100 beta_\*\*\*\*.nii files, each representing the beta estimates of one stimulus in one run. In the combined 4D nii file, the volumes are ordered according to: stim00run1, stim01run1, ..., stim00run2, stim01run2, ..., stim00run4, ..., stim24run4 
-Similarly, the residual images are also stacked into a 4D nii files for multivariate normalisation.
+Then three 4D nii files are created by stacking images together:  for each participant, a `stimuli_4r.nii` file is created from 100 beta_\*\*\*\*.nii files, each representing the beta estimates of one stimulus in one run. In the combined 4D nii file, the volumes are ordered according to: stim00run1, stim01run1, ..., stim00run2, stim01run2, ..., stim00run4, ..., stim24run4 
+Similarly, the residual images are also stacked into a 4D nii file for multivariate normalisation.
 
 ## Preprocessing of Activity Pattern Matrix
-In MVPA of fMRI data, there are a wealth of methods to increase the signal-to-noise ratio of the data. Following are two that were considered during the data analyses process, but only the second one is adopted. It is important to keep in mind that there are researcher's degree of freedom when making these choice. To avoid post-hoc decisions and cherry-picking, we use split-half stability as our metric to inform our choice. This metric is independent of the specific hypothesis we are trying to test. 
+In MVPA of fMRI data, there is a wealth of methods to increase the signal-to-noise ratio of the data. The following are two that were considered during the data analysis process, but only the second one was adopted. It is important to keep in mind that there is a researcher's degree of freedom when making these choices. To avoid post-hoc decisions and cherry-picking, we use split-half stability as our metric to inform our choice. This metric is independent of the specific hypothesis we are trying to test. 
 
 ### 1. Reliability-based Voxel Selection
 Using a [split-half approach by Tarhan & Konkle](https://doi.org/10.1016/j.neuroimage.2019.116350), we calculate the reliability map for each participant.
-Let $M1$ and $M2$ be the $N_{stimuli}\times N_{voxels}$ activity pattern matrices for the odd and even runs respectively. Then $M1_{i}$ and $M2_{i}$ (column $i$ in $M1$ and $M2$) defines the response profile of voxel $i$ in odd and even runs. Reliability is defined as the stability of the response profile, i.e., the reliability of a given voxel $i$ is computed by  
+Let $M1$ and $M2$ be the $N_{stimuli}\times N_{voxels}$ activity pattern matrices for the odd and even runs, respectively. Then $M1_{i}$ and $M2_{i}$ (column $i$ in $M1$ and $M2$) defines the response profile of voxel $i$ in odd and even runs. Reliability is defined as the stability of the response profile, i.e., the reliability of a given voxel $i$ is computed by  
 $$R_{i} = Spearman's r(M1_{i},M2_{i})$$ 
-A nifti file of the reliability map is saved in the first level directory of the participants. Then a threshold of 0 is applied to binarize the map into a reliability mask which specifies the reliable voxels.
+A NIFTI file of the reliability map is saved in the first-level directory of the participants. Then a threshold of 0 is applied to binarise the map into a reliability mask, which specifies the reliable voxels.
 This is implemented in the [`generate_reliability_mask.py`](/scripts/Exp1_fmri/generate_reliability_mask.py)
 
 **This approach is not adopted in the current pipeline.**  
@@ -31,65 +31,65 @@ This is implemented in the [`generate_reliability_mask.py`](/scripts/Exp1_fmri/g
 
 
 ### 2. Multivariate Noise Normalisation
-Multivariate noise normalisation is also known as whitening of the activity pattern matrix. It tries to remove the noise correlation between voxels. It uses the first-level residual information in univariate glm to estimate the covariance matrix of voxels. Then the inverse of this covariance matrix is calculated and applied to the activity pattern matrix. 
+Multivariate noise normalisation is also known as whitening of the activity pattern matrix. It tries to remove the noise correlation between voxels. It uses the first-level residual information in a univariate GLM to estimate the covariance matrix of voxels. Then the inverse of this covariance matrix is calculated and applied to the activity pattern matrix. 
 
-#### python implementation
-Here we follow the description from [Walther et al., 2016](https://doi.org/10.1016/j.neuroimage.2015.12.012). The implementation is a python version of [the MATLAB script by Ritchie et al](https://osf.io/3k759) accompanying their [2021 Neuroimage paper](https://doi.org/10.1016/j.neuroimage.2021.118686). The python function for running MVNN is incorporated in the [`preprocessor` module of `zpyhelper`](https://github.com/ZiluLiang/zpyhelper)
+#### Python implementation
+Here we follow the description from [Walther et al., 2016](https://doi.org/10.1016/j.neuroimage.2015.12.012). The implementation is a Python version of [the MATLAB script by Ritchie et al](https://osf.io/3k759) accompanying their [2021 Neuroimage paper](https://doi.org/10.1016/j.neuroimage.2021.118686). The Python function for running MVNN is incorporated in the [`preprocessor` module of `zpyhelper`](https://github.com/ZiluLiang/zpyhelper/blob/main/zpyhelper/MVPA/preprocessors.py)
 
-1. saving residual files during first-level glm for [LS-A](#1-the-ls-a-approach)
-   Our implementation first saves the first-level residual files generated by SPM in a compressed format. The $T$ residual files for one participant in one run (with $T$ being the number of scans in one run) is compressed to a `resid_runk.nii.gz` (with `k` being the run id) file using the script [`compress_residualnii.py`](/scripts/Exp1_fmri/compress_residualnii.py)  
-2. OAS from sklearn is used to estimate the covariance matrix from residual. eigenvalue decomposition from numpy is used to calculate the inverse of the covariance matrix
+1. Saving residual files during first-level GLM for [LS-A](#1-the-ls-a-approach)
+   Our implementation first saves the first-level residual files generated by SPM in a compressed format. The $T$ residual files for one participant in one run (with $T$ being the number of scans in one run) are compressed to a `resid_runk.nii.gz` (with `k` being the run id) file using the script [`compress_residualnii.py`](/scripts/Exp1_fmri/compress_residualnii.py)  
+2. OAS from sklearn is used to estimate the covariance matrix from residuals. Eigenvalue decomposition from numpy is used to calculate the inverse of the covariance matrix
   
 
 ### 3. Centering
-Some literature argue that there is a benefit of centering before running analyses. There are two ways of centering:  
+Some literature argues that there is a benefit to centring before running analyses. There are two ways of centring:  
    - **cocktail blank removal**:   
-    subtract mean activity pattern, centering is performed for each voxel (each column of the activity pattern matrix) separately.
+    Subtract mean activity pattern, centring is performed for each voxel (each column of the activity pattern matrix) separately.
    - **demean**:   
-    subtract mean activity value, centering is performed for each condition (each row of the activity pattern matrix) separately.  
+    Subtract the mean activity value, and centring is performed for each condition (each row of the activity pattern matrix) separately.  
 
-But in general, centering may change the way we interpret the neural geometry (see [Walther et al., 2016](https://doi.org/10.1016/j.neuroimage.2015.12.012)). Some distance metrix is sensitive to the centering performed. Hence we did not perform any centering for the neural activity pattern matrix.   
+But in general, centring may change the way we interpret the neural geometry (see [Walther et al., 2016](https://doi.org/10.1016/j.neuroimage.2015.12.012)). Some distance metrics are sensitive to the centring performed. Therefore, we did not perform any centring for the neural activity pattern matrix.   
 
   
 ## What we did in the end
 **In the end, we went with the following pipeline:  
-We performed multivariate noise normalisation on the beta activity pattern matrix extracted from the first level GLM of the LSA approach. The whitening matrix used for noise normalisation is estimated from the residuals of this GLM (stored in residual.nii files) using an OAS estimator.  
-We made this choice because analysis in ROIs show that MVNN has improved the split-half stability of the neural RDM, while VS has small or no influence on this metric, so we only performed MVNN to our data.**
+We performed multivariate noise normalisation on the beta activity pattern matrix extracted from the first-level GLM of the LSA approach. The whitening matrix used for noise normalisation is estimated from the residuals of this GLM (stored in residual.nii files) using an OAS estimator.  
+We made this choice because analysis in ROIs shows that MVNN has improved the split-half stability of the neural RDM, while VS has a small or no influence on this metric, so we only performed MVNN on our data.**
 
 
 # Different types of MVPA
-Several types of MVP analysis are designed to test the representation geometry. Analyses are performed via different class of [`Estimators`](https://github.com/ZiluLiang/zpyhelper/blob/main/zpyhelper/MVPA/estimators.py). There are also [Estimators defined specifically for this project](/src/multivariate/mvpa_estimator.py)
+Several types of MVP analysis are designed to test the representation geometry. Analyses are performed via different classes of [`Estimators`](https://github.com/ZiluLiang/zpyhelper/blob/main/zpyhelper/MVPA/estimators.py). There are also [Estimators defined specifically for this project](/src/multivariate/mvpa_estimator.py)
 
 ## Representation similarity analysis using Correlation / Regression Analysis to compare neural and model RDM
-This is implemented by the `PatternCorrelation` and `MultipleRDMRegression` esimator in zpyhelper
+This is implemented by the `PatternCorrelation` and `MultipleRDMRegression` estimator in zpyhelper
 ### Neural RDM
-activity pattern within each mask/sphere is extracted to compute the neural RDM. If voxel selection is performed, then the spherical region will only include the selected voxels to compute neural RDM. Neural RDM was computed using **correlation distance** 
+The activity pattern within each mask/sphere is extracted to compute the neural RDM. If voxel selection is performed, then the spherical region will only include the selected voxels to compute neural RDM. Neural RDM was computed using **correlation distance** 
  
 ### Quantifying similarity between neural RDM and model RDM
-Only the lower triangular part of the model RDMs and neural RDMs (excluding diagonals) are extracted for the analysis  
+Only the lower triangular part of the model RDMs and neural RDMs (excluding diagonals) is extracted for the analysis  
 **(1) regression**  
-regression uses one or a set of model RDMs to predict neural RDM. Dependent variable and predictors are standardized (separately) before entering the regression analysis.  Note that the coefficient estimates can be unreliable when multiple highly correlated model RDMs are entered. Always check the degree of conlinearity before runnning the analysis.  
+Regression uses one or a set of model RDMs to predict neural RDM. Dependent variable and predictors are standardised (separately) before entering the regression analysis.  Note that the coefficient estimates can be unreliable when multiple highly correlated model RDMs are entered. Always check the degree of collinearity before running the analysis.  
 **(2) correlation**  
-Spearman's rank correlation is computed between the neural RDM and one model RDM. the correlation coefficient is Fisher z-transformed before entering second level analysis.  
+Spearman's rank correlation is computed between the neural RDM and one model RDM. The correlation coefficient is Fisher z-transformed before entering second-level analysis.  
 
 ### Implementation
 In ROI:   
-we did [within-task](/scripts/Exp1_fmri/multivariate/rsa_withintask.py) and [cross-task](/scripts/Exp1_fmri/multivariate/rsa_crosstask.py) RSA.  
-we also visualized the group average neural RDM using MDS [here](/scripts/Exp1_fmri/multivariate/dimreduc_MDS.py)
+We did [within-task](/scripts/Exp1_fmri/multivariate/rsa_withintask.py) and [cross-task](/scripts/Exp1_fmri/multivariate/rsa_crosstask.py) RSA.  
+We also visualised the group average neural RDM using MDS [here](/scripts/Exp1_fmri/multivariate/dimreduc_MDS.py)
 
 In Searchlight:   
-we did [searchlight analyses to look for spatial and feature representation](/scripts/Exp1_fmri/Searchlight-HighLowD.py). The [second level analyses](/scripts/Exp1_fmri/secondlevelsearchlight.m) of these results were ran using SPM12.
+We did [searchlight analyses to look for spatial and feature representation](/scripts/Exp1_fmri/Searchlight-HighLowD.py). The [second-level analyses](/scripts/Exp1_fmri/secondlevelsearchlight.m) of these results were ran using SPM12.
 
 
 
 ## Functional dimensionality of neural representation
 We estimated the functional dimensionality of fMRI data for the treasure hunt task with four-fold cross-validated singular value decomposition (SVD) following [Ahlheim & Love 2018](doi:10.1016/j.neuroimage.2018.06.015).   
 
-To quantify the dimensionality of the representation of each rule , we examined the dimensionality of non-centre training stimuli representation on each axis separately. Let $B=[b_1,b_2,…,b_j,…]^T (b_j∈R^{n_{voxel}})$ be the activity pattern matrix of m stimuli from all four runs. We split the activity pattern matrices from four runs into three subsets: fitting subset ($B_{fit}$, two runs), validation subset ($B_{val}$, one run) and test subset ($B_{test}$, one run). Then we took the average activity pattern of the fitting set $\bar{B_{fit}}$, and performed SVD:
+To quantify the dimensionality of the representation of each rule, we examined the dimensionality of non-centre training stimuli representation on each axis separately. Let $B=[b_1,b_2,…,b_j,…]^T (b_j∈R^{n_{voxel}})$ be the activity pattern matrix of m stimuli from all four runs. We split the activity pattern matrices from four runs into three subsets: fitting subset ($B_{fit}$, two runs), validation subset ($B_{val}$, one run) and test subset ($B_{test}$, one run). Then we took the average activity pattern of the fitting set $\bar{B_{fit}}$, and performed SVD:
 $$
 \bar{B_{fit}}=USV^T
 $$
-Here $U=[u_1,u_2,u_3,u_4]$ and $V=[v_1,v_2,…v_{n_{voxel}}]$ were the left and right singular vectors, and the diagonal entries of $S: [s_{11},s_{22},s_{33},s_{44}]$ were the singular values. We reconstructed the data with all possible dimensionality values from 1 to $m$ and found a dimensionality $\hat{k}$ ̂that maximized the correlation between the reconstructed data and the validation subset. $\hat{B_{fit}}_k$, ̂the reconstruction of $B_{fit}$ with dimensionality $k$, was computed as:
+Here $U=[u_1,u_2,u_3,u_4]$ and $V=[v_1,v_2,…v_{n_{voxel}}]$ were the left and right singular vectors, and the diagonal entries of $S: [s_{11},s_{22},s_{33},s_{44}]$ were the singular values. We reconstructed the data with all possible dimensionality values from 1 to $m$ and found a dimensionality $\hat{k}$ ̂that maximised the correlation between the reconstructed data and the validation subset. $\hat{B_{fit}}_k$, ̂the reconstruction of $B_{fit}$ with dimensionality $k$, was computed as:
 $$
 \hat{B_{fit}}_k = \sum_{i=1}^{k} s_{ii}  u_{i} v_{i}^T
 $$
@@ -99,27 +99,27 @@ and we computed  $\hat{k}$ with
 $$
 \hat{k} =  \arg\max_{k\in[1,2,…,m]}  pearsonr(\hat{B_{fit}}_k,\bar{B_{val}}) 
 $$
-$\hat{k}$ would be used as the estimated functional dimensionality for the held-out run. To obtain a metric for reconstruction quality on this held-out run, we computed the $\hat{k}$ dimensional reconstruction across the fitting subset and validation subset, then compared it against the held-out run. That is, we computed the average activity pattern matrix across the three runs of fitting and validation subset $\bar{B_{fv}}$, performed SVD on $\bar{B_{fv}}$, and obtained $\hat{B_{fv}}_k$ which was a $\hat{k}$ dimensional reconstruction of the data. We computed the correlation between $\hat{B_{fv}}_k$ and the held-out $B_{test}$ to obtain a metric of reconstruction quality.  
+$\hat{k}$ would be used as the estimated functional dimensionality for the held-out run. To obtain a metric for reconstruction quality on this held-out run, we computed the $\hat{k}$ -dimensional reconstruction across the fitting subset and validation subset, then compared it against the held-out run. That is, we computed the average activity pattern matrix across the three runs of fitting and validation subset $\bar{B_{fv}}$, performed SVD on $\bar{B_{fv}}$, and obtained $\hat{B_{fv}}_k$ which was a $\hat{k}$ dimensional reconstruction of the data. We computed the correlation between $\hat{B_{fv}}_k$ and the held-out $B_{test}$ to obtain a metric of reconstruction quality.  
 
-Script that implement this analysis in ROI can be found [HERE](/scripts/Exp1_fmri/multivariate/computeCVSVDdim_withinaxis.py)
+Script that implements this analysis in ROI can be found [HERE](/scripts/Exp1_fmri/multivariate/computeCVSVDdim_withinaxis.py)
 
 
 ## Parallel vs Orthogonal Neural Vector Analysis
-**Note this analysis is not yet implemented by the estimators.**   
+**Note that this analysis is not yet implemented by the estimators.**   
 Let $𝑓_𝑗$ be the coordinate of stimuli $j$ in neural representation space $ℝ^𝑚$ ($m$ being the number of voxels). For any two stimuli $𝑗,𝑘$, we define the neural vector (coding direction) from $𝑗$ to $𝑘$ as:  
 $$𝑣_{𝑗𝑘}=𝑓_𝑗− 𝑓_𝑘$$
-For any given pair of neural vectors, we can compute its cosine similarity as an indicator of how parallel these two neural vectors are
+For any given pair of neural vectors, we can compute their cosine similarity as an indicator of how parallel these two neural vectors are
 $$cos⁡(𝑣_1, 𝑣_2)=  \frac{𝑣_1 \times 𝑣_2}{\left\Vert 𝑣_1 \right\Vert \times \left\Vert 𝑣_2 \right\Vert}$$
 
-This is used in combination with the RSA analysis in a cross-validated fashion to quantify how the rule representations are aligned to each other. Script that implement this analysis in ROI can be found [HERE](/scripts/Exp1_fmri/multivariate/PTAregRSAtwofold.py).
+This is used in combination with the RSA analysis in a cross-validated fashion to quantify how the rule representations are aligned to each other. Script that implements this analysis in ROI can be found [HERE](/scripts/Exp1_fmri/multivariate/PTAregRSAtwofold.py).
 
-For visualization purpose, we computed the PS from the average activity pattern across runs,  generated a null distribution of PS, and then classified participants according to their PS and the null distribution. This is done using the following scripts: [PS computation and classification](/scripts/Exp1_fmri/multivariate/computeAxisPS_navi.py), [MDS isualization](/scripts/Exp1_fmri/multivariate/dimreduc_MDS_parallelaxisgroups.py)
+For visualisation purposes, we computed the PS from the average activity pattern across runs,  generated a null distribution of PS, and then classified participants according to their PS and the null distribution. This is done using the following scripts: [PS computation and classification](/scripts/Exp1_fmri/multivariate/computeAxisPS_navi.py), [MDS visualisation](/scripts/Exp1_fmri/multivariate/dimreduc_MDS_parallelaxisgroups.py)
 
 
 ## Vector addition analysis
 To test the vector addition hypothesis, we ran regressions to predict the activity pattern of test stimuli as linear combinations of activity patterns of training stimuli. To avoid overfitting, we averaged the activity patterns of a given stimulus across odd runs and across even runs to obtain an odd-even split for cross-validation. 
 
-Regression weights fitted with the averaged patterns from the odd split were applied to the even split to validate the regression model fit and vice versa. Let $X_{tr,odd}, X_{tr,even}$ be the activity pattern matrix of training stimuli for odd and even splits respectively,  and $X_{te,odd}, X_{te,even}$ denotes the activity pattern matrix of test stimuli for odd and even splits respectively. Each row of an activity pattern matrix (denoted by $x_{te,odd}, x_{te,even}$) is the activity pattern of a stimulus. We obtained two weight matrices $W_odd$ and $W_even$ in which each row (denoted by $w_{odd}, w_{even}$) is a set of ordinary least square estimates obtained for predicting a test stimulus:  
+Regression weights fitted with the averaged patterns from the odd split were applied to the even split to validate the regression model fit and vice versa. Let $X_{tr, odd}, X_{tr, even}$ be the activity pattern matrix of training stimuli for odd and even splits respectively,  and $X_{te, odd}, X_{te, even}$ denotes the activity pattern matrix of test stimuli for odd and even splits respectively. Each row of an activity pattern matrix (denoted by $x_{te, odd}, x_{te, even}$) is the activity pattern of a stimulus. We obtained two weight matrices $W_odd$ and $W_even$ in which each row (denoted by $w_{odd}, w_{even}$) is a set of ordinary least square estimates obtained for predicting a test stimulus:  
 $$
 w_{odd}=\arg\min_{w} f(x)  \|x_{te,odd}-wX_{tr,odd}\|_2 \n 
 $$
@@ -128,7 +128,7 @@ w_{even}=\arg\min_{w} f(x)  \|x_{te,even}-wX_{tr,even}\|_2\
 $$
 where $\|∙\|_{2}$ indicated L2-norm of a vector. The final retrieval pattern matrix was computed by averaging $W_odd$ and $W_even$.  
 
-Model fit was evaluated on the held-out data by applying the weights to make prediction about test stimuli and calculating the coefficient of determination (denoted $R^2$ hereafter). Note that $R^2$ can be negative because the held-out data were not seen during fitting. If the $R^2$ was significantly above zero, it indicated that the prediction in the held-out data was successful. Specifically, for odd and even split, we computed  the mean $R^2$ across prediction of all test stimuli :
+Model fit was evaluated on the held-out data by applying the weights to make predictions about test stimuli and calculating the coefficient of determination (denoted $R^2$ hereafter). Note that $R^2$ can be negative because the held-out data were not seen during fitting. If the $R^2$ was significantly above zero, it indicated that the prediction in the held-out data was successful. Specifically, for odd and even split, we computed  the mean $R^2$ across predictions of all test stimuli :
 $$
 R^2_{odd} = 1/16\times \sum_{} (1 - \frac{\|x_{te,odd}-w_{even}X_{tr,odd}\|_2}{\|x_{te,odd}-mean(x_{te,odd})\|_2})
 $$
@@ -141,25 +141,25 @@ The final $R^2$ was computed by averaging $R^2_{odd}$ and $R^2_{even}$. Moreover
 This is implemented by an estimator class [`CompositionalRetrieval_CV`](/src/multivariate/mvpa_estimator.py). The [analysis](/scripts/Exp1_fmri/multivariate/compute_train2testRetrievalPatternCV.py) was conducted in ROI.
 
 ## Decoding
-We ran several decoding analysis, in which we tried to predict the properties of stimulus from its activity patterns. All decoders were logistic regression decoders with a L2 penalty as implemented in scipy:
+We ran several decoding analyses, in which we tried to predict the properties of the stimulus from its activity patterns. All decoders were logistic regression decoders with an L2 penalty as implemented in scipy:
 - [decoding training stimuli feature](/scripts/Exp1_fmri/multivariate/decoding_trainingstim.py), this is related to the dimensionality analysis
-- [decoder generalization from navigation task to localizer task](/scripts/Exp1_fmri/multivariate/decoding_navi2loc.py)
+- [decoder generalisation from navigation task to localizer task](/scripts/Exp1_fmri/multivariate/decoding_navi2loc.py)
   
 
 
 # Running MVPA Analysis
 ## Regions
-### 1. ROI-based: obtaining ROI masks from AAL parcellation or functional maskss
-AAL3v1 parcellation and the HCP-MMP1 parcellation are used to generate anatomical masks for ROIs. The procedure was carried out in marsbar. Each anatomical masks is a binarize and resampled to match the resolution of the participants' functional images.  
-Details on what parcellation is included in each anatomical mask are in [`AAL_anatomical_masks.json`](/src/AAL_anatomical_masks.json) and [`HCP-MMP_anatomical_masks.json`](/src/HCP-MMP_anatomical_masks.json). This is read in by [`anatomical_masks.m`](/src/anatomical_masks.m) to generate the mask file in nii format. These ROIs are visualized using MRIcrogl with [custom python script](/scripts/Exp1_fmri/visualizeROI.py).  
+### 1. ROI-based: obtaining ROI masks from AAL parcellation or functional masks
+AAL3v1 parcellation and the HCP-MMP1 parcellation are used to generate anatomical masks for ROIs. The procedure was carried out in marsbar. Each anatomical mask is binarised and resampled to match the resolution of the participants' functional images.  
+Details on what parcellation is included in each anatomical mask are in [`AAL_anatomical_masks.json`](/src/AAL_anatomical_masks.json) and [`HCP-MMP_anatomical_masks.json`](/src/HCP-MMP_anatomical_masks.json). This is read in by [`anatomical_masks.m`](/src/anatomical_masks.m) to generate the mask file in nii format. These ROIs are visualised using MRIcrogl with [custom python script](/scripts/Exp1_fmri/visualizeROI.py).  
 
 Data from ROI are [extracted in python](/scripts/Exp1_fmri/multivariate/extractROIdata.py) into a `pkl` file stored [here](/data/Exp1_fmri/fmri/ROIdata/roi_data_4r.pkl).
 
-### 2. Whole brain searchlight: obtaining spherical searchlight regions
+### 2. Whole-brain searchlight: obtaining spherical searchlight regions
 For each voxel, a spherical ROI is defined with a radius of 10mm (4 times the voxel size). An additional constraint is added: each searchlight sphere should include at least 50 usable voxels. 
 
 ## Statistical tests
 ### Non-parametric tests with permutation test
-non parametric test do not assume distribution of the metric, and maybe a more exact test for the effect. For ROI-based analysis, we computed group-level statistics using permutation tests
+non parametric test do not assume distribution of the metric, and may be a more exact test for the effect. For ROI-based analysis, we computed group-level statistics using permutation tests
 ### Parametric tests
-For whole-brain searchlight analysis, for a given estimator, metric maps (maps of correlation or regression coefficients) are generated for each participant. This is then entered into SPM's second level analysis to perform statistic test (one-sample t-test) and multiple correction.
+For whole-brain searchlight analysis, for a given estimator, metric maps (maps of correlation or regression coefficients) are generated for each participant. This is then entered into SPM's second-level analysis to perform statistical test (one-sample t-test) and multiple corrections.
