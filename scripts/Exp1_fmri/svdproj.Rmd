@@ -14,18 +14,16 @@ project_dir = rstudioapi::getActiveProject();
 src_dir = file.path(project_dir, "src/R", fsep="/")
 llr_dir = file.path(project_dir, "src/LLR", fsep="/")
 
-data_dir = file.path(project_dir, "AALandHCPMMP1_anatrepfun","cvSVD_dimsionality", fsep="/")
+data_dir = file.path(project_dir,"data","Exp1_fmri","fmri","ROIdata","cvSVD_dimsionality", fsep="/")
 result_dir = data_dir
 
 
 source(file.path(src_dir,"envSetup.R",fsep="/"), local = knitr::knit_global())
 source(file.path(src_dir,"funcDef.R",fsep="/"), local = knitr::knit_global())
 source(file.path(src_dir,"setPlotDefault.R",fsep="/"), local = knitr::knit_global())
-source(file.path(project_dir,"scripts","Exp2_pilots","plotting_colorpals.R"))
+source(file.path(project_dir,"scripts","Exp1_fmri","plotting_colorpals.R"))
 
-scaled_projection_df = read.csv(file.path(data_dir,"scaled_svdprojection_df.csv"))
-
-library("ordinal")
+scaled_projection_df = read.csv(file.path(data_dir,"trainingstim_withinax_meanXsvd1Dproj_df.csv")) 
 ```
 
 ## Prepdata
@@ -35,118 +33,12 @@ scaled_projection_df = scaled_projection_df%>%
   mutate(axisloc_factor = factor(axisloc*2,levels=c(-2,-1,1,2),
                        ordered=TRUE)
          )
-
-
-
-clmmfml = "axisloc_factor~SVD_projection_scaled+(1 | subid)" #*dimonaxis
-```
-
-## CLMM
-```{r}
-XT = xtabs(SVD_projection_scaled ~ axisloc_factor + dimonaxis + roi ,
-           data = scaled_projection_df)
-XT
-```
-
-```{r}
-
-ppc_res = clm("axisloc_factor~SVD_projection_scaled",
-              data=filter(scaled_projection_df,roi=="PPC_bilateral"&subgroup=="Generalizer"), 
-              link = "probit",threshold ="flexible")
-
-summary(ppc_res)
-anova(ppc_res, type="II")
-
-
-
-```
-
-```{r}
-
-roi_ax_res_list = list()
-roi_ax_anova_list = list()
-roi_ax_emm_list = list()
-res_names = c()
-for (currroi in unique(scaled_projection_df$roi)){
-  for (currax in unique(scaled_projection_df$dimonaxis)){
-    Gres = clm("axisloc_factor~SVD_projection_scaled",
-              data=filter(scaled_projection_df,roi==currroi&dimonaxis==currax&subgroup=="Generalizer"), 
-              link = "logit",threshold ="equidistant")
-    nGres = clm("axisloc_factor~SVD_projection_scaled",
-              data=filter(scaled_projection_df,roi==currroi&dimonaxis==currax&subgroup=="nonGeneralizer"), 
-              link = "logit",threshold ="equidistant")
-    Allres = clm("axisloc_factor~SVD_projection_scaled",
-              data=filter(scaled_projection_df,roi==currroi&dimonaxis==currax), 
-              link = "logit",threshold ="equidistant")
-    
-    roi_ax_res_list = append(roi_ax_res_list,
-                             list(summary(Gres),
-                                  summary(nGres),
-                                  summary(Allres)),
-                             )
-    roi_ax_anova_list = append(roi_ax_anova_list,
-                             list(anova(Gres, type="II"),
-                                  anova(nGres, type="II"),
-                                  anova(Allres, type="II")),
-                             )
-    
-    roi_ax_emm_list = append(roi_ax_emm_list,
-                             list(nominal_test(Gres),
-                                  nominal_test(nGres),
-                                  nominal_test(Allres)),
-                             )
-
-    
-    res_names = append(res_names,
-                       paste0(str_remove(currroi,"_bilateral"),"_",currax,"_",c("G","nG","All"))
-                       )
-  }
-}
-names(roi_ax_anova_list)<-res_names
-names(roi_ax_res_list)<-res_names
-
 ```
 
 
-
-
-
-## LME test
-```{r}
-lmerfml = "SVD_projection~axisloc_factor+(1|subid)"
-scaled_projection_df = scaled_projection_df%>%
-  mutate(axisloc_factor = factor(axisloc*2,levels=c(-2,-1,1,2)))
-
-scaled_projection_df_mean = scaled_projection_df %>%
-  aggregate_data(groupbyvars = c("subid","roi","axisloc_factor"),
-                 yvars=c("SVD_projection","SVD_projection_scaled"),
-                 stats="mu",
-                 additionalvars=c("subgroup")
-                 )%>%
-  change_cols_name(c("mu_SVD_projection","mu_SVD_projection_scaled"),
-                   c("SVD_projection","SVD_projection_scaled"))
-```
-
-
-```{r}
-library(MASS) 
-ord_contrasts <- contr.sdif(nlevels(scaled_projection_df$axisloc_factor))
-lmerfml = "SVD_projection~axisloc_factor+(1|subid)"
-ppc_res = lmer(as.formula(lmerfml),
-               data=filter(scaled_projection_df,roi=="HPC_bilateral"&subgroup=="Generalizer"&dimonaxis=="x axis"),
-               contrasts=list(axisloc_factor=ord_contrasts))
-isSingular(ppc_res, tol = 1e-4)
-summary(ppc_res)
-anova(ppc_res, type="II")
-#summary(emtrends(ppc_res, var = "axisloc", specs = "dimonaxis"),infer=T)
-#ppc_marginal = emmeans(ppc_res, ~ axisloc_factor | dimonaxis)
-#summary(emmeans(ppc_res, ~ axisloc_factor | dimonaxis),infer=T)
-
-#coef(ppc_res)
-```
 ## LME
 ```{r}
-lmerfml = "SVD_projection~axisloc*dimonaxis+(1|subid)"#+(1|subid:run)"
+lmerfml = "SVD_projection~axisloc*dimonaxis+(1|subid)"
 ```
 
 ```{r}
@@ -232,6 +124,3 @@ saveWorkbook(wb, file = fp, overwrite = TRUE)
 
 
 
-
-
-s

@@ -1,6 +1,6 @@
 packagelist = c("tidyverse","ggtext","ggsignif","lme4","lmerTest","ggpubr",
                 "emmeans","multcomp","margins","cowplot","ggh4x","grid",
-                "pracma","multcomp","jtools","huxtable","broom.mixed",
+                "pracma","multcomp","jtools","huxtable","broom.mixed","openxlsx",
                 "doParallel","parallel","foreach","rstatix","car","corrr",
                 "gridExtra","pbapply","Cairo","colorspace")
 

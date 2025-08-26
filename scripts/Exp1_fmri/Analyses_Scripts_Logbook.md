@@ -1,4 +1,5 @@
-This logbook provides a documentation of the analysis script associated with the main figure. Details of how the analysis are conducted can be found in the [Multivariate Analysis Pipeline](/scripts/Exp1_fmri/MultivariateAnalysisPipeline.md).
+This logbook provides a documentation of the analysis scripts associated with the main figures. Details of how the data is preprocessed and prepared as well as how the analyses are conducted can be found in the [Multivariate Analysis Pipeline](/scripts/Exp1_fmri/MultivariateAnalysisPipeline.md).
+
 
 # Figure 1: Behaviour
 ## Participant Classification
@@ -18,6 +19,8 @@ After classification, behavioural performance were plotted in [``Behavioural Per
 
 # Figure 2: Dimensionality analysis
 We estimated the functional dimensionality of individual rule representations using a previously established cross-validated SVD procedure, which is implemented in [`computeCVSVDdim_withinaxis.py`](/scripts/Exp1_fmri/multivariate/computeCVSVDdim_withinaxis.py).
+
+LME models examining the relationship between projections and axis locations are conducted in R by [``svdproj.Rmd``](/scripts/Exp1_fmri/svdproj.Rmd)
 
 The decoding analysis included in the partial correlation results was implemented in [`decoding_trainingstim.py`](/scripts/Exp1_fmri/multivariate/decoding_trainingstim.py).
 
