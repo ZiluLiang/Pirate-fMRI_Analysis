@@ -6,6 +6,7 @@ This task aims to investigate the neural mechanism underlying compositional gene
 
 ## Pipelines
 To find out the correspondence between the scripts and the analyses reported in the paper, see [Analyses-Scripts-Logbook](/scripts/Exp1_fmri/Analyses_Scripts_Logbook.md).
+To recreate the plots in the main text, see [PublicationReadyFigures](/scripts/Exp1_fmri/publication_ready_figures.ipynb).
 
 Detailed pipelines for the analyses are documented here:
 1. [fmri data preprocessing pipeline](/src/preprocessing/PreprocessingPipeline.md)
