@@ -19,6 +19,7 @@ CambridgeMRCPPCmaskusedbyPaulspaper
 scripts/resultvisualization
 scripts/LLR_bysub
 scripts/Exp1_fmri/Exp1_fmri_mvnn_effect
+scripts/Exp1_fmri/secondlevelsearchlight_thesis.m
 scripts/Exp1_transfer
 scripts/Exp2*
 src/CanlabCore-master.zip
@@ -32,6 +33,6 @@ src/external
 .Rproj.user
 
 *.ipynb
-!scripts/Exp1_fmri/compare_MVpreproc.ipynb
 !scripts/Exp1_fmri/publication_ready_figures.ipynb
 !scripts/Exp1_fmri/illustrativeparallelmodel.ipynb
+

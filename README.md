@@ -9,7 +9,7 @@ To find out the correspondence between the scripts and the analyses reported in 
 To recreate the plots in the main text, see [PublicationReadyFigures](/scripts/Exp1_fmri/publication_ready_figures.ipynb).
 
 Detailed pipelines for the analyses are documented here:
-1. [fmri data preprocessing pipeline](/src/preprocessing/PreprocessingPipeline.md)
+1. [fmri data preprocessing pipeline](/src/preprocessing/PreprocessingPipeline.md), the whole process was implemented in [`preprocess_image.m`](/scripts/Exp1_fmri/prepare_MVPA.m), with sanity checks in [`sanity_check.m`](/scripts/Exp1_fmri/sanity_check.m)
 2. [fmri data multivariate analyses pipelines](/scripts/Exp1_fmri/MultivariateAnalysisPipeline.md) 
 
 
@@ -40,4 +40,4 @@ The YAML file specified a version of `matlabengine` that is supported with MATLA
 zpyhelper is an accompanying package for running MVPA analysis in Python that is still under development. It is not currently released yet. To install, you need to go to [the GitHub repo for zpyhelper](https://github.com/ZiluLiang/zpyhelper) and follow the instructions.
 
 ### File structure
-see [File Structure](/docs/FILESTRUCTURE.md) for naming conventions and data structure
+see [File Structure](/docs/FILESTRUCTURE.md) for naming conventions and data structure. The raw data was converted and organised into this structure using [`prepared_image.m`](/scripts/Exp1_fmri/prepare_image.m)
