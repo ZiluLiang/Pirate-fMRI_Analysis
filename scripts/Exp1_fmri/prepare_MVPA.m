@@ -111,11 +111,8 @@ histogram(mrs1./bold_means)
 % xlabel("con1");ylabel("con2")
 % hold on
 % line(con1,con1)
+
 %% concatenate regressor/contrast estimates into 4D series - navigation task
-% contrast img group 1 - 25 contrasts one for each stimuli
-%    concatenated into-> stimuli_all.nii (each stimulus's average effect across all runs)
-% contrast img group 2 - two 25 contrasts one for each stimuli in odd/even run 
-%    concatenated into-> stimuli_odd.nii and stimuli_even.nii (each stimulus's average effect across odd/even runs)
 % reg img - 100 regressors one for each stimuli in each run
 %    concatenated into-> stimuli_4r.nii (no averaging)
 

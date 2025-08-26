@@ -1,4 +1,0 @@
-
-
-# Generating the probability distribution
-#

@@ -4,13 +4,9 @@ This file is an overview of the multivariate analyses in the current dataset, th
 ## Activity pattern
 To run multivariate analysis, we need to get the activity pattern matrix. To achieve that, we adopted the ['LS-A' approach](https://doi.org/10.1016/j.neuroimage.2011.08.076).
 ### 1. The LS-A approach
-For each participant, we build first-level GLMs with 25 regressors (one for each stimulus) in each session (run), which yields a total of 25*4 = 100 condition regressors. Response stage was modelled with a boxcar function with a duration corresponding to the participant's actual navigation time in the task. Realignment parameters and their first derivatives are included as nuisance regressors (see [Univariate Analysis Pipeline](/src/univariate/UnivariateAnalysisPipeline.md#iii-models-for-extracting-beta-series)).  
-Then we build the following contrasts:  
-(1) a contrast for each of the stimuli, which yields 25 contrasts  
-We extracted the 25 stimuli contrast to construct a $N_{stimuli}\times N_{voxels}$ activity pattern matrix for visualisation.
+For each participant, we build first-level GLMs with 25 regressors (one for each stimulus) in each session (run), which yields a total of 25*4 = 100 condition regressors. Response stage was modelled with a boxcar function with a duration corresponding to the participant's actual navigation time in the task. Realignment parameters and their first derivatives are included as nuisance regressors (see [Univariate Analysis Pipeline](/src/univariate/UnivariateAnalysisPipeline.md#iii-models-for-extracting-beta-series)).    
+This step is done in MATLAB in [`prepare_MVPA.m`](/scripts/Exp1_fmri/prepare_MVPA.m)
 
-(2) a contrast for each of the stimuli in odd/even runs, this yields 25*2 = 50 contrasts  
-We extracted the 50 stimulus contrasts separating odd and even runs to construct two $N_{stimuli}\times N_{voxels}$ activity pattern matrices for calculating the reliability map and running RSA.
 
 ### 2. activity pattern 4D nii files
 Then three 4D nii files are created by stacking images together:  for each participant, a `stimuli_4r.nii` file is created from 100 beta_\*\*\*\*.nii files, each representing the beta estimates of one stimulus in one run. In the combined 4D nii file, the volumes are ordered according to: stim00run1, stim01run1, ..., stim00run2, stim01run2, ..., stim00run4, ..., stim24run4 
