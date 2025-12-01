@@ -236,7 +236,7 @@ class MVPARunner:
         fmribeh_dir = self.fmribeh_dir
         
         # load stimuli list
-        stim_list_fn = glob.glob(os.path.join(fmribeh_dir,subid,'sub*_stimlist.txt'))[0]
+        stim_list_fn = os.path.join(fmribeh_dir,subid,'sub-%s_stimlist.txt'%(subid.replace("sub","")))
         stim_list    =  pd.read_csv(stim_list_fn, sep=",", header=0).sort_values(by = ['stim_id'], ascending=True,inplace=False)# use `sort_values` to make sure stim list is in the same order for all participants
         
         stim_id = np.array(stim_list['stim_id']) # get stimuli id
@@ -267,7 +267,8 @@ class MVPARunner:
         stimgroup   = np.tile(np.atleast_2d(stimgroup).T,(nsession,1))
 
         # load behavioral response
-        participant_resp_fns = glob.glob(os.path.join(fmribeh_dir,subid,'sub*_task-piratenavigation_run-*.csv'))
+        participant_resp_fns = [os.path.join(fmribeh_dir,subid,'sub-%s_task-piratenavigation_run-%d.csv'%(subid.replace("sub",""), runid)) for runid in range(1, nsession+1)]
+        assert all([os.path.exists(x) for x in participant_resp_fns]), f"cannot find some or all response files for {subid} in {participant_resp_fns}"
         resp_lists = [pd.read_csv(x, sep=",", header=0).sort_values(by = ['stim_id'], ascending=True,inplace=False).iloc[filter[0],:] for x in participant_resp_fns]
         if taskname == "navigation":
             if nsession == 4:

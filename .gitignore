@@ -21,7 +21,9 @@ scripts/LLR_bysub
 scripts/Exp1_fmri/Exp1_fmri_mvnn_effect
 scripts/Exp1_fmri/secondlevelsearchlight_thesis.m
 scripts/Exp1_transfer
+scripts/Exp1_fmri/deepmreye/pretrained_model_weights_FreyNau
 scripts/Exp2*
+scripts/allpilots_metalearningeffect/
 src/CanlabCore-master.zip
 src/High_pass_filter_analysis.png
 src/LLR/genParticipantSpecificProbDF.R
