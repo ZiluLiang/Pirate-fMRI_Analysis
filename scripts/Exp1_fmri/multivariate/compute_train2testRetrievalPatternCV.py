@@ -65,6 +65,14 @@ def average_and_reorder(activitypattern:np.array,stimdf:pd.DataFrame)-> Union[li
     Union[list, list]
         return a list of activity pattern and a list of stimuli dataframe in the order of [training, test, localizer]
     """
+    # add a column of stim_attrx and stim_attry for later shuffling
+    stimdf["stim_attrx"] = stimdf["stim_x"]*2+2
+    stimdf["stim_attry"] = stimdf["stim_y"]*2+2
+    stimdf["stim_attrx"] = stimdf["stim_attrx"].astype(int)
+    stimdf["stim_attry"] = stimdf["stim_attry"].astype(int)
+    assert np.array_equal(stimdf["stim_attrx"].unique(), [0,1,2,3,4])
+    assert np.array_equal(stimdf["stim_attry"].unique(), [0,1,2,3,4])
+
         
     # filter out data from treasure hunt task
     navi_filter = np.vstack(
@@ -122,7 +130,7 @@ def average_and_reorder(activitypattern:np.array,stimdf:pd.DataFrame)-> Union[li
 ##################################################### ANALYSIS STARTS HERE #####################################################
 organize_and_get_data = True
 run_ana = True
-rois = ["PPC_bilateral","V1_bilateral","vmPFC_bilateral","HPC_bilateral"]
+rois = ["PPC_bilateral","V1_bilateral","vmPFC_bilateral","HPC_bilateral","M1_left"]
 resultdir = os.path.join(ROIRSAdir,"retrievalpatternCV")
 checkdir(resultdir)
 

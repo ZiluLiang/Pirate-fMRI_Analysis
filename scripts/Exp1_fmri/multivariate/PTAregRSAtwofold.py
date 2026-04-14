@@ -58,7 +58,7 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 print(f"N_participants = {len(subid_list)}")
 
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
-rois = [x for x in roi_data.keys() if "bilateral" in x]
+rois = list( roi_data.keys())#[x for x in roi_data.keys() if "bilateral" in x]
 
 ## select activity pattern of non-center training stimuli
 sub_patterns = {}
@@ -122,9 +122,13 @@ def PTA_RSA_CV(subrsaX, subdf):
         if subfitPS>0:
             PTAhigh_prim = "PTA_locNomial_TL" 
             PTAlow_prim = "PTA_locEuc_TL"
+            PTAhigh_prim2 = "PTA_TLhigh"
+            PTAlow_prim2 = "PTA_TLlow"
         elif subfitPS<0:
             PTAhigh_prim = "PTA_locNomial_TR"
             PTAlow_prim = "PTA_locEuc_TR"
+            PTAhigh_prim2 = "PTA_TRhigh"
+            PTAlow_prim2 = "PTA_TRlow"
         else:
             randidx = np.random.permutation([0,1])
             PTAhigh_prim = ["PTA_locNomial_TL","PTA_locNomial_TR"][randidx]
@@ -134,6 +138,22 @@ def PTA_RSA_CV(subrsaX, subdf):
             {"name": "train stim Compete PTAhigh Cartesian",
             "reg_names": ["PTA_ax", f"{PTAhigh_prim}", "gtlocEuclidean"],
             "short_names":  ["PTA_ax","PTA_locNomial","gtlocEuclidean"]
+            },
+            {"name": "train stim Compete PTAaxloconlyhighlow",
+            "reg_names": [PTAhigh_prim, PTAlow_prim, "PTA_ax", "gtlocEuclidean"],
+            "short_names":  ["PTA_high","PTA_low","ortho_high","ortho_low"]
+            },
+            {"name": "train stim Compete PTAOrthohighlow",
+            "reg_names": [f"{PTAhigh_prim2}", f"{PTAlow_prim2}", "PTA_ax", "gtlocEuclidean"],
+            "short_names":  ["PTA_high","PTA_low","ortho_high","ortho_low"]
+            },
+            {"name": "train stim Compete PTAOrtho-high",
+            "reg_names": [f"{PTAhigh_prim2}", "gtlocEuclidean"],
+            "short_names":  ["PTA_high","feature"]
+            },
+            {"name": "train stim Compete PTAOrtho-low",
+            "reg_names": [f"{PTAlow_prim2}", "gtlocEuclidean"],
+            "short_names":  ["PTA_low","gtlocEuclidean"]
             },
             
             {"name": "train stim betweenxy Cartesian", 

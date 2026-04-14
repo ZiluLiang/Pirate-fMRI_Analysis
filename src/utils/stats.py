@@ -14,9 +14,13 @@ def ttest1samp_equiv_permutation(y,n_perm=10000,return_ponly = True,**kwargs):
     else:
         return res
 
-def ttestpairedsamp_equiv_permutation(y1,y2,n_perm=10000,return_ponly = True,**kwargs):
+def ttestpairedsamp_equiv_permutation(y1,y2,n_perm=10000,return_ponly = True,stat="mean",**kwargs):
+    if stat=="mean":
+        statfun = lambda y1,y2: np.mean(y1-y2)
+    elif stat=="median":
+        statfun = lambda y1,y2: np.median(y1-y2)
     res = scipy.stats.permutation_test((y1,y2),
-                                       statistic=lambda y1,y2: np.mean(y1-y2),
+                                       statistic=statfun,
                                        n_resamples=n_perm,permutation_type="samples",
                                        random_state = 0, # for reproducibility
                                        **kwargs)

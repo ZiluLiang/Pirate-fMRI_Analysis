@@ -130,7 +130,7 @@ run_classification = True
 if run_PS_permutation:
     # Load data
     roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
-    rois = [x for x in list(roi_data.keys()) if "bilateral" in x]
+    rois = list(roi_data.keys())
     ## select activity pattern of non-center training stimuli
     print("Selecting activity pattern of non-center training stimuli")
     sub_patterns = {}

@@ -29,8 +29,8 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 
 
 #ANATOMICAL ROIs
-base_rois =  ["PPC","HPC","vmPFC","V1"]
-rois = dict(zip([f"{x}_bilateral" for x in base_rois],[f"{x}_bilateral" for x in base_rois]))
+base_rois =  ["PPC_bilateral","HPC_bilateral","vmPFC_bilateral","V1_bilateral","M1_left"]
+rois = dict(zip(base_rois,base_rois))
 save_file_name = "roi_data_4r"
 
 

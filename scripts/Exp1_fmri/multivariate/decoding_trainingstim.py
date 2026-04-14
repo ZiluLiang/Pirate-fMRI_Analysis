@@ -52,7 +52,7 @@ print("N_cohort 1: ",len(cohort1ids), "  N_cohort 2: ",len(cohort2ids), "N_Total
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
 rois = list(roi_data.keys())
 
-preprox_fun = lambda x,sess: concat_data([scale_feature(scale_feature(sx,2),1) for sx in split_data(x,sess)]) #scale_feature(x,1)#scale_feature(x,1)#concat_data([scale_feature(sx,1) for sx in split_data(x,sess)]) #extract_pc(scale_feature(x,1)) #
+preprox_fun = lambda x,sess: concat_data([scale_feature(scale_feature(sx,2),1) for sx in split_data(x,sess)]) # normalise the matrix in each session, then normalise eachs column(voxel values in different conditions) across sessions
 
 # For LR
 baseclf_kwargs = {'max_iter':100000,'solver':'lbfgs','multi_class':'multinomial','random_state':0}
@@ -62,9 +62,11 @@ gridsearcg_paramgrid={'C':np.concatenate([np.geomspace(10**-5,5,num=10),np.linsp
 save_fn = "noncenter_trainingstim_LRdecoding_acc_skf"
 save_dir = os.path.join(ROIRSAdir,"trainingstim_decoding_results")
 checkdir(save_dir)
-flag_saveGSres = True
-flag_saveCM = True
-n_jobs = 10
+flag_saveGSres: bool = True
+flag_saveCM: bool = True
+
+# set number of parallel jobs
+n_jobs = cpu_count()-1 # leave one cpu free
 
 res_dfs = []
 confusion_mats = {}
@@ -126,7 +128,7 @@ for ir,roi in enumerate(rois):
                     clf = GridSearchCV(LogisticRegression(**baseclf_kwargs),
                                     param_grid=gridsearcg_paramgrid,
                                     cv=RepeatedStratifiedKFold(n_repeats=5,n_splits=n_splits-1),
-                                    n_jobs=n_jobs)
+                                    n_jobs=n_jobs)# set to verbose=2 if want see how many jobs run and how long they take
                     clf.fit(fit_X,fit_target)
                     GSres.append(pd.DataFrame(clf.cv_results_).assign(roi=roi,subid=subid,target=tarvar,straifiedfold=i))#heldoutrun=heldout_sessions))
 
@@ -160,10 +162,13 @@ for ir,roi in enumerate(rois):
         "decoder":decoder,
         "performance":roires_df[roires_df.roi==roi].copy().reset_index(drop=True)
         }
+    
     if flag_saveCM:
         roi_res_dict["confusion_matrices"] = confusion_mats[roi]
+
     if flag_saveGSres:
         roi_res_dict["GSresults"] = roiGSres_df[roiGSres_df.roi==roi].copy().reset_index(drop=True)
+    
     dump(roi_res_dict, os.path.join(save_dir,f"{save_fn}_{roi}.pkl"))
 
 

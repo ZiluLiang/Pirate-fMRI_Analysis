@@ -17,6 +17,7 @@ CambridgeMRCPPCmaskusedbyPaulspaper
 **/deprecated
 
 scripts/resultvisualization
+scripts/allpilots_metalearningeffect
 scripts/LLR_bysub
 scripts/Exp1_fmri/Exp1_fmri_mvnn_effect
 scripts/Exp1_fmri/secondlevelsearchlight_thesis.m

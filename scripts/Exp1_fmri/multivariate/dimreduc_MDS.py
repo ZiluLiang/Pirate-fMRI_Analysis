@@ -44,7 +44,7 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 print("N_cohort 1: ",len(cohort1ids), "  N_cohort 2: ",len(cohort2ids), "N_Total: ",len(subid_list))
 
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
-rois =  [x for x in list(roi_data.keys()) if "bilateral" in x]# + ["allgtlocPrecentral_left"]
+rois =  list(roi_data.keys())
 
 
 cohort_names_lists = dict(zip(["First Cohort","Second Cohort","Combined Cohort"],[cohort1ids,cohort2ids,subid_list]))

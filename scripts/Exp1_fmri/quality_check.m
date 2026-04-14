@@ -106,7 +106,7 @@ for isub = 1:nsub
 end
 
 %% --------------  Calculate tSNR for each run of each participants  -------------- 
-mask_dir = 'E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\ROIRSA\AALandHCPMMP1';
+mask_dir = 'E:\pirate_fmri\Analysis\data\Exp1_fmri\fmri\ROIdata';
 masks_names = cellstr(spm_select('List',mask_dir,'.*_bilateral.nii'));
 masks = cell2struct(fullfile(mask_dir,masks_names),cellfun(@(x) strrep(x,'.nii',''),masks_names,'uni',0));
 mean_tsnr = nan(numel(ids)*5,numel(masks_names));
@@ -151,4 +151,5 @@ mean_tsnr_T.taskrun = arrayfun(@(k) task_runs(tmp(k,1)),1:size(tmp,1),'uni',1)';
 mean_tsnr_T.taskname = arrayfun(@(k) task_names(tmp(k,1)),1:size(tmp,1),'uni',0)';
 
 mean_tsnr_T.Properties.RowNames = arrayfun(@(k) [ids{tmp(k,2)},'-run',num2str(tmp(k,1))],1:size(tmp,1),'uni',0);
-writetable(mean_tsnr_T,fullfile(qc_dir,'QualityCheckLogBook.xlsx'),'Sheet','tsnr_cohort2')
+writetable(mean_tsnr_T,fullfile(mask_dir,'tsnr.csv'))
+%writetable(mean_tsnr_T,fullfile(qc_dir,'QualityCheckLogBook.xlsx'),'Sheet','tsnr_cohort2')

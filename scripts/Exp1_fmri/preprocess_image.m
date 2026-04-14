@@ -91,9 +91,30 @@ if generate_nuisance
     end
 end
 % plot number of excluded volumes
+nuisance_regs = cell(numel(ids),1);
+for isub = 1:numel(ids)
+    nuisance_regs{isub} = struct();
+    tasknames = {"localizer","piratenavigation"};
+    runs = [1,4];
+    for j = 1:numel(tasknames)
+        for r = 1:runs(j)
+            subimg_dir  = fullfile(directory.preprocess,ids{isub});
+            prefix = [strrep(filepattern.preprocess.nuisance,'^',''),'sub-',ids{isub}(4:end)];
+            submat = readmatrix(fullfile(subimg_dir,sprintf("%s_task-%s_run-%d.txt",prefix,tasknames{j},r)));
+            
+            nuisance_regs{isub}.(sprintf("%s%d",tasknames{j},r)) = submat;
+        end
+    end
+end
 scrubbed_num = cellfun(@(x) structfun(@(t) size(t,2)-12,x)', nuisance_regs, 'UniformOutput', false);
 scrubbed_num = cat(1,scrubbed_num{:});
 scrubbed_ratio = scrubbed_num./[326,296,296,296,296];
+exc_maintask = any(scrubbed_ratio(:, 2:5) > 0, 2);
+exc_localiser = scrubbed_ratio(:, 1) > 0;
+sprintf("perceptage participant scrubbed treasurehunt: %d/56\n", sum(exc_maintask))
+sprintf("perceptage participant scrubbed localizer: %d/56\n", sum(exc_localiser))
+sprintf("mean scrubbed treasurehunt: %.4f %%\n", mean(scrubbed_ratio(exc_maintask,2:5),"all")*100)
+sprintf("mean scrubbed localiser: %.4f %%", mean(scrubbed_ratio(exc_localiser,1),"all")*100)
 cs = {'orange','lightBlue'};
 formated_ids = cellfun(@(x) sprintf('\\color{%s} %s',cs{ismember(x,participants.generalizerids)+1},x),ids,'UniformOutput',false);
 figure;heatmap([fieldnames(nuisance_regs{1});{'mu-piratenavigation'}],formated_ids,[scrubbed_ratio*100,mean(scrubbed_ratio(:,2:end)*100,2)]);

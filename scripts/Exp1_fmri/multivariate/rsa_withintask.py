@@ -47,7 +47,7 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 print(f"N_participants = {len(subid_list)}")
 
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
-rois = ["V1_bilateral","PPC_bilateral","vmPFC_bilateral","HPC_bilateral"]
+rois = ["V1_bilateral","PPC_bilateral","vmPFC_bilateral","HPC_bilateral","M1_left"]
 
 #run RSA analysis
 res_df_list = []

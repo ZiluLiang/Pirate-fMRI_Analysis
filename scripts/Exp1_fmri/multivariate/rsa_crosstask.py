@@ -48,7 +48,7 @@ with open(os.path.join(study_scripts,'pirate_defaults.json')) as f:
 print(f"N_participants = {len(subid_list)}")
 
 roi_data = load(os.path.join(ROIRSAdir,"roi_data_4r.pkl"))
-rois = ["V1_bilateral","PPC_bilateral","vmPFC_bilateral","HPC_bilateral"]
+rois = ["V1_bilateral","PPC_bilateral","vmPFC_bilateral","HPC_bilateral","M1_left"]
 
 
 ############################################### CROSS-TASK RSA ANALYSIS ########################################################
@@ -178,7 +178,7 @@ gs.map_dataframe(
 
 
 ### plot the group average RDM
-fig,axes = plt.subplots(2,4,figsize=(12,6))
+fig,axes = plt.subplots(2,len(rois),figsize=(12,6))
 for j,roi in enumerate(rois):
     G_meanrdm = [x for x,subid in zip(crosstask_rdms["symmetric"][roi],subid_list) if subid in generalizers]
     NG_meanrdm = [x for x,subid in zip(crosstask_rdms["symmetric"][roi],subid_list) if subid in nongeneralizers]

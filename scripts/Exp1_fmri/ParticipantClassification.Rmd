@@ -301,7 +301,7 @@ meanscanning  = meanscannerLLR%>%
 pretrainscanner_behavsum_long = left_join(last_pretrain,meanscanning,by=c("cohort","subid","stage","islearner","isgeneralizer","performance_metric"))
 ```
 
-```{r, fig.height=9}
+```{r, fig.height=6}
 annot_change <- data.frame(
   label = c("nL\U2192L", "nG\U2192G","L\U2192nL", "G\U2192nG"),
   stage = c("train","test","train","test"),
@@ -314,52 +314,31 @@ annot_change <- data.frame(
 
 p_trsc_corr = pretrainscanner_behavsum_long %>%
   filter(performance_metric=="LLR")%>%
-  mutate(outlierlabel=if_else(xor(scanning>0,lastpretrain>0),subid,""),
+  mutate(isoutlier = factor(if_else(scanning<0 &lastpretrain>0,"excluded",isgeneralizer),
+                            levels = c("generalizer","non-generalizer","excluded")),
+         outlierlabel=if_else(xor(scanning>0,lastpretrain>0),subid,""),
          stage=factor(stage,levels=c("train","test"),
                       labels=c("Training stimuli", "Test stimuli")))%>%
-  ggplot(aes(x=lastpretrain,y=scanning,color=isgeneralizer))+
-  facet_nested_wrap(vars(stage,cohort),nrow = 2,
-            remove_labels="none",axes="all",
-            )+
-  geom_point(alpha=0.5)+
-  geom_text(aes(label=outlierlabel),
-            fontface="bold",size=3)+
-  geom_text(data=annot_change,aes(x=x,y=y,label=label),
-            fontface="bold",inherit.aes=F,size=6)+
-  geom_abline(slope=1,intercept=0,linetype="dashed",color="grey")+
-  geom_vline(xintercept=0,linetype="dashed",color="grey")+
-  geom_hline(yintercept=0,linetype="dashed",color="grey")+
-  scale_color_manual(values=twolevel_colors)+
-  labs(x="last pretraining block LLR", y = "average LLR across scanning blocks",
-       title="Correlation between LLR in \nlast pretraining block and average across scanning blocks")+
-  theme(legend.position = "top",legend.direction = "horizontal")
-p_trsc_corr
-ggsave(file.path(result_dir,paste0('LLR_corr_pretrain2scan','.png')),plot = p_trsc_corr,device = 'png',width = 8,height = 9)
-
-
-p_trsc_corr2 = pretrainscanner_behavsum_long %>%
-  filter(performance_metric=="LLR"&cohort=="second cohort")%>%
-  mutate(outlierlabel=if_else(scanning<0&lastpretrain>0,subid,""),
-         stage=factor(stage,levels=c("train","test"),
-                      labels=c("Training stimuli", "Test stimuli")))%>%
-  ggplot(aes(x=lastpretrain,y=scanning,color=isgeneralizer))+
+  ggplot(aes(x=lastpretrain,y=scanning,color=isoutlier))+
   facet_nested_wrap(vars(stage),nrow = 1,
             remove_labels="none",axes="all",
             )+
   geom_point(alpha=0.5)+
   geom_text(aes(label=outlierlabel),
-            fontface="bold",size=3)+
+            fontface="bold",size=3,nudge_y = 0.15)+
   geom_text(data=annot_change,aes(x=x,y=y,label=label),
             fontface="bold",inherit.aes=F,size=6)+
   geom_abline(slope=1,intercept=0,linetype="dashed",color="grey")+
   geom_vline(xintercept=0,linetype="dashed",color="grey")+
   geom_hline(yintercept=0,linetype="dashed",color="grey")+
-  scale_color_manual(values=twolevel_colors)+
+  scale_color_manual(values=c(twolevel_colors,"#808080"))+
   labs(x="last pretraining block LLR", y = "average LLR across scanning blocks",
-       title="Correlation between LLR in \nlast pretraining block and average across scanning blocks")+
+       title="Correlation between LLR in \nlast pretraining block and average across scanning blocks",
+       color="generalizer classified according scanning blocks?")+
   theme(legend.position = "top",legend.direction = "horizontal")
-p_trsc_corr2
-ggsave(file.path(result_dir,paste0('LLR_corr_pretrain2scan_cohort2only','.png')),plot = p_trsc_corr2,device = 'png',width = 10,height = 6)
+p_trsc_corr
+ggsave(file.path(result_dir,paste0('LLR_corr_pretrain2scan','.png')),plot = p_trsc_corr,device = 'png',width = 10,height = 6)
+
 
 ```
 

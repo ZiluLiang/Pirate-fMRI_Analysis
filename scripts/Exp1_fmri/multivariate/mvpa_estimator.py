@@ -138,15 +138,17 @@ class CompositionalRetrieval_CV(MetaEstimator):
             configural_df = configural_df[conf_odd_fil].copy()
             
             # model retrieval patterns: highD-perceptual matching; lowD-distance modulated
-            percept_reg_coefs = cdist(configural_df[["stim_x","stim_y"]].to_numpy(),
-                                    component_df[["stim_x","stim_y"]].to_numpy(),
+            # we use the discrete attribute values (0,1,2,3,4) to compute perceptual similarity (one-hot)
+            percept_reg_coefs = cdist(configural_df[["stim_attrx","stim_attry"]].to_numpy(),
+                                    component_df[["stim_attrx","stim_attry"]].to_numpy(),
                                     lambda u,v: sum(u==v))
-                
+            # we use the distance between the locations to compute distance modulated similarity    
             compo_locrep  = component_df[["stim_x","stim_y"]].to_numpy()*2
             config_locrep = configural_df[["stim_x","stim_y"]].to_numpy()*2
             loc_reg = LinearRegression(fit_intercept=False,positive=False).fit(compo_locrep.T, config_locrep.T)
             dist_mod_reg_coefs = loc_reg.coef_
             
+            assert numpy.shape(percept_reg_coefs) == numpy.shape(reg_coefs), f"expecting percept_reg_coefs shape {numpy.shape(reg_coefs)}, got {numpy.shape(percept_reg_coefs)}"
             # regress the empirical on the models
             pdcoef = LinearRegression(fit_intercept=True).fit(
                         X=numpy.array([scale_feature(dist_mod_reg_coefs.flatten(),2),scale_feature(percept_reg_coefs.flatten(),2)]).T,

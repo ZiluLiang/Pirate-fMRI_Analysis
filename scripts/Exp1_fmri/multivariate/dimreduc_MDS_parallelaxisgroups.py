@@ -58,7 +58,7 @@ resoutput_dir = os.path.join(respar_dir,"MDS")
 checkdir(resoutput_dir)
 
 # set ROIs
-rois = ["HPC_bilateral","V1_bilateral","vmPFC_bilateral","PPC_bilateral"]
+rois = list(roi_data.keys())
 classifyby = "HPC_bilateral"
 curr_classifications = PS_classification[classifyby].values
 PSgroupnamestr = {1:"top-left",-1:"top-right",0:"orthogonal"}

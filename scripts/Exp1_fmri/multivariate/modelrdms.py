@@ -201,7 +201,6 @@ class ModelRDM:
         stim["training_axes_TR"]   = numpy.array(self.stimdf[["training_axset","training_axlocTR"]])
         
         
-        
         ### shuffle
         for k,v in stim.items():
             if k in shuffle_columns:
@@ -219,20 +218,23 @@ class ModelRDM:
                                "locwrtlrbu_localx","locwrtlrbu_localy","locwrtlrbu_localxy",  ## local features are encoded as from left-right and bottom-up
                                "hierachical_wrtcentre","hierachical_wrtlrbu",
                                # parallel training axes model (only valid for train-train distance)
-                               "PTA_locEuc_TL","PTA_locEuc_TR"
+                               "PTA_locEuc_TL","PTA_locEuc_TR", # these two only contains axis location information
+                               "PTA_TLlow","PTA_TRlow" # these two include both axes separation and axis location
                                ],
                               ["gtloc","stim_x","stim_y",
                                "stim_xsign","stim_ysign","stim_xysign",
                                "stim_xdist","stim_ydist","stim_xydist",
                                "stim_lrbux","stim_lrbuy","stim_lrbuxy",
                                "hierachical_wrtcentre","hierachical_wrtlrbu",
-                               "training_axlocTL","training_axlocTR"])) 
+                               "training_axlocTL","training_axlocTR",
+                               "training_axes_TL","training_axes_TR" 
+                               ])) 
         for mname,col in euclidean_rdms.items():
             models[mname] = compute_rdm(stim[col],metric="euclidean")
 
         models["gtlocCityBlock"] = compute_rdm(stim["gtloc"],metric="cityblock")
 
-        nomial_rdms = dict(zip(["feature","PTA_TL","PTA_TR"],["features","training_axes_TL","training_axes_TR"]))
+        nomial_rdms = dict(zip(["feature","PTA_TLhigh","PTA_TRhigh"],["features","training_axes_TL","training_axes_TR"]))
         for mname,col in nomial_rdms.items():
             models[mname] = compute_rdm_nomial(stim[col].squeeze())
 

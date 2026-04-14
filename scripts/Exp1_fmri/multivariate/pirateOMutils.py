@@ -5,6 +5,7 @@ import itertools
 from sklearn.metrics import r2_score
 from zpyhelper.MVPA.rdm import lower_tri
 from zpyhelper.MVPA.preprocessors import split_data
+from typing import Union
 
 def generate_filters(stimdf,verbose=False)->dict:
     """Generate filters for picking specific subset of the data
@@ -212,3 +213,71 @@ def cross_val_SVD(X,session_labels):
         est_d[j] = optdim        
         
     return est_d, reconstruction_corr, reconstruction_r2, unique_sess
+
+
+def shuffle_locations(locations:np.ndarray, shuffle_function:Union[str,callable]="randomxy", 
+                      randomseed:Union[None,int]=None, return_mapping:bool=False,
+                      force_different=True)->np.ndarray:
+    """Shuffle the input data according to the specified method.
+
+    Parameters
+    ----------
+    locations : np.ndarray
+        The array of locations data to be shuffled. Shape (n_samples, 2). First column is x and second column is y. 
+    shuffle_function : Union[str,callable], optional
+        The shuffling method. Can be "factorised", "randomxy" or "fullrand" or a callable function. Defaults to "fullrand". \n
+        factorised: shuffle unique x and unique y coordinates independently.\n
+        randomxy: shuffle x and y coordinates together but keep their pairings. This is equivalent to permuting the rows.\n
+        fullrand: shuffle the entire locations array randomly, i.e., permuting all elements in the array.\n
+    randomseed : Union[None,int], optional
+        Random seed for reproducibility. Defaults to None.
+    return_mapping : bool, optional
+        Whether to return the mapping used for shuffling in "factorised" method. Defaults to False.
+    force_different : bool, optional
+        Whether to ensure that the shuffled locations are different from the original locations. Defaults to True.
+    Returns
+    -------
+    np.ndarray
+        The shuffled data.
+    """
+    # Set random seed for reproducibility
+    rng = np.random.default_rng(randomseed)
+    
+    # Perform shuffling based on the specified method
+    if isinstance(shuffle_function, str):
+        if shuffle_function == "randomxy":
+            shuffled_indices = rng.permutation(locations.shape[0])
+            if force_different:
+                while np.array_equal(locations, locations[shuffled_indices]):
+                    shuffled_indices = rng.permutation(locations.shape[0])
+            return locations[shuffled_indices]
+        elif shuffle_function == "factorised":
+            unique_x = np.unique(locations[:, 0])
+            unique_y = np.unique(locations[:, 1])
+            shuffled_x = rng.permutation(unique_x)
+            shuffled_y = rng.permutation(unique_y)#
+            if force_different:
+                while np.array_equal(unique_x, shuffled_x):
+                    shuffled_x = rng.permutation(unique_x)
+                while np.array_equal(unique_y, shuffled_y):
+                    shuffled_y = rng.permutation(unique_y)
+            x_map = {orig: shuf for orig, shuf in zip(unique_x, shuffled_x)}
+            y_map = {orig: shuf for orig, shuf in zip(unique_y, shuffled_y)}
+            shuffled_locations = np.array([[x_map[x], y_map[y]] for x, y in locations])
+            if return_mapping:
+                return shuffled_locations, (x_map, y_map)
+            else:
+                return shuffled_locations
+        elif shuffle_function == "fullrand":
+            flat_locations = locations.flatten()
+            shuffled_flat = rng.permutation(flat_locations)
+            if force_different:
+                while np.array_equal(flat_locations, shuffled_flat):
+                    shuffled_flat = rng.permutation(flat_locations)
+            return shuffled_flat.reshape(locations.shape)
+        else:
+            raise ValueError(f"Unknown shuffle_function string: {shuffle_function}")
+    elif callable(shuffle_function):
+        return shuffle_function(locations)
+    else:
+        raise TypeError("shuffle_function must be either a string or a callable function.")

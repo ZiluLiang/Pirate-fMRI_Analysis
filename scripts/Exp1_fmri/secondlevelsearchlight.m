@@ -4,23 +4,25 @@ clear;clc
 
 par_dirs = {
             fullfile(directory.fmri_data,'unsmoothedLSA','rsa_searchlight','fourruns_mvnn_averageall'),...            
-            fullfile(directory.fmri_data,'unsmoothedLSA','rsa_searchlight','localizer_mvnn_averageall')
+            fullfile(directory.fmri_data,'unsmoothedLSA','rsa_searchlight','localizer_mvnn_averageall'),...
+            fullfile(directory.fmri_data,'unsmoothedLSA','rsa_searchlight','fourruns_mvnn_averageall_noresptrials'),...
+            fullfile(directory.fmri_data,'unsmoothedLSA','rsa_searchlight','fourruns_mvnn_averageall_movdirxysep')
             };
 analysis = {'regression','correlation'};   
 run_rec = cell(numel(par_dirs),numel(analysis));
 
 %% run second level
-x = 1;
+x = 4;
 searchlight_rsa_dir = par_dirs{x};        
 
-for j_analysis = 2
+for j_analysis = 1
 
 rsa_folders = {dir(fullfile(searchlight_rsa_dir,analysis{j_analysis})).name};
 rsa_folders = rsa_folders(cellfun(@(x) ~contains(x,'.'),rsa_folders));
 rsa_dirs = fullfile(searchlight_rsa_dir,analysis{j_analysis},rsa_folders);
 run_rec{x}{j_analysis} = cell(numel(rsa_dirs),1);
 
-for j_rsadir = numel(rsa_dirs)
+for j_rsadir = 1:numel(rsa_dirs)
     rsa_dir = rsa_dirs{j_rsadir};
     switch analysis{j_analysis}
         case "correlation"
