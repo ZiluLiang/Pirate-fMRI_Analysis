@@ -6,7 +6,7 @@ This task aims to investigate the neural mechanism underlying compositional gene
 
 ## Pipelines
 To find out the correspondence between the scripts and the analyses reported in the paper, see [Analyses-Scripts-Logbook](/scripts/Exp1_fmri/Analyses_Scripts_Logbook.md).
-To recreate the plots in the main text, see [PublicationReadyFigures](/scripts/Exp1_fmri/publication_ready_figures.ipynb).
+To recreate the plots in the main text, see [PublicationReadyFigures](/scripts/Exp1_fmri/publication_ready_figures.ipynb). We additionally provided [a revision plots jupyter notebook](/scripts/Exp1_fmri/publication_ready_figures_revisionplots.ipynb) that show the plots generated to address reviewer's concern, some of which were reported in the supplementary.
 
 Detailed pipelines for the analyses are documented here:
 1. [fmri data preprocessing pipeline](/src/preprocessing/PreprocessingPipeline.md), the whole process was implemented in [`preprocess_image.m`](/scripts/Exp1_fmri/prepare_MVPA.m), with sanity checks in [`sanity_check.m`](/scripts/Exp1_fmri/sanity_check.m)
@@ -23,7 +23,7 @@ Detailed pipelines for the analyses are documented here:
 [**MRIcroGL**](https://www.nitrc.org/projects/mricrogl) 
 Python needs to be installed for customised MRIcroGL scripts to run.  
 
-**Python environment** can be directly installed from yaml file [here](/piratefmri.yaml), then install [zpyhelper](https://github.com/ZiluLiang/zpyhelper) into this environment. Steps: 
+**Python environment** can be directly installed from yaml file [here](/piratefmri.yml), then install [zpyhelper](https://github.com/ZiluLiang/zpyhelper) into this environment. Steps: 
 - 1. Use `conda env create -f piratefmri.yaml` to install the packages used in this repo.  
 - 2. Then go to [the GitHub repo for zpyhelper](https://github.com/ZiluLiang/zpyhelper), download the code to a local directory, and install it in the 'piratefmri' environment.
         ```

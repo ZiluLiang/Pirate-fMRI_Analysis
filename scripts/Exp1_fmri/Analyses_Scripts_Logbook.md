@@ -41,3 +41,16 @@ The spatial representation RSA analysis was conducted in both ROI ([`rsa_withint
 The cross-task RSA was conducted in ROI ([`rsa_crosstask.py`](/scripts/Exp1_fmri/multivariate/rsa_crosstask.py))
 
 The cross-task decoding was conducted in ROI [`decoding_navi2loc.py`](/scripts/Exp1_fmri/multivariate/decoding_navi2loc.py)
+
+# Control analyses
+## In M1
+We repeated the dimensionality analyses, vector addition analyses, and spatial representation analyses in M1 in the same scripts specified above.
+
+## Gaze Decoding
+Gaze decoding was performed using the DeepMReye toolbox. All scripts are housed in the [deepmreye folder](/scripts/Exp1_fmri/deepmreye/) Our analysis pipeline consists of the following steps:
+1. file preparation ([dm_preproc_movefile.py](/scripts/Exp1_fmri/deepmreye/dm_preproc_movefile.py))
+2. extracting eye voxels ([dm_preproc_eyemask.py](/scripts/Exp1_fmri/deepmreye/dm_preproc_eyemask.py))
+3. preprocessing voxel data for decoding ([dm_preproc_preprocess.py](/scripts/Exp1_fmri/deepmreye/dm_preproc_preprocess.py))
+4.obtaining the pretrained models available for download from OSF, applying it to decode gaze from the localiser task data to figure out which model is the best performing one to use for the main treasure hunt task ([dm_decoder_pretrainedmodels.py](/scripts/Exp1_fmri/deepmreye/dm_decoder_pretrainedmodels.py))
+5. applying the best performing model to the treasure hunt task ([dm_decoder_m7treasurehunt.py](/scripts/Exp1_fmri/deepmreye/dm_decoder_m7treasurehunt.py))
+6. performing shuffling of the treasure hunt task data to do permutation test ([dm_decoder_m7treasurehunt_shuffle.py](/scripts/Exp1_fmri/deepmreye/dm_decoder_m7treasurehunt_shuffle.py))
