@@ -39,4 +39,6 @@ src/external
 !scripts/Exp1_fmri/publication_ready_figures.ipynb
 !scripts/Exp1_fmri/publication_ready_figures_revisionplots.ipynb
 !scripts/Exp1_fmri/illustrativeparallelmodel.ipynb
+!scripts/Exp1_fmri/deepmreye/DeepMReye_decodingconsistency.ipynb
+!scripts/Exp1_fmri/deepmreye/DeepMReye_treasurehuntgaze.ipynb
 
